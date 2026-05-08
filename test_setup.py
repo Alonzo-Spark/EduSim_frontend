@@ -5,9 +5,13 @@ Run this before using the full RAG system.
 """
 
 import os
+import sys
 import json
 from dotenv import load_dotenv
-import google.generativeai as genai
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "app", "src"))
+
+from modules.shared.gemini_service import generate_text, GeminiServiceError
 
 load_dotenv()
 
@@ -27,16 +31,22 @@ def test_api_connection():
     print("🔧 Testing Gemini API connection...")
     
     try:
-        genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content("Say 'API is working!' in one sentence.")
+        response_text = generate_text(
+            "Say 'API is working!' in one sentence.",
+            temperature=0.2,
+            max_output_tokens=64,
+            cache_namespace="test.setup",
+        )
 
-        if response and getattr(response, "text", None):
+        if response_text:
             print("✅ API Connection Successful!")
-            print(f"📝 Response: {response.text}")
+            print(f"📝 Response: {response_text}")
             return True
 
         print("❌ Gemini returned an empty response")
+        return False
+    except GeminiServiceError as e:
+        print(f"❌ Gemini service error: {e}")
         return False
     except json.JSONDecodeError:
         print("❌ Failed to parse API response")

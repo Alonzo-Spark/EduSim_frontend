@@ -1,130 +1,34 @@
-/**
- * Simulation JSON Schema Types
- * Defines the structure for AI-generated simulations
- */
+export type Vector = {
+  x: number;
+  y: number;
+};
 
-export type ObjectType =
-  | "ball"
-  | "planet"
-  | "pendulum"
-  | "spring"
-  | "block"
-  | "wave"
-  | "projectile"
-  | "liquid";
-
-export type Behavior =
-  | "gravity"
-  | "collision"
-  | "orbit"
-  | "friction"
-  | "bouncing"
-  | "oscillation"
-  | "damping"
-  | "drag";
-
-export type EnvironmentBackground =
-  | "space"
-  | "earth"
-  | "ocean"
-  | "laboratory"
-  | "vacuum"
-  | "custom";
-
-// Physics object configuration
-export interface PhysicsObject {
-  id?: string;
-  type: ObjectType;
-  color?: string;
-  position: [number, number] | [number, number, number]; // [x, y] or [x, y, z]
-  velocity?: [number, number] | [number, number, number];
-  radius?: number;
+export type SimulationObject = {
+  /** Unique identifier */
+  id: string;
+  /** Primitive type, e.g., "projectile", "pendulum", "ball" */
+  type: string;
+  /** Current position */
+  position: Vector;
+  /** Current velocity */
+  velocity: Vector;
+  /** Mass (kg) – optional, used for force calculations */
   mass?: number;
-  width?: number;
-  height?: number;
-  rotation?: number;
-  rotationVelocity?: number;
-  physics?: {
-    bounce?: boolean;
-    restitution?: number;
-    friction?: number;
-    static?: boolean;
-    gravity?: boolean;
-    collisions?: boolean;
-  };
-  // Specific to pendulum
-  length?: number;
-  angle?: number;
-  angularVelocity?: number;
+  /** Additional properties specific to the primitive */
+  props?: Record<string, any>;
+};
 
-  // Specific to spring
-  restLength?: number;
-  springConstant?: number;
+export type Environment = {
+  /** Width and height of the canvas (pixels) */
+  width: number;
+  height: number;
+  /** Gravity acceleration (m/s²) – defaults to 9.81 */
+  gravity?: number;
+  /** Global damping factor (0‑1) to simulate friction/air resistance */
   damping?: number;
+};
 
-  // Specific to orbit
-  orbitRadius?: number;
-  orbitSpeed?: number;
-
-  // For projectile
-  velocityMagnitude?: number;
-
-  label?: string;
-  trail?: boolean;
-  trailLength?: number;
-}
-
-export interface Environment {
-  gravity: number; // m/s²
-  background: EnvironmentBackground;
-  width?: number;
-  height?: number;
-  timeScale?: number;
-  friction?: number;
-  airResistance?: number;
-  boundaryType?: "wrap" | "bounce" | "stop";
-}
-
-export interface SimulationConfig {
-  environment: Environment;
-  objects: PhysicsObject[];
-  duration?: number;
-  fps?: number;
-  description?: string;
-  topic?: string;
-  educationalContext?: string;
-}
-
-// Validation and type guards
-export function isValidObjectType(type: any): type is ObjectType {
-  return ["ball", "planet", "pendulum", "spring", "block", "wave", "projectile", "liquid"].includes(
-    type,
-  );
-}
-
-export function isValidBehavior(behavior: any): behavior is Behavior {
-  return [
-    "gravity",
-    "collision",
-    "orbit",
-    "friction",
-    "bouncing",
-    "oscillation",
-    "damping",
-    "drag",
-  ].includes(behavior);
-}
-
-export function validateSimulationConfig(config: any): config is SimulationConfig {
-  if (!config || typeof config !== "object") return false;
-  if (!config.environment || !Array.isArray(config.objects)) return false;
-  if (!Array.isArray(config.objects)) return false;
-
-  return config.objects.every(
-    (obj: any) =>
-      obj.type &&
-      isValidObjectType(obj.type) &&
-      Array.isArray(obj.position) &&
-      obj.position.length >= 2,
-  );
-}
+export type SimulationState = {
+  objects: SimulationObject[];
+  env: Environment;
+};

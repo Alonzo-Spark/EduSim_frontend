@@ -3,13 +3,13 @@ import json
 import time
 from pathlib import Path
 from typing import List, Dict, Any
-import google.generativeai as genai
 from rag.retriever import get_retriever
 import pickle
 import faiss
 from sentence_transformers import SentenceTransformer
 import os
 from dotenv import load_dotenv
+from app.src.modules.shared.gemini_service import generate_text
 
 
 load_dotenv(Path(__file__).resolve().parents[4] / ".env")
@@ -17,37 +17,6 @@ load_dotenv(Path(__file__).resolve().parents[4] / ".env")
 # RAG Setup
 _retriever = None
 _embeddings_model = None
-
-
-def _configure_gemini_model():
-    api_key = os.getenv("GOOGLE_API_KEY")
-    print("Starting Gemini generation...")
-    print("API KEY EXISTS:", bool(api_key))
-
-    if not api_key:
-        raise ValueError("GOOGLE_API_KEY is missing. Add it to .env to enable Gemini generation.")
-
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel("gemini-1.5-flash")
-
-
-def _generate_with_gemini(prompt: str):
-    model_names = ["gemini-1.5-flash", "gemini-flash-latest"]
-    last_error = None
-
-    for model_name in model_names:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            print("Gemini Response:", response)
-            print("Gemini Text:", getattr(response, "text", None))
-            return response
-        except Exception as e:
-            last_error = e
-            if model_name != model_names[-1]:
-                print(f"Gemini primary model failed ({model_name}); trying fallback gemini-flash-latest: {e}")
-
-    raise RuntimeError(f"Gemini generation failed: {str(last_error)}") from last_error
 
 
 def _empty_tutor_payload(message: str):
@@ -106,11 +75,8 @@ def analyze_with_llm(query: str, context: str) -> Dict[str, Any]:
     user_prompt = f"Context:\n{context}\n\nQuery:\n{query}"
     
     try:
-        _configure_gemini_model()
         final_prompt = f"{system_prompt}\n\n{user_prompt}\n\nReturn only the JSON object."
-        response = _generate_with_gemini(final_prompt)
-
-        response_text = getattr(response, "text", None)
+        response_text = generate_text(final_prompt, temperature=0.2, max_output_tokens=2048, cache_namespace="tutor.analysis")
         if not response_text:
             return _empty_tutor_payload("Gemini returned an empty response.")
 
@@ -189,10 +155,12 @@ def analyze_tutor_query(query: str) -> Dict[str, Any]:
     try:
         explanation_started = time.perf_counter()
         print("Gemini request started: tutor explanation")
-        _configure_gemini_model()
-        response = _generate_with_gemini(explanation_prompt)
-
-        rag_explanation = getattr(response, "text", None)
+        rag_explanation = generate_text(
+            explanation_prompt,
+            temperature=0.2,
+            max_output_tokens=2048,
+            cache_namespace="tutor.explanation",
+        )
         if not rag_explanation:
             rag_explanation = "Gemini returned an empty response."
         else:

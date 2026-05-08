@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { PageWrapper } from "@/components/Card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAgentSimulation } from "@/hooks/useAgentSimulation";
 import { agentSimulationService } from "@/services/agentSimulationService";
+import { DynamicSimulationRenderer } from "@/components/simulation-runtime/DynamicSimulationRenderer";
 
 export const Route = createFileRoute("/ai-agent")({
   component: AIAgentPage,
@@ -41,15 +42,14 @@ const EXAMPLE_PROMPTS = [
 
 const GENERATION_STAGES = [
   "Analyzing prompt",
-  "Detecting subject",
+  "Detecting intent",
   "Retrieving textbook context",
   "Extracting formulas",
-  "Generating simulation logic",
-  "Synthesizing interactive visuals",
-  "Validating HTML safety",
-  "Sanitizing content",
-  "Injecting security policy",
-  "Rendering simulation",
+  "Synthesizing Physics DSL",
+  "Validating DSL",
+  "Initializing physics runtime",
+  "Mounting renderer",
+  "Starting animation loop",
 ];
 
 function ProgressBar({ percentage, stage }: { percentage: number; stage: string | null }) {
@@ -117,11 +117,6 @@ function AIAgentPage() {
   const [useStreaming, setUseStreaming] = useState(true);
   const [complexity, setComplexity] = useState<"beginner" | "medium" | "advanced">("medium");
 
-  const simulationHtml = useMemo(() => {
-    if (!simulation?.html) return "";
-    return simulation.html;
-  }, [simulation?.html]);
-
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
 
@@ -173,10 +168,10 @@ function AIAgentPage() {
                 Autonomous AI Simulation Agent
               </h1>
               <p className="text-sm text-muted-foreground max-w-2xl">
-                Generate interactive physics, chemistry, and mathematics simulations from natural
-                language. The agent analyzes your prompt, retrieves textbook context, and creates
-                complete educational simulations.
-              </p>
+                  Generate interactive physics simulations from natural language. The agent detects
+                  the simulation intent, retrieves textbook context, generates a validated DSL, and
+                  mounts a live physics runtime.
+                </p>
             </div>
             <Sparkles className="w-8 h-8 text-[var(--neon-purple)] flex-shrink-0" />
           </div>
@@ -343,10 +338,15 @@ function AIAgentPage() {
                 )}
 
                 {/* Formula Display */}
-                {simulation.formula && (
-                  <div className="rounded-2xl border border-[var(--neon-purple)]/30 bg-[var(--neon-purple)]/10 p-3">
+                {(simulation.formula || simulation.formula_explanation) && (
+                  <div className="rounded-2xl border border-[var(--neon-purple)]/30 bg-[var(--neon-purple)]/10 p-3 space-y-1">
                     <p className="text-xs text-muted-foreground mb-1">Key Formula</p>
-                    <p className="font-mono text-sm text-[var(--neon-purple)]">{simulation.formula}</p>
+                    <p className="font-mono text-sm text-[var(--neon-purple)]">
+                      {simulation.formula || "Formula unavailable"}
+                    </p>
+                    {simulation.formula_explanation && (
+                      <p className="text-xs text-muted-foreground">{simulation.formula_explanation}</p>
+                    )}
                   </div>
                 )}
 
@@ -370,13 +370,12 @@ function AIAgentPage() {
             )}
 
             {/* Simulation Canvas */}
-            <div className="rounded-2xl border border-white/10 overflow-hidden min-h-[500px] bg-black/50">
-              {simulationHtml ? (
-                <iframe
-                  title={simulation?.title || "Generated Simulation"}
-                  sandbox="allow-scripts"
-                  srcDoc={simulationHtml}
-                  className="w-full min-h-[500px] border-0 bg-black"
+            <div className="rounded-2xl border border-white/10 overflow-hidden min-h-[500px] bg-black/50 p-3">
+              {simulation?.dsl ? (
+                <DynamicSimulationRenderer
+                  dsl={simulation.dsl}
+                  formula={simulation.formula}
+                  explanation={simulation.formula_explanation}
                 />
               ) : (
                 <div className="h-[500px] flex flex-col items-center justify-center text-center p-6">

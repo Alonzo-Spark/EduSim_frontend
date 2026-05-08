@@ -8,6 +8,7 @@ import {
   simulationSynthesisService,
   SynthesizedSimulation,
 } from "@/services/simulationSynthesisService";
+import { DynamicSimulationRenderer } from "@/components/simulation-runtime/DynamicSimulationRenderer";
 
 export const Route = createFileRoute("/my-simulations")({
   component: MySimulationsPage,
@@ -66,7 +67,7 @@ function MySimulationsPage() {
     setError(null);
     try {
       const item = await simulationSynthesisService.getById(id);
-      if (!isClientSafeHtml(item.html || "")) {
+      if (item.html && !isClientSafeHtml(item.html)) {
         throw new Error("Blocked unsafe generated HTML in client safety check.");
       }
       setActive(item);
@@ -120,7 +121,7 @@ function MySimulationsPage() {
             }
           },
           (simulation) => {
-            if (!isClientSafeHtml(simulation.html || "")) {
+            if (simulation.html && !isClientSafeHtml(simulation.html)) {
               setError("Generated simulation was blocked by client safety checks.");
             } else {
               setActive(simulation);
@@ -133,7 +134,7 @@ function MySimulationsPage() {
       } else {
         // Regular generation (non-streaming)
         const generated = await simulationSynthesisService.generate(prompt.trim());
-        if (!isClientSafeHtml(generated.html || "")) {
+        if (generated.html && !isClientSafeHtml(generated.html)) {
           throw new Error("Generated simulation was blocked by client safety checks.");
         }
 
@@ -278,8 +279,20 @@ function MySimulationsPage() {
               </div>
             )}
 
+            {active?.formula_explanation && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-muted-foreground">
+                {active.formula_explanation}
+              </div>
+            )}
+
             <div className="rounded-2xl border border-white/10 overflow-hidden min-h-[520px] bg-black/30">
-              {activeHtml ? (
+              {active?.dsl ? (
+                <DynamicSimulationRenderer
+                  dsl={active.dsl}
+                  formula={active.formula}
+                  explanation={active.formula_explanation}
+                />
+              ) : activeHtml ? (
                 <iframe
                   title={active?.title || "Synthesized Simulation"}
                   sandbox="allow-scripts"

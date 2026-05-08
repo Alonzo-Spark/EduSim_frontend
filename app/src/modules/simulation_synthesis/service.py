@@ -12,13 +12,17 @@ import faiss
 from sentence_transformers import SentenceTransformer
 
 from rag.retriever import get_retriever
-from rag.generator import generate_gemini_text
-from .templates import detect_subject, get_system_prompt, get_user_content_enhancement, SubjectType
-from .sanitizer import sanitize_html, validate_html_safety_beautifulsoup
+from app.src.modules.shared.gemini_service import GeminiServiceError, generate_text
+from .templates import detect_subject
+from .intent_detector import detect_simulation_intent
+from .formula_registry import get_formula_bundle
+from .prompt_builder import build_dsl_prompt
+from .sanitizer import sanitize_json
+from .validator import validate_simulation
 
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 INDEX_FILE = Path("faiss_index/index.faiss")
 METADATA_FILE = Path("faiss_index/metadata.pkl")
@@ -26,6 +30,10 @@ PERSISTENCE_FILE = Path("data/generated_simulations.json")
 
 _retriever = None
 _store_lock = Lock()
+
+
+def _normalize_prompt(prompt: str) -> str:
+    return re.sub(r"\s+", " ", prompt.lower()).strip()
 
 
 def _load_retriever():
@@ -94,93 +102,7 @@ def _build_context_block(chunks: list[dict[str, Any]]):
     return "\n\n".join(lines)
 
 
-def _call_gemini_for_html(user_prompt: str, context: str, extracted: dict[str, list[str]], subject: SubjectType = "physics"):
-    if not GOOGLE_API_KEY:
-        raise ValueError("GOOGLE_API_KEY is missing. Add it to .env to enable synthesis.")
-
-    print("Gemini request started: simulation synthesis")
-    system_prompt = get_system_prompt(subject)
-    subject_enhancement = get_user_content_enhancement(subject, extracted)
-    final_prompt = (
-        f"{system_prompt}\n\n"
-        f"User intent: {user_prompt}\n\n"
-        f"{subject_enhancement}\n\n"
-        f"Retrieved textbook context:\n{context}\n\n"
-        f"Extracted formulas: {extracted.get('formulas', [])}\n"
-        f"Extracted constants: {extracted.get('constants', [])}\n"
-        f"Extracted laws: {extracted.get('laws', [])}\n"
-        f"Extracted definitions: {extracted.get('definitions', [])}\n\n"
-        "Return only a complete HTML document starting with <!DOCTYPE html>."
-    )
-
-    generated = generate_gemini_text(final_prompt, temperature=0.2, max_output_tokens=3500)
-    print("Gemini generation completed: simulation synthesis")
-    return generated
-
-
-def _extract_html_document(raw_output: str):
-    cleaned = raw_output.strip()
-
-    fenced = re.search(r"```(?:html)?\s*(.*?)```", cleaned, flags=re.IGNORECASE | re.DOTALL)
-    if fenced:
-        cleaned = fenced.group(1).strip()
-
-    if "<!DOCTYPE html" in cleaned:
-        idx = cleaned.find("<!DOCTYPE html")
-        cleaned = cleaned[idx:]
-
-    if not cleaned.lower().startswith("<!doctype html"):
-        raise ValueError("Model output is not a complete HTML document.")
-
-    return cleaned
-
-
-def _inject_csp(html: str):
-    csp_meta = (
-        '<meta http-equiv="Content-Security-Policy" '
-        "content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
-        "img-src data:; font-src data:; connect-src 'none'; media-src 'none'; frame-src 'none'; "
-        "object-src 'none'; base-uri 'none'; form-action 'none'\">"
-    )
-
-    if re.search(r"http-equiv\s*=\s*['\"]Content-Security-Policy['\"]", html, flags=re.IGNORECASE):
-        return html
-
-    if "<head>" in html:
-        return html.replace("<head>", f"<head>\n  {csp_meta}", 1)
-
-    if "<html" in html:
-        return re.sub(r"(<html[^>]*>)", rf"\1\n<head>\n  {csp_meta}\n</head>", html, count=1)
-
-    return html
-
-
-def _validate_generated_html(html: str):
-    blocked_patterns = [
-        r"<script[^>]+src\s*=",
-        r"https?://",
-        r"\bfetch\s*\(",
-        r"XMLHttpRequest",
-        r"WebSocket",
-        r"navigator\.sendBeacon",
-        r"window\.open",
-        r"document\.cookie",
-        r"localStorage",
-        r"sessionStorage",
-        r"\btop\.",
-        r"\bparent\.",
-        r"<iframe",
-        r"<object",
-        r"<embed",
-        r"<form",
-        r"<link[^>]+href",
-        r"\beval\s*\(",
-        r"new\s+Function\s*\(",
-    ]
-
-    for pattern in blocked_patterns:
-        if re.search(pattern, html, flags=re.IGNORECASE):
-            raise ValueError(f"Generated HTML contains blocked content pattern: {pattern}")
+# HTML generation functions removed in favor of JSON DSL
 
 
 def _read_store():
@@ -236,6 +158,29 @@ def _guess_topic(prompt: str):
     return subject_titles.get(subject, "AI Generated Simulation")
 
 
+def _build_simulation_metadata(prompt: str, topic: str | None = None):
+    intent = detect_simulation_intent(prompt)
+    formula_bundle = get_formula_bundle(intent.simulation_type)
+    title = topic or intent.label or _guess_topic(prompt)
+
+    return {
+        "intent": {
+            "simulation_type": intent.simulation_type,
+            "label": intent.label,
+            "confidence": intent.confidence,
+            "keywords": list(intent.keywords),
+        },
+        "formula_bundle": {
+            "label": formula_bundle.label,
+            "primary_formula": formula_bundle.primary_formula,
+            "formulas": list(formula_bundle.formulas),
+            "explanation": formula_bundle.explanation,
+            "concepts": list(formula_bundle.concepts),
+        },
+        "title": title,
+    }
+
+
 def _build_sources(chunks: list[dict[str, Any]]):
     sources = []
     seen = set()
@@ -252,8 +197,122 @@ def _build_sources(chunks: list[dict[str, Any]]):
     return sources
 
 
+def _find_cached_simulation(prompt: str, topic: str | None = None):
+    normalized_prompt = _normalize_prompt(prompt)
+    normalized_topic = topic.strip().lower() if topic else ""
+
+    with _store_lock:
+        items = _read_store()
+
+    for item in items:
+        if item.get("normalized_prompt") == normalized_prompt:
+            return item
+        if normalized_topic and item.get("title", "").strip().lower() == normalized_topic:
+            if _normalize_prompt(item.get("prompt", "")) == normalized_prompt:
+                return item
+    return None
+
+
+def _build_fallback_dsl(simulation_type: str, title: str, formula_bundle: dict[str, Any]):
+    formulas = list(formula_bundle.get("formulas", []))
+    primary_formula = formula_bundle.get("primary_formula", "")
+    equations = formulas or ([primary_formula] if primary_formula else [])
+
+    if simulation_type == "projectile_motion":
+        return {
+            "simulation_type": simulation_type,
+            "topic": title,
+            "environment": {"gravity": 9.8, "friction": 0.0, "air_resistance": 0.02},
+            "entities": [{"id": "projectile_1", "type": "projectile", "mass": 1.0, "properties": {}}],
+            "interactions": [{"type": "projectile_launch", "target": "projectile_1", "parameters": {"angle_deg": 45.0, "initial_speed": 20.0}}],
+            "visualizations": [{"type": "trajectory_path"}, {"type": "motion_trace"}],
+            "equations": equations,
+        }
+
+    if simulation_type == "pendulum":
+        return {
+            "simulation_type": simulation_type,
+            "topic": title,
+            "environment": {"gravity": 9.8, "friction": 0.01, "air_resistance": 0.0},
+            "entities": [{"id": "bob_1", "type": "pendulum", "mass": 1.2, "properties": {"length": 180, "angle": 0.45}}],
+            "interactions": [{"type": "gravity", "target": "bob_1", "parameters": {"g": 9.8}}],
+            "visualizations": [{"type": "motion_trace"}, {"type": "energy_bar"}],
+            "equations": equations,
+        }
+
+    if simulation_type == "collision":
+        return {
+            "simulation_type": simulation_type,
+            "topic": title,
+            "environment": {"gravity": 9.8, "friction": 0.0, "air_resistance": 0.0},
+            "entities": [
+                {"id": "ball_a", "type": "sphere", "mass": 2.0, "properties": {}},
+                {"id": "ball_b", "type": "sphere", "mass": 2.0, "properties": {}},
+            ],
+            "interactions": [{"type": "collision", "target": "ball_a", "parameters": {"with_entity": "ball_b", "restitution": 0.9}}],
+            "visualizations": [{"type": "motion_trace"}, {"type": "velocity_graph"}],
+            "equations": equations,
+        }
+
+    if simulation_type == "gravity_system":
+        return {
+            "simulation_type": simulation_type,
+            "topic": title,
+            "environment": {"gravity": 9.8, "friction": 0.0, "air_resistance": 0.0},
+            "entities": [
+                {"id": "sun_1", "type": "sphere", "mass": 1000.0, "properties": {}},
+                {"id": "planet_1", "type": "sphere", "mass": 10.0, "properties": {"orbitRadius": 180}},
+            ],
+            "interactions": [{"type": "gravity", "target": "planet_1", "parameters": {"g": 9.8}}],
+            "visualizations": [{"type": "trajectory_path"}, {"type": "motion_trace"}],
+            "equations": equations,
+        }
+
+    if simulation_type == "inclined_plane":
+        return {
+            "simulation_type": simulation_type,
+            "topic": title,
+            "environment": {"gravity": 9.8, "friction": 0.2, "air_resistance": 0.0},
+            "entities": [{"id": "block_1", "type": "block", "mass": 4.0, "properties": {"planeAngle": 28}}],
+            "interactions": [{"type": "incline", "target": "block_1", "parameters": {"angle_deg": 28}}],
+            "visualizations": [{"type": "force_vectors"}, {"type": "motion_trace"}],
+            "equations": equations,
+        }
+
+    if simulation_type == "circular_motion":
+        return {
+            "simulation_type": simulation_type,
+            "topic": title,
+            "environment": {"gravity": 9.8, "friction": 0.0, "air_resistance": 0.0},
+            "entities": [
+                {"id": "object_1", "type": "sphere", "mass": 2.0, "properties": {"orbitRadius": 140}},
+                {"id": "anchor_1", "type": "block", "mass": None, "properties": {}},
+            ],
+            "interactions": [{"type": "torque", "target": "object_1", "parameters": {"moment": 0.0, "pivot": [0, 0]}}],
+            "visualizations": [{"type": "trajectory_path"}, {"type": "acceleration_graph"}],
+            "equations": equations,
+        }
+
+    return {
+        "simulation_type": simulation_type,
+        "topic": title,
+        "environment": {"gravity": 9.8, "friction": 0.0, "air_resistance": 0.0},
+        "entities": [{"id": "body_1", "type": "block", "mass": 5.0, "properties": {}}],
+        "interactions": [{"type": "apply_force", "target": "body_1", "parameters": {"force": [20, 0]}}],
+        "visualizations": [{"type": "force_vectors"}, {"type": "motion_trace"}],
+        "equations": equations,
+    }
+
+
 def generate_simulation_synthesis(prompt: str, topic: str | None = None):
-    # Detect subject from prompt (used for template selection)
+    cached_item = _find_cached_simulation(prompt, topic)
+    if cached_item is not None:
+        print(f"Gemini cache hit: synthesis simulation {cached_item.get('id')}")
+        return cached_item
+
+    metadata = _build_simulation_metadata(prompt, topic=topic)
+    intent = metadata["intent"]
+    formula_bundle = metadata["formula_bundle"]
     subject = detect_subject(prompt)
     
     print("Gemini request started: simulation retrieval")
@@ -264,24 +323,39 @@ def generate_simulation_synthesis(prompt: str, topic: str | None = None):
     context = _build_context_block(chunks)
     extracted = _extract_context_features(chunks)
     
-    # Call Gemini with subject-specific template
-    generated = _call_gemini_for_html(prompt, context, extracted, subject=subject)
-    html = _extract_html_document(generated)
+    print("Gemini request started: DSL synthesis")
+    dsl_prompt = build_dsl_prompt(
+        prompt,
+        context,
+        extracted,
+        simulation_type=intent["simulation_type"],
+        formula_bundle=formula_bundle,
+    )
+    try:
+        raw_generated = generate_text(
+            dsl_prompt,
+            temperature=0.2,
+            max_output_tokens=3500,
+            cache_namespace=f"simulation_synthesis:{intent['simulation_type']}",
+        )
+    except GeminiServiceError as exc:
+        print(f"Gemini synthesis failed; using fallback DSL: {exc}")
+        raw_generated = json.dumps(_build_fallback_dsl(intent["simulation_type"], title=metadata["title"], formula_bundle=formula_bundle))
+    print("Gemini generation completed: DSL synthesis")
     
-    # Regex-based validation (first layer)
-    _validate_generated_html(html)
+    # Sanitize and parse JSON
+    dsl_json = sanitize_json(raw_generated)
     
-    # BeautifulSoup-based sanitization (second layer - defense-in-depth)
-    html = sanitize_html(html)
+    # Validate DSL
+    validation_result = validate_simulation(dsl_json)
+    if not validation_result["success"]:
+        raise ValueError(f"DSL validation failed: {validation_result['errors']}")
     
-    # Additional BeautifulSoup validation (third layer)
-    validate_html_safety_beautifulsoup(html)
-    
-    # CSP injection (fourth layer)
-    html = _inject_csp(html)
+    valid_dsl = validation_result["data"]
+    valid_dsl["simulation_type"] = intent["simulation_type"]
 
-    title = topic or _guess_topic(prompt)
-    formula = extracted.get("formulas", [""])[0] if extracted.get("formulas") else ""
+    title = metadata["title"]
+    formula = formula_bundle["primary_formula"]
     description = f"AI-synthesized interactive simulation for: {prompt.strip()}"
     sources = _build_sources(chunks)
 
@@ -303,11 +377,15 @@ def generate_simulation_synthesis(prompt: str, topic: str | None = None):
     item = {
         "id": str(uuid4()),
         "title": title,
+        "prompt": prompt.strip(),
+        "normalized_prompt": _normalize_prompt(prompt),
         "description": description,
         "topic": topic_info,
-        "html": html,
+        "intent": intent,
+        "dsl": valid_dsl,
         "formula": formula,
-        "formulas": extracted.get("formulas", []),
+        "formulas": formula_bundle["formulas"] or extracted.get("formulas", []),
+        "formula_explanation": formula_bundle["explanation"],
         "learning_objectives": [],
         "related_concepts": [],
         "interactions": [],
@@ -383,13 +461,23 @@ def generate_simulation_synthesis_stream(prompt: str, topic: str | None = None):
     
     try:
         simulation_id = str(uuid4())
+        cached_item = _find_cached_simulation(prompt, topic)
+        if cached_item is not None:
+            yield _format_sse_event("started", {"id": cached_item.get("id"), "stage": "Initializing..."})
+            yield _format_sse_event("progress", {"stage": "Cache hit: returning existing simulation"})
+            yield _format_sse_event("complete", cached_item)
+            return
+
+        metadata = _build_simulation_metadata(prompt, topic=topic)
+        intent = metadata["intent"]
+        formula_bundle = metadata["formula_bundle"]
         
         # Event 1: Started
         yield _format_sse_event("started", {"id": simulation_id, "stage": "Initializing..."})
 
         # Detect subject
         subject = detect_subject(prompt)
-        yield _format_sse_event("progress", {"stage": "Detecting subject: " + subject})
+        yield _format_sse_event("progress", {"stage": f"Detecting intent: {intent['label']}"})
 
         # Event 2: Retrieving context
         yield _format_sse_event("progress", {"stage": "Retrieving textbook context..."})
@@ -407,34 +495,43 @@ def generate_simulation_synthesis_stream(prompt: str, topic: str | None = None):
             "stage": f"Extracted {len(extracted.get('formulas', []))} formulas, {len(extracted.get('constants', []))} constants"
         })
 
-        # Event 4: Calling LLM for synthesis
-        yield _format_sse_event("progress", {"stage": "Synthesizing simulation with AI..."})
-        generated = _call_gemini_for_html(prompt, context, extracted, subject=subject)
+        # Event 4: Calling LLM for DSL synthesis
+        yield _format_sse_event("progress", {"stage": "Synthesizing Physics DSL with AI..."})
+        dsl_prompt = build_dsl_prompt(
+            prompt,
+            context,
+            extracted,
+            simulation_type=intent["simulation_type"],
+            formula_bundle=formula_bundle,
+        )
+        try:
+            raw_generated = generate_text(
+                dsl_prompt,
+                temperature=0.2,
+                max_output_tokens=3500,
+                cache_namespace=f"simulation_synthesis:{intent['simulation_type']}",
+            )
+        except GeminiServiceError as exc:
+            print(f"Gemini synthesis failed; using fallback DSL: {exc}")
+            raw_generated = json_module.dumps(_build_fallback_dsl(intent["simulation_type"], title=metadata["title"], formula_bundle=formula_bundle))
         
-        # Event 5: Extracting HTML
-        yield _format_sse_event("progress", {"stage": "Extracting HTML document..."})
-        html = _extract_html_document(generated)
+        # Event 5: Sanitizing JSON
+        yield _format_sse_event("progress", {"stage": "Sanitizing and parsing JSON..."})
+        dsl_json = sanitize_json(raw_generated)
 
-        # Event 6: Validating
-        yield _format_sse_event("progress", {"stage": "Validating HTML safety (regex)..."})
-        _validate_generated_html(html)
+        # Event 6: Validating DSL Schema
+        yield _format_sse_event("progress", {"stage": "Validating DSL schema..."})
+        validation_result = validate_simulation(dsl_json)
+        if not validation_result["success"]:
+            raise ValueError(f"DSL validation failed: {validation_result['errors']}")
         
-        # Event 7: Sanitizing
-        yield _format_sse_event("progress", {"stage": "Sanitizing HTML with BeautifulSoup..."})
-        html = sanitize_html(html)
-        
-        # Event 8: Additional validation
-        yield _format_sse_event("progress", {"stage": "Running final safety checks..."})
-        validate_html_safety_beautifulsoup(html)
-        
-        # Event 9: CSP injection
-        yield _format_sse_event("progress", {"stage": "Injecting Content-Security-Policy..."})
-        html = _inject_csp(html)
+        valid_dsl = validation_result["data"]
+        valid_dsl["simulation_type"] = intent["simulation_type"]
 
         # Event 10: Saving
         yield _format_sse_event("progress", {"stage": "Saving simulation to store..."})
-        title = topic or _guess_topic(prompt)
-        formula = extracted.get("formulas", [""])[0] if extracted.get("formulas") else ""
+        title = metadata["title"]
+        formula = formula_bundle["primary_formula"]
         description = f"AI-synthesized interactive simulation for: {prompt.strip()}"
         sources = _build_sources(chunks)
 
@@ -456,11 +553,15 @@ def generate_simulation_synthesis_stream(prompt: str, topic: str | None = None):
         item = {
             "id": simulation_id,
             "title": title,
+            "prompt": prompt.strip(),
+            "normalized_prompt": _normalize_prompt(prompt),
             "description": description,
             "topic": topic_info,
-            "html": html,
+            "intent": intent,
+            "dsl": valid_dsl,
             "formula": formula,
-            "formulas": extracted.get("formulas", []),
+            "formulas": formula_bundle["formulas"] or extracted.get("formulas", []),
+            "formula_explanation": formula_bundle["explanation"],
             "learning_objectives": [],
             "related_concepts": [],
             "interactions": [],

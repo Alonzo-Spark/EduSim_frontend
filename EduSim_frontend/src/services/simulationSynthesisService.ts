@@ -1,3 +1,5 @@
+import type { SimulationDSL } from "@/runtime/dsl";
+
 export interface SimulationSourceRef {
   source: string;
   page: number | string;
@@ -13,7 +15,15 @@ export interface SynthesizedSimulation {
   prompt: string;
   timestamp: string;
   html?: string;
+  dsl?: SimulationDSL;
   subject?: string;
+  formula_explanation?: string;
+  intent?: {
+    simulation_type: string;
+    label: string;
+    confidence: number;
+    keywords: string[];
+  };
 }
 
 interface GenerateResponse extends SynthesizedSimulation {

@@ -19,10 +19,49 @@ export interface GenerateSimulationResponse {
 
 class SimulationGeneratorService {
   private apiBaseUrl: string;
+  private cache = new Map<string, GenerateSimulationResponse>();
+  private readonly cacheStorageKey = "edusim.simulation-generator-cache";
 
   constructor() {
     // Get API base URL from environment or use default
     this.apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+    this.loadCacheFromStorage();
+  }
+
+  private normalizeKey(prompt: string, educationalContext?: string): string {
+    return `${prompt.trim().toLowerCase()}::${(educationalContext || "").trim().toLowerCase()}`;
+  }
+
+  private loadCacheFromStorage() {
+    if (typeof localStorage === "undefined") {
+      return;
+    }
+
+    try {
+      const raw = localStorage.getItem(this.cacheStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, GenerateSimulationResponse>;
+      for (const [key, value] of Object.entries(parsed)) {
+        if (value && typeof value === "object") {
+          this.cache.set(key, value);
+        }
+      }
+    } catch {
+      // Ignore storage read failures.
+    }
+  }
+
+  private persistCacheToStorage() {
+    if (typeof localStorage === "undefined") {
+      return;
+    }
+
+    try {
+      const serialized = JSON.stringify(Object.fromEntries(this.cache.entries()));
+      localStorage.setItem(this.cacheStorageKey, serialized);
+    } catch {
+      // Ignore storage write failures.
+    }
   }
 
   /**
@@ -31,12 +70,22 @@ class SimulationGeneratorService {
   async generateSimulation(
     prompt: string,
     educationalContext?: string,
+    signal?: AbortSignal,
   ): Promise<GenerateSimulationResponse> {
     try {
+      const cacheKey = this.normalizeKey(prompt, educationalContext);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        console.log("[simulationGenerator] cache hit", { cacheKey });
+        return cached;
+      }
+
       const request: GenerateSimulationRequest = {
         prompt,
         educational_context: educationalContext,
       };
+
+      console.log("[simulationGenerator] request start", { prompt: prompt.trim() });
 
       const response = await fetch(`${this.apiBaseUrl}/api/generate-simulation`, {
         method: "POST",
@@ -44,6 +93,7 @@ class SimulationGeneratorService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(request),
+        signal,
       });
 
       if (!response.ok) {
@@ -65,13 +115,29 @@ class SimulationGeneratorService {
         };
       }
 
+      this.cache.set(cacheKey, {
+        success: true,
+        simulation: data.simulation,
+        reasoning: data.reasoning,
+      });
+      this.persistCacheToStorage();
+      console.log("[simulationGenerator] request success", { cacheKey });
+
       return {
         success: true,
         simulation: data.simulation,
         reasoning: data.reasoning,
       };
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return {
+          success: false,
+          error: "Request cancelled",
+        };
+      }
+
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("[simulationGenerator] request failure", { errorMessage });
       return {
         success: false,
         error: `Failed to generate simulation: ${errorMessage}`,

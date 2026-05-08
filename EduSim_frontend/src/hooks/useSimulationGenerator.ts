@@ -2,7 +2,7 @@
  * Hook for managing simulation generation state
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { SimulationConfig } from "@/types/simulation";
 import { simulationGenerator } from "@/services/simulationGenerator";
 
@@ -23,6 +23,10 @@ export function useSimulationGenerator() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const generate = useCallback(async (prompt: string, educationalContext?: string) => {
+    if (state.loading) {
+      return;
+    }
+
     // Cancel previous request if still pending
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -35,7 +39,11 @@ export function useSimulationGenerator() {
       error: null,
     });
 
-    const result = await simulationGenerator.generateSimulation(prompt, educationalContext);
+    const result = await simulationGenerator.generateSimulation(
+      prompt,
+      educationalContext,
+      abortControllerRef.current.signal,
+    );
 
     if (!abortControllerRef.current.signal.aborted) {
       setState({
@@ -47,6 +55,12 @@ export function useSimulationGenerator() {
     }
 
     return result;
+  }, [state.loading]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, []);
 
   const clear = useCallback(() => {
