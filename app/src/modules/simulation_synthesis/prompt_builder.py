@@ -148,13 +148,7 @@ _EXAMPLE_INCLINED_PLANE = {
 # Prompt Builder
 # =========================================================
 
-def build_dsl_prompt(
-    user_prompt: str,
-    context: str,
-    extracted: dict,
-    simulation_type: str | None = None,
-    formula_bundle: dict | None = None,
-) -> str:
+def build_dsl_prompt(user_prompt: str, context: str, extracted: dict) -> str:
     """
     Builds a structured, schema-enforced DSL prompt for Gemini.
     Includes few-shot examples, strict JSON rules, and vocabulary constraints.
@@ -172,9 +166,6 @@ def build_dsl_prompt(
     formulas = extracted.get("formulas", [])
     laws = extracted.get("laws", [])
     constants = extracted.get("constants", [])
-    canonical_formula = (formula_bundle or {}).get("primary_formula", "")
-    canonical_formulas = (formula_bundle or {}).get("formulas", [])
-    simulation_label = (formula_bundle or {}).get("label", simulation_type or "physics")
 
     return f"""You are a Physics DSL Compiler. Your ONLY job is to convert a natural language physics simulation request into a structured JSON object following the Physics DSL schema below. You must not generate any HTML, CSS, JavaScript, markdown, prose, or explanations.
 
@@ -249,7 +240,6 @@ Common interaction types:
 - Do not invent new schema keys
 - Entity ids must be unique snake_case strings
 - All interactions must target a valid entity id from the entities list
-- If a canonical simulation type is provided, the output simulation_type must match it exactly.
 
 === FEW-SHOT EXAMPLES ===
 
@@ -264,13 +254,6 @@ Common interaction types:
 Formulas: {formulas}
 Laws: {laws}
 Constants: {constants}
-
-=== CANONICAL SIMULATION TARGET ===
-
-Simulation Type: {simulation_type or "unspecified"}
-Simulation Label: {simulation_label}
-Primary Formula: {canonical_formula}
-Related Canonical Formulas: {canonical_formulas}
 
 === USER REQUEST ===
 

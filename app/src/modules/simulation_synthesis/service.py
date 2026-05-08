@@ -12,10 +12,8 @@ import faiss
 from sentence_transformers import SentenceTransformer
 
 from rag.retriever import get_retriever
-from app.src.modules.shared.gemini_service import GeminiServiceError, generate_text
+from rag.generator import generate_gemini_text
 from .templates import detect_subject
-from .intent_detector import detect_simulation_intent
-from .formula_registry import get_formula_bundle
 from .prompt_builder import build_dsl_prompt
 from .sanitizer import sanitize_json
 from .validator import validate_simulation
@@ -324,23 +322,8 @@ def generate_simulation_synthesis(prompt: str, topic: str | None = None):
     extracted = _extract_context_features(chunks)
     
     print("Gemini request started: DSL synthesis")
-    dsl_prompt = build_dsl_prompt(
-        prompt,
-        context,
-        extracted,
-        simulation_type=intent["simulation_type"],
-        formula_bundle=formula_bundle,
-    )
-    try:
-        raw_generated = generate_text(
-            dsl_prompt,
-            temperature=0.2,
-            max_output_tokens=3500,
-            cache_namespace=f"simulation_synthesis:{intent['simulation_type']}",
-        )
-    except GeminiServiceError as exc:
-        print(f"Gemini synthesis failed; using fallback DSL: {exc}")
-        raw_generated = json.dumps(_build_fallback_dsl(intent["simulation_type"], title=metadata["title"], formula_bundle=formula_bundle))
+    dsl_prompt = build_dsl_prompt(prompt, context, extracted)
+    raw_generated = generate_gemini_text(dsl_prompt, temperature=0.2, max_output_tokens=3500)
     print("Gemini generation completed: DSL synthesis")
     
     # Sanitize and parse JSON
@@ -352,10 +335,9 @@ def generate_simulation_synthesis(prompt: str, topic: str | None = None):
         raise ValueError(f"DSL validation failed: {validation_result['errors']}")
     
     valid_dsl = validation_result["data"]
-    valid_dsl["simulation_type"] = intent["simulation_type"]
 
-    title = metadata["title"]
-    formula = formula_bundle["primary_formula"]
+    title = topic or _guess_topic(prompt)
+    formula = extracted.get("formulas", [""])[0] if extracted.get("formulas") else ""
     description = f"AI-synthesized interactive simulation for: {prompt.strip()}"
     sources = _build_sources(chunks)
 
@@ -381,7 +363,6 @@ def generate_simulation_synthesis(prompt: str, topic: str | None = None):
         "normalized_prompt": _normalize_prompt(prompt),
         "description": description,
         "topic": topic_info,
-        "intent": intent,
         "dsl": valid_dsl,
         "formula": formula,
         "formulas": formula_bundle["formulas"] or extracted.get("formulas", []),
@@ -497,23 +478,8 @@ def generate_simulation_synthesis_stream(prompt: str, topic: str | None = None):
 
         # Event 4: Calling LLM for DSL synthesis
         yield _format_sse_event("progress", {"stage": "Synthesizing Physics DSL with AI..."})
-        dsl_prompt = build_dsl_prompt(
-            prompt,
-            context,
-            extracted,
-            simulation_type=intent["simulation_type"],
-            formula_bundle=formula_bundle,
-        )
-        try:
-            raw_generated = generate_text(
-                dsl_prompt,
-                temperature=0.2,
-                max_output_tokens=3500,
-                cache_namespace=f"simulation_synthesis:{intent['simulation_type']}",
-            )
-        except GeminiServiceError as exc:
-            print(f"Gemini synthesis failed; using fallback DSL: {exc}")
-            raw_generated = json_module.dumps(_build_fallback_dsl(intent["simulation_type"], title=metadata["title"], formula_bundle=formula_bundle))
+        dsl_prompt = build_dsl_prompt(prompt, context, extracted)
+        raw_generated = generate_gemini_text(dsl_prompt, temperature=0.2, max_output_tokens=3500)
         
         # Event 5: Sanitizing JSON
         yield _format_sse_event("progress", {"stage": "Sanitizing and parsing JSON..."})
@@ -526,7 +492,6 @@ def generate_simulation_synthesis_stream(prompt: str, topic: str | None = None):
             raise ValueError(f"DSL validation failed: {validation_result['errors']}")
         
         valid_dsl = validation_result["data"]
-        valid_dsl["simulation_type"] = intent["simulation_type"]
 
         # Event 10: Saving
         yield _format_sse_event("progress", {"stage": "Saving simulation to store..."})
@@ -557,7 +522,6 @@ def generate_simulation_synthesis_stream(prompt: str, topic: str | None = None):
             "normalized_prompt": _normalize_prompt(prompt),
             "description": description,
             "topic": topic_info,
-            "intent": intent,
             "dsl": valid_dsl,
             "formula": formula,
             "formulas": formula_bundle["formulas"] or extracted.get("formulas", []),
