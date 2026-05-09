@@ -20,6 +20,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useAgentSimulation } from "@/hooks/useAgentSimulation";
+import { useSavedSimulations } from "@/hooks/useSavedSimulations";
+import { useEffect } from "react";
 import type {
   PhysicsDSL,
   DSLEntity,
@@ -276,9 +278,23 @@ function AIAgentPage() {
     clearError,
   } = useAgentSimulation();
 
+  const { saveSimulation } = useSavedSimulations();
+
   const [prompt, setPrompt] = useState("");
   const [useStreaming, setUseStreaming] = useState(true);
   const [complexity, setComplexity] = useState<"beginner" | "medium" | "advanced">("medium");
+
+  useEffect(() => {
+    if (simulation) {
+      saveSimulation({
+        id: simulation.id,
+        title: simulation.title,
+        subject: simulation.topic?.subject || "Physics",
+        type: "dsl",
+        simulation: simulation.dsl,
+      });
+    }
+  }, [simulation, saveSimulation]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;

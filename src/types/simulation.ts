@@ -1,3 +1,53 @@
+export interface PhysicsObject {
+  id?: string;
+  type: string;
+  position: number[];
+  velocity?: number[];
+  mass?: number;
+  radius?: number;
+  width?: number;
+  height?: number;
+  length?: number;
+  angle?: number;
+  angularVelocity?: number;
+  rotation?: number;
+  rotationVelocity?: number;
+  orbitRadius?: number;
+  orbitSpeed?: number;
+  restLength?: number;
+  springConstant?: number;
+  damping?: number;
+  physics?: {
+    static?: boolean;
+    restitution?: number;
+    bounce?: boolean;
+  };
+  [key: string]: any;
+}
+
+export interface SimulationConfig {
+  title: string;
+  description: string;
+  environment: {
+    width: number;
+    height: number;
+    gravity: number;
+    airResistance?: number;
+    timeScale?: number;
+  };
+  objects: PhysicsObject[];
+}
+
+export function validateSimulationConfig(config: any): config is SimulationConfig {
+  return (
+    config &&
+    typeof config.title === "string" &&
+    Array.isArray(config.objects) &&
+    config.environment &&
+    typeof config.environment.gravity === "number"
+  );
+}
+
 export type Vector = {
   x: number;
   y: number;
@@ -29,6 +79,10 @@ export type Environment = {
 };
 
 export type SimulationState = {
-  objects: SimulationObject[];
-  env: Environment;
+  objects: SimulationObject[] | PhysicsObject[];
+  env?: Environment;
+  time?: number;
+  paused?: boolean;
+  gravity?: number;
+  timeScale?: number;
 };
