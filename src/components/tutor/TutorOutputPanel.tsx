@@ -1,37 +1,46 @@
 import React from "react";
 import { BookOpen, Cpu, FlaskConical, Lightbulb, Zap } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChatBubble } from "./ChatBubble";
+import { MessageSquare, Layout } from "lucide-react";
+import { AIExplanationCard } from "./AIExplanationCard";
 
 interface TutorOutputPanelProps {
   data: {
-    queryType: string;
-    concepts: string[];
-    formulas: Array<{
+    title?: string;
+    description?: string;
+    queryType?: string;
+    concepts?: string[];
+    formulas?: Array<{
       formula: string;
       name: string;
       topic: string;
       meaning: string;
     }>;
-    explanation: string;
-    ragContent: Array<{
+    explanation?: string;
+    ai_explanation?: string;
+    ragContent?: Array<{
       title: string;
       content: string;
     }>;
   } | null;
   className?: string;
+  selectedTopic?: {
+    subject: string;
+    chapter: string;
+    topic?: string;
+  };
 }
 
-export function TutorOutputPanel({ data, className = "" }: TutorOutputPanelProps) {
+export function TutorOutputPanel({ data, className = "", selectedTopic }: TutorOutputPanelProps) {
+  const explanationText = data?.explanation || data?.ai_explanation || "";
+
   if (!data) {
     return (
       <div
         className={`glass-strong rounded-3xl p-12 flex flex-col items-center justify-center text-center gap-6 ${className}`}
       >
-        <div className="w-20 h-20 rounded-3xl bg-white/5 flex items-center justify-center animate-pulse">
+        <div className="w-20 h-20 rounded-3xl bg-secondary flex items-center justify-center animate-pulse">
           <BookOpen className="w-10 h-10 text-muted-foreground/30" />
         </div>
         <div>
@@ -45,162 +54,167 @@ export function TutorOutputPanel({ data, className = "" }: TutorOutputPanelProps
   }
 
   return (
-    <div className={`flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar ${className}`}>
-      {/* Query Type Badge */}
-      <div className="flex justify-end">
-        <div className="px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-          <span>Query Type:</span>
-          <span
-            className={
-              data.queryType === "formula"
-                ? "text-[var(--neon-cyan)]"
-                : data.queryType === "concept"
-                  ? "text-[var(--neon-purple)]"
-                  : "text-[var(--neon-yellow)]"
-            }
-          >
-            {data.queryType}
-          </span>
-        </div>
-      </div>
-
-      {/* Section 1: Related Concepts */}
-      <section className="glass-strong rounded-3xl p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Lightbulb className="w-5 h-5 text-[var(--neon-yellow)]" />
-          <h3 className="text-lg font-bold">Related Concepts</h3>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {data.concepts.length > 0 ? (
-            data.concepts.map((concept, i) => (
-              <div
-                key={i}
-                className="px-4 py-2 rounded-2xl bg-[var(--neon-purple)]/10 border border-[var(--neon-purple)]/30 text-[var(--neon-purple)] text-sm font-semibold animate-in fade-in zoom-in duration-300 shadow-[0_0_15px_rgba(192,38,211,0.1)]"
-                style={{ animationDelay: `${i * 100}ms` }}
-              >
-                {concept}
-              </div>
-            ))
-          ) : (
-            <div className="w-full p-4 rounded-2xl bg-white/5 border border-white/5 text-center">
-              <p className="text-sm text-muted-foreground italic">
-                No specific concepts identified for this query.
+    <div className={`flex flex-col gap-6 h-full ${className}`}>
+      <Tabs defaultValue="analysis" className="w-full h-full flex flex-col gap-6">
+        {/* Curriculum Context Header */}
+        {selectedTopic && (
+          <div className="px-5 py-4 rounded-3xl bg-secondary/30 border border-border/50 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-xl">
+              📚
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Currently Viewing</p>
+              <p className="text-sm font-semibold text-foreground">
+                {selectedTopic.subject} • {selectedTopic.chapter}
+                {selectedTopic.topic && (
+                  <>
+                    <span className="mx-2 text-muted-foreground/50">/</span>
+                    <span className="text-primary">{selectedTopic.topic}</span>
+                  </>
+                )}
               </p>
             </div>
-          )}
-        </div>
-      </section>
+          </div>
+        )}
 
-      {/* Section 2: Relevant Formulas */}
-      <section className="glass-strong rounded-3xl p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Cpu className="w-5 h-5 text-[var(--neon-cyan)]" />
-          <h3 className="text-lg font-bold">Relevant Formulas</h3>
+        <div className="flex items-center justify-between mt-2">
+          <TabsList className="bg-secondary/50 border border-border/50 rounded-2xl p-1 shadow-sm">
+            <TabsTrigger value="analysis" className="rounded-xl flex items-center gap-2 px-6 font-bold text-sm">
+              <Layout className="w-4 h-4" />
+              Analysis
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="rounded-xl flex items-center gap-2 px-6 font-bold text-sm">
+              <MessageSquare className="w-4 h-4" />
+              Tutor Chat
+            </TabsTrigger>
+          </TabsList>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {data.formulas.length > 0 ? (
-            data.formulas.map((f, i) => (
-              <div
-                key={i}
-                className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-[var(--neon-cyan)]/50 transition-all group animate-in slide-in-from-bottom-4 duration-500"
-                style={{ animationDelay: `${i * 150}ms` }}
-              >
-                <div className="text-2xl font-mono font-bold text-[var(--neon-cyan)] mb-2 group-hover:scale-105 transition-transform origin-left">
-                  {f.formula}
-                </div>
-                <div className="text-sm font-bold text-foreground mb-1">{f.name}</div>
-                <div className="text-xs text-muted-foreground italic mb-3">{f.topic}</div>
-                <div className="text-xs text-muted-foreground leading-relaxed bg-black/20 p-2 rounded-lg">
-                  {f.meaning}
-                </div>
+
+        <TabsContent value="analysis" className="flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-6 outline-none animate-in fade-in duration-500">
+          {/* Section 1: Related Concepts */}
+          <section className="glass-strong rounded-[2rem] p-8 border border-border/50">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Lightbulb className="w-5 h-5 text-primary" />
               </div>
-            ))
-          ) : (
-            <div className="col-span-full p-4 rounded-2xl bg-white/5 border border-white/5 text-center">
-              <p className="text-sm text-muted-foreground italic">
-                No formulas directly relevant to this query were found.
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Related Concepts</h3>
+                <p className="text-xs text-muted-foreground">Key ideas connected to this topic</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              {data.concepts && data.concepts.length > 0 ? (
+                data.concepts.map((concept, i) => (
+                  <div
+                    key={i}
+                    className="px-4 py-2.5 rounded-xl bg-secondary/80 border border-border/50 text-foreground text-sm font-bold animate-in fade-in zoom-in duration-300 hover:border-primary/30 hover:bg-secondary transition-all"
+                    style={{ animationDelay: `${i * 50}ms` }}
+                  >
+                    {concept}
+                  </div>
+                ))
+              ) : (
+                <div className="w-full p-6 rounded-2xl bg-secondary/30 border border-dashed border-border text-center">
+                  <p className="text-sm text-muted-foreground italic">
+                    No specific concepts identified.
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Section 2: Relevant Formulas */}
+          <section className="glass-strong rounded-[2rem] p-8 border border-border/50">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                <Cpu className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Relevant Formulas</h3>
+                <p className="text-xs text-muted-foreground">Mathematical expressions and laws</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {data.formulas && data.formulas.length > 0 ? (
+                data.formulas.map((f, i) => (
+                  <div
+                    key={i}
+                    className="p-6 rounded-2xl bg-secondary/50 border border-border/50 hover:border-primary/30 hover:bg-secondary/80 transition-all group animate-in slide-in-from-bottom-4 duration-500 shadow-sm"
+                    style={{ animationDelay: `${i * 100}ms` }}
+                  >
+                    <div className="text-2xl font-mono font-bold text-foreground mb-3 group-hover:text-primary transition-colors">
+                      {f.formula}
+                    </div>
+                    <div className="text-sm font-bold text-foreground/90 mb-1">{f.name}</div>
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-3 opacity-60">{f.topic}</div>
+                    <div className="text-xs text-muted-foreground leading-relaxed bg-background/50 p-3 rounded-xl border border-border/30">
+                      {f.meaning}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full p-8 rounded-2xl bg-secondary/30 border border-dashed border-border text-center">
+                  <p className="text-sm text-muted-foreground italic">
+                    No formulas relevant to this query were found.
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+
+
+          <AIExplanationCard content={data.explanation || data.ai_explanation || ""} />
+          {/* Section 4: Textbook / RAG Content */}
+          <section className="glass-strong rounded-3xl p-6 border-l-4 border-l-indigo-500 mb-4">
+            <div className="flex items-center gap-3 mb-6">
+              <FlaskConical className="w-5 h-5 text-indigo-400" />
+              <h3 className="text-lg font-bold">Textbook Context</h3>
+            </div>
+            <div className="space-y-4">
+              {data.ragContent && data.ragContent.length > 0 ? (
+                data.ragContent.map((item, i) => (
+                  <div
+                    key={i}
+                    className="p-5 rounded-2xl bg-secondary border border-border hover:bg-secondary/80 transition-all animate-in fade-in slide-in-from-right-4 duration-500"
+                    style={{ animationDelay: `${i * 200}ms` }}
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
+                      <h4 className="text-xs font-bold text-primary uppercase tracking-wider">
+                        {item.title}
+                      </h4>
+                    </div>
+                    <p className="text-sm text-muted-foreground/90 leading-relaxed italic border-l-2 border-border pl-4">
+                      "{item.content}"
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 rounded-2xl bg-secondary border border-border text-center">
+                  <p className="text-sm text-muted-foreground italic">
+                    No textbook excerpts found for this topic. I'll rely on general AI knowledge.
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="chat" className="flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-4 outline-none">
+          <div className="flex flex-col gap-4 p-2">
+            <ChatBubble
+              role="ai"
+              content={`Hello! I've analyzed your question. Here's a quick summary:\n\n${explanationText.split('\n')[0] || "No explanation available yet."}...`}
+            />
+            <div className="glass-strong rounded-2xl p-6 border-dashed border-border text-center">
+              <p className="text-sm text-muted-foreground">
+                The interactive chat feature is being synchronized.
+                For now, please refer to the detailed Analysis tab for full insights.
               </p>
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* Section 3: AI Explanation */}
-      <section className="glass-strong rounded-3xl p-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--neon-purple)]/10 blur-3xl -z-10" />
-        <div className="flex items-center gap-3 mb-6">
-          <Zap className="w-5 h-5 text-[var(--neon-purple)]" />
-          <h3 className="text-lg font-bold">AI Explanation</h3>
-        </div>
-        <div className="text-foreground/90 leading-relaxed space-y-4 prose prose-invert max-w-none prose-headings:text-[var(--neon-purple)] prose-a:text-[var(--neon-cyan)]">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
-            rehypePlugins={[rehypeKatex]}
-            components={{
-              h1: ({ node, ...props }) => (
-                <h1 className="text-2xl font-bold mt-6 mb-4 text-white" {...props} />
-              ),
-              h2: ({ node, ...props }) => (
-                <h2
-                  className="text-xl font-bold mt-5 mb-3 text-[var(--neon-cyan)] border-b border-white/10 pb-2"
-                  {...props}
-                />
-              ),
-              h3: ({ node, ...props }) => (
-                <h3 className="text-lg font-bold mt-4 mb-2 text-white" {...props} />
-              ),
-              p: ({ node, ...props }) => <p className="mb-4 text-white/80" {...props} />,
-              ul: ({ node, ...props }) => (
-                <ul className="list-disc pl-6 mb-4 space-y-2 text-white/80" {...props} />
-              ),
-              ol: ({ node, ...props }) => (
-                <ol className="list-decimal pl-6 mb-4 space-y-2 text-white/80" {...props} />
-              ),
-              li: ({ node, ...props }) => <li className="" {...props} />,
-              strong: ({ node, ...props }) => (
-                <strong className="font-bold text-white" {...props} />
-              ),
-            }}
-          >
-            {data.explanation}
-          </ReactMarkdown>
-        </div>
-      </section>
-
-      {/* Section 4: Textbook / RAG Content */}
-      <section className="glass-strong rounded-3xl p-6 border-l-4 border-l-[var(--neon-blue)]">
-        <div className="flex items-center gap-3 mb-6">
-          <FlaskConical className="w-5 h-5 text-[var(--neon-blue)]" />
-          <h3 className="text-lg font-bold">Textbook Content (RAG)</h3>
-        </div>
-        <div className="space-y-4">
-          {data.ragContent.length > 0 ? (
-            data.ragContent.map((item, i) => (
-              <div
-                key={i}
-                className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/[0.08] transition-all animate-in fade-in slide-in-from-right-4 duration-500"
-                style={{ animationDelay: `${i * 200}ms` }}
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2 h-2 rounded-full bg-[var(--neon-blue)] shadow-[0_0_8px_var(--neon-blue)]" />
-                  <h4 className="text-xs font-bold text-[var(--neon-blue)] uppercase tracking-wider">
-                    {item.title}
-                  </h4>
-                </div>
-                <p className="text-sm text-muted-foreground/90 leading-relaxed italic border-l-2 border-white/10 pl-4">
-                  "{item.content}"
-                </p>
-              </div>
-            ))
-          ) : (
-            <div className="p-8 rounded-2xl bg-white/5 border border-white/5 text-center">
-              <p className="text-sm text-muted-foreground italic">
-                No textbook excerpts found for this topic. I'll rely on general AI knowledge.
-              </p>
-            </div>
-          )}
-        </div>
-      </section>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

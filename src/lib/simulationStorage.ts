@@ -5,9 +5,9 @@ const STORAGE_KEY = "edusim_saved_simulations";
 export const simulationStorage = {
   /** Load all saved simulations from localStorage */
   load(): SavedSimulation[] {
-    if (typeof localStorage === "undefined") return [];
+    if (typeof window === "undefined") return [];
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = window.localStorage.getItem(STORAGE_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
       console.error("Failed to load simulations from localStorage:", error);
@@ -17,9 +17,9 @@ export const simulationStorage = {
 
   /** Save all simulations to localStorage */
   save(simulations: SavedSimulation[]): void {
-    if (typeof localStorage === "undefined") return;
+    if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(simulations));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(simulations));
     } catch (error) {
       console.error("Failed to save simulations to localStorage:", error);
     }

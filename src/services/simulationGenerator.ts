@@ -33,12 +33,12 @@ class SimulationGeneratorService {
   }
 
   private loadCacheFromStorage() {
-    if (typeof localStorage === "undefined") {
+    if (typeof window === "undefined") {
       return;
     }
 
     try {
-      const raw = localStorage.getItem(this.cacheStorageKey);
+      const raw = window.localStorage.getItem(this.cacheStorageKey);
       if (!raw) return;
       const parsed = JSON.parse(raw) as Record<string, GenerateSimulationResponse>;
       for (const [key, value] of Object.entries(parsed)) {
@@ -52,13 +52,13 @@ class SimulationGeneratorService {
   }
 
   private persistCacheToStorage() {
-    if (typeof localStorage === "undefined") {
+    if (typeof window === "undefined") {
       return;
     }
 
     try {
       const serialized = JSON.stringify(Object.fromEntries(this.cache.entries()));
-      localStorage.setItem(this.cacheStorageKey, serialized);
+      window.localStorage.setItem(this.cacheStorageKey, serialized);
     } catch {
       // Ignore storage write failures.
     }

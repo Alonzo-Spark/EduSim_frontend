@@ -84,12 +84,19 @@ export function renderSimulation(state: SimulationState, canvas: HTMLCanvasEleme
 
   // Draw each object
   state.objects.forEach((obj) => {
-    drawObject(ctx, obj);
-    // Optionally draw velocity vector for educational purposes
-    const velocityEnd: Vector = {
-      x: obj.position.x + obj.velocity.x * 0.2, // scale for visibility
-      y: obj.position.y + obj.velocity.y * 0.2,
-    };
-    drawArrow(ctx, obj.position, velocityEnd, "#27ae60");
+    // If it's a SimulationObject (has Vector position/velocity)
+    if (obj.position && typeof obj.position === 'object' && 'x' in obj.position) {
+      const sObj = obj as SimulationObject;
+      drawObject(ctx, sObj);
+      
+      // Optionally draw velocity vector for educational purposes
+      if (sObj.velocity) {
+        const velocityEnd: Vector = {
+          x: sObj.position.x + sObj.velocity.x * 0.2, // scale for visibility
+          y: sObj.position.y + sObj.velocity.y * 0.2,
+        };
+        drawArrow(ctx, sObj.position, velocityEnd, "#27ae60");
+      }
+    }
   });
 }

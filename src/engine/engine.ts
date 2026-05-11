@@ -26,10 +26,17 @@ export class Engine {
    */
   update(deltaTime: number) {
     const { objects, env } = this.state;
+    if (!env) return;
+    
     const gravity = env.gravity ?? 9.81;
     const damping = env.damping ?? 0;
 
     objects.forEach((obj) => {
+      // Ensure velocity exists
+      if (!obj.velocity) {
+        obj.velocity = { x: 0, y: 0 };
+      }
+
       // Simple Euler integration for position.
       obj.position.x += obj.velocity.x * deltaTime;
       obj.position.y += obj.velocity.y * deltaTime;
@@ -44,34 +51,28 @@ export class Engine {
           break;
         }
         default:
-          // No specific physics – leave velocity unchanged.
           break;
       }
 
-      // Apply global damping (air resistance / friction).
+      // Apply global damping
       if (damping > 0) {
-        obj.velocity.x *= 1 - damping;
-        obj.velocity.y *= 1 - damping;
+        obj.velocity.x *= (1 - damping);
+        obj.velocity.y *= (1 - damping);
       }
 
-      // Simple boundary collision – bounce off the floor and walls.
-      // Floor (y direction, assuming origin at top‑left).
+      // Simple boundary collision
       if (obj.position.y >= env.height) {
         obj.position.y = env.height;
-        // Reverse vertical velocity with a restitution factor.
         obj.velocity.y = -obj.velocity.y * 0.8;
       }
-      // Ceiling.
       if (obj.position.y <= 0) {
         obj.position.y = 0;
         obj.velocity.y = -obj.velocity.y * 0.8;
       }
-      // Left wall.
       if (obj.position.x <= 0) {
         obj.position.x = 0;
         obj.velocity.x = -obj.velocity.x * 0.8;
       }
-      // Right wall.
       if (obj.position.x >= env.width) {
         obj.position.x = env.width;
         obj.velocity.x = -obj.velocity.x * 0.8;

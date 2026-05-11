@@ -55,7 +55,7 @@ export function AIInputPanel({ onSimulationGenerated, className }: AIInputPanelP
 
   // Load history from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("simulation-prompt-history");
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem("simulation-prompt-history") : null;
     if (saved) {
       try {
         setHistory(JSON.parse(saved));
@@ -67,8 +67,8 @@ export function AIInputPanel({ onSimulationGenerated, className }: AIInputPanelP
 
   // Save history to localStorage
   useEffect(() => {
-    if (history.length > 0) {
-      localStorage.setItem("simulation-prompt-history", JSON.stringify(history.slice(0, 10)));
+    if (history.length > 0 && typeof window !== "undefined") {
+      window.localStorage.setItem("simulation-prompt-history", JSON.stringify(history.slice(0, 10)));
     }
   }, [history]);
 
@@ -97,7 +97,9 @@ export function AIInputPanel({ onSimulationGenerated, className }: AIInputPanelP
 
   const clearHistory = () => {
     setHistory([]);
-    localStorage.removeItem("simulation-prompt-history");
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("simulation-prompt-history");
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

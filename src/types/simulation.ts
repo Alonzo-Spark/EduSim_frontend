@@ -79,8 +79,8 @@ export type Environment = {
 };
 
 export type SimulationState = {
-  objects: SimulationObject[] | PhysicsObject[];
-  env?: Environment;
+  objects: SimulationObject[];
+  env: Environment;
   time?: number;
   paused?: boolean;
   gravity?: number;

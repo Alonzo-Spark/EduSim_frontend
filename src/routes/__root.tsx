@@ -1,7 +1,9 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
-import { Sidebar } from "@/components/Sidebar";
-import { Navbar } from "@/components/Navbar";
-
+import { Outlet, Link, createRootRoute, HeadContent, Scripts, useRouterState } from "@tanstack/react-router";
+import { motion, AnimatePresence } from "framer-motion";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { Navbar } from "@/components/layout/Navbar";
+import { FloatingButton } from "@/components/layout/FloatingButton";
+import { useSidebarStore } from "@/store/useSidebarStore";
 
 import appCss from "../styles.css?url";
 
@@ -56,14 +58,50 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const routerState = useRouterState();
+  const { isCollapsed } = useSidebarStore();
+  
   return (
-    <div className="flex min-h-screen w-full relative">
+    <div className="flex min-h-screen w-full relative bg-background text-foreground overflow-hidden">
       <Sidebar />
-      <main className="flex-1 p-4 md:p-6 max-w-full overflow-x-hidden">
+      
+      <motion.main 
+        initial={false}
+        animate={{ 
+          paddingLeft: typeof window !== "undefined" && window.innerWidth >= 768 
+            ? (isCollapsed ? 72 : 240) 
+            : 0 
+        }}
+        transition={{ type: "spring", stiffness: 400, damping: 40 }}
+        className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden relative w-full"
+      >
         <Navbar />
-        <Outlet />
-      </main>
-
+        
+        {/* Main Content Scroll Container */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pt-28 pb-12 px-4 md:px-10 custom-scrollbar scroll-smooth">
+          <div className="mx-auto max-w-[1500px] w-full">
+            {/* 
+              Directly rendering Outlet here fixes the "manual refresh" bug. 
+              PageTransition was causing component unmounting/remounting issues 
+              that interfered with TanStack Router's internal state.
+            */}
+            <AnimatePresence mode="popLayout">
+              <motion.div
+                key={routerState.location.pathname}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full"
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
+      </motion.main>
+      
+      <FloatingButton />
     </div>
   );
 }
