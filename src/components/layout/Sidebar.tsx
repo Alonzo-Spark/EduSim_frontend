@@ -11,6 +11,7 @@ import {
   GraduationCap,
   ChevronLeft,
   LogOut,
+  Atom,
 } from "lucide-react";
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -24,6 +25,7 @@ interface SidebarItem {
 const items: SidebarItem[] = [
   { to: "/", label: "Home", icon: Home },
   { to: "/tutor", label: "Tutor", icon: GraduationCap },
+  { to: "/simulation-generator", label: "Simulations", icon: Atom },
   { to: "/my-simulations", label: "My Simulations", icon: Rocket },
   { to: "/favorites", label: "Favorites", icon: Heart },
   { to: "/progress", label: "Progress", icon: BarChart3 },

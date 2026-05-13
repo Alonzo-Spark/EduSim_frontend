@@ -1,9 +1,11 @@
 import React from "react";
 import { DSLRenderer } from "./DSLRenderer";
 import { HtmlRenderer } from "./HtmlRenderer";
+import { SimulationDSL } from "@/runtime/dsl";
+import { Layout } from "lucide-react";
 
 interface RuntimeEngineProps {
-  dsl?: any;
+  dsl?: SimulationDSL;
   html?: string;
   formula?: string;
   explanation?: string;
@@ -41,7 +43,8 @@ export const RuntimeEngine: React.FC<RuntimeEngineProps> = ({
   }
 
   return (
-    <div className="w-full h-full min-h-[520px] rounded-2xl flex items-center justify-center bg-slate-900/20 border border-white/5 text-slate-500 italic">
+    <div className="w-full h-full min-h-[520px] rounded-2xl flex flex-col items-center justify-center bg-slate-900/20 border border-white/5 text-slate-500 italic">
+      <Layout className="w-10 h-10 mb-4 opacity-10" />
       No simulation data to render.
     </div>
   );

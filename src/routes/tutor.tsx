@@ -11,6 +11,7 @@ import { TutorService, TutorAnalysisResponse } from "@/services/TutorService";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { TutorOutputSkeleton } from "@/components/loaders/TutorSkeletons";
 import { useCurriculumTopic } from "@/hooks/useCurriculumTopic";
+import { FloatingSimulationWorkspaceOverlay } from "@/components/simulation/FloatingSimulationWorkspaceOverlay";
 
 // Define search params for the route
 export const Route = createFileRoute("/tutor")({
@@ -30,7 +31,13 @@ function TutorPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const setTutorResponse = useSimulationStore((state) => state.setTutorResponse);
+  const { 
+    setTutorResponse, 
+    simulationGenerated, 
+    simulationData, 
+    resetGenerationState 
+  } = useSimulationStore();
+  
   const { data: topicContent, loading: topicLoading, fetchTopic } = useCurriculumTopic();
 
   // Load topic content from search params
@@ -107,7 +114,7 @@ ${topicContent.related_concepts?.map((c) => `- ${c}`).join("\n") || "No related 
   return (
     <div className="w-full text-foreground pt-2 pb-8">
       {/* Display current search context */}
-      {searchQuery && (
+      {searchQuery && !simulationGenerated && (
         <div className="mb-6 px-4 py-3 rounded-xl bg-primary/5 border border-primary/20">
           <p className="text-sm text-primary font-medium">
             📚 Currently viewing: <span className="opacity-80">{searchQuery}</span>
@@ -115,7 +122,7 @@ ${topicContent.related_concepts?.map((c) => `- ${c}`).join("\n") || "No related 
         </div>
       )}
 
-      {/* Main Grid Layout */}
+      {/* Main RAG-powered interactive tutor UI structure */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Left: Input Panel */}
         <div className="min-w-0 sticky top-32">
@@ -157,9 +164,16 @@ ${topicContent.related_concepts?.map((c) => `- ${c}`).join("\n") || "No related 
         </div>
       </div>
 
+      {/* Embedded high-fidelity overlay satisfying explicit floating sandbox constraints */}
+      <FloatingSimulationWorkspaceOverlay 
+        isOpen={simulationGenerated}
+        onClose={resetGenerationState}
+        simulation={simulationData || { title: searchQuery || "AI Dynamic Simulation Sandbox" }}
+      />
+
       {/* Global Error Toast */}
       {error && (
-        <div className="fixed bottom-6 right-6 bg-red-500/10 border border-red-500/30 rounded-2xl p-4 max-w-md animate-in slide-in-from-right-8 shadow-2xl backdrop-blur-md">
+        <div className="fixed bottom-6 right-6 bg-red-500/10 border border-red-500/30 rounded-2xl p-4 max-w-md animate-in slide-in-from-right-8 shadow-2xl backdrop-blur-md z-50">
           <p className="text-sm text-red-400 font-bold">{error}</p>
         </div>
       )}

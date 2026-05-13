@@ -22,12 +22,35 @@ import {
 import { useAgentSimulation } from "@/hooks/useAgentSimulation";
 import { useSavedSimulations } from "@/hooks/useSavedSimulations";
 import { useEffect } from "react";
-import type {
-  PhysicsDSL,
-  DSLEntity,
-  DSLInteraction,
-  DSLVisualization,
-} from "@/services/agentSimulationService";
+export interface DSLEntity {
+  id: string;
+  type: string;
+  mass: number | null;
+}
+
+export interface DSLInteraction {
+  type: string;
+  target: string;
+  parameters: Record<string, any>;
+}
+
+export interface DSLVisualization {
+  type: string;
+}
+
+export interface PhysicsDSL {
+  simulation_type: string;
+  topic: string;
+  environment: {
+    gravity: number;
+    friction: number;
+  };
+  entities: DSLEntity[];
+  interactions: DSLInteraction[];
+  visualizations: DSLVisualization[];
+  equations: string[];
+}
+
 
 export const Route = createFileRoute("/ai-agent")({
   component: AIAgentPage,
@@ -187,7 +210,7 @@ function DSLInspector({ dsl }: { dsl: PhysicsDSL }) {
           <Box className="w-3.5 h-3.5" /> Entities ({dsl.entities.length})
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {dsl.entities.map((e) => (
+          {dsl.entities.map((e: DSLEntity) => (
             <EntityCard key={e.id} entity={e} />
           ))}
         </div>
@@ -199,7 +222,7 @@ function DSLInspector({ dsl }: { dsl: PhysicsDSL }) {
           <GitBranch className="w-3.5 h-3.5" /> Interactions ({dsl.interactions.length})
         </p>
         <div className="space-y-2">
-          {dsl.interactions.map((inter, i) => (
+          {dsl.interactions.map((inter: DSLInteraction, i: number) => (
             <InteractionCard key={i} interaction={inter} />
           ))}
         </div>
@@ -211,7 +234,7 @@ function DSLInspector({ dsl }: { dsl: PhysicsDSL }) {
           <BarChart2 className="w-3.5 h-3.5" /> Visualizations
         </p>
         <div className="flex flex-wrap gap-2">
-          {dsl.visualizations.map((v, i) => (
+          {dsl.visualizations.map((v: DSLVisualization, i: number) => (
             <VisualizationBadge key={i} viz={v} />
           ))}
         </div>
@@ -222,7 +245,7 @@ function DSLInspector({ dsl }: { dsl: PhysicsDSL }) {
         <div>
           <p className="text-xs text-muted-foreground mb-2">Equations</p>
           <div className="space-y-1">
-            {dsl.equations.map((eq, i) => (
+            {dsl.equations.map((eq: string, i: number) => (
               <p
                 key={i}
                 className="font-mono text-xs text-[var(--neon-purple)] bg-[var(--neon-purple)]/5 px-3 py-1.5 rounded-lg border border-[var(--neon-purple)]/20"
@@ -480,7 +503,7 @@ function AIAgentPage() {
             {/* DSL Inspector or Empty State */}
             <div className="rounded-2xl border border-white/10 overflow-hidden min-h-[500px] bg-black/30 p-4">
               {simulation?.dsl ? (
-                <DSLInspector dsl={simulation.dsl} />
+                <DSLInspector dsl={simulation.dsl as unknown as PhysicsDSL} />
               ) : (
                 <div className="h-[500px] flex flex-col items-center justify-center text-center p-6">
                   <PlayCircle className="w-12 h-12 text-muted-foreground/30 mb-3" />
