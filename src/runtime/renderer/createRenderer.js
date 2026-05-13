@@ -71,8 +71,8 @@ class EduSimRenderer {
     ctx.save();
     ctx.scale(pixelRatio, pixelRatio);
 
-    const worldWidthPx = dsl.environment?.world?.width || 800;
-    const worldHeightPx = dsl.environment?.world?.height || 600;
+    const worldWidthPx = toPixels(dsl.environment?.world?.width || 20);
+    const worldHeightPx = toPixels(dsl.environment?.world?.height || 15);
     const containerWidth = canvas.width / pixelRatio;
     const containerHeight = canvas.height / pixelRatio;
 

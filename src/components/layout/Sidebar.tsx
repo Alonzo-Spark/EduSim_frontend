@@ -31,6 +31,7 @@ const items: SidebarItem[] = [
   { to: "/progress", label: "Progress", icon: BarChart3 },
   { to: "/profile", label: "Profile", icon: User },
   { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/dsl-test", label: "DSL Test", icon: Sparkles },
 ];
 
 export function Sidebar() {

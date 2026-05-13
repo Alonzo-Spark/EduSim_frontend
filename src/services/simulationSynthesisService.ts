@@ -73,6 +73,26 @@ class SimulationSynthesisService {
     return data as SynthesizedSimulation;
   }
 
+  /**
+   * Hits the direct /api/generate endpoint for raw DSL testing
+   */
+  async generateRaw(prompt: string): Promise<any> {
+    const response = await fetch(`${this.apiBaseUrl}/api/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.detail || "DSL generation failed");
+    }
+
+    return await response.json();
+  }
+
   async list(limit = 30): Promise<SynthesizedSimulation[]> {
     const response = await fetch(
       `${this.apiBaseUrl}/api/simulations/synthesis/list?limit=${limit}`,

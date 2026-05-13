@@ -258,4 +258,29 @@ export class SimulationLoader {
     this.forceMap.clear();
     this.liveState.initialStates.clear();
   }
+
+  getLiveState() {
+    if (!this.engine) return null;
+    
+    // Map of current values for all observable paths
+    const state = {
+      time: this.engine.timing.timestamp / 1000,
+      values: {}
+    };
+
+    // Extract current values for all objects
+    this.bodyMap.forEach((body, id) => {
+      state.values[`objects.${id}.position.x`] = toWorld(body.position.x);
+      state.values[`objects.${id}.position.y`] = toWorld(body.position.y);
+      state.values[`objects.${id}.velocity.x`] = toWorld(body.velocity.x);
+      state.values[`objects.${id}.velocity.y`] = toWorld(body.velocity.y);
+      state.values[`objects.${id}.velocity.magnitude`] = toWorld(Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2));
+      state.values[`objects.${id}.physics.mass`] = body.mass;
+    });
+
+    // Add calculated fields from liveState
+    state.values['runtime.calculated.period'] = this.liveState.lastMeasuredPeriod;
+    
+    return state;
+  }
 }
