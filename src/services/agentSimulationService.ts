@@ -1,3 +1,5 @@
+import { SimulationDSL } from "@/runtime/dsl";
+
 /**
  * Autonomous AI Simulation Generation Agent Service
  *
@@ -7,43 +9,6 @@
  * - AI-powered Physics DSL generation
  * - Streaming generation with progress updates
  */
-
-// =========================================================
-// Physics DSL Types
-// =========================================================
-
-export interface DSLEnvironment {
-  gravity: number;
-  friction: number;
-  air_resistance: number;
-}
-
-export interface DSLEntity {
-  id: string;
-  type: string;
-  mass: number | null;
-  properties: Record<string, unknown>;
-}
-
-export interface DSLInteraction {
-  type: string;
-  target: string;
-  parameters: Record<string, unknown>;
-}
-
-export interface DSLVisualization {
-  type: string;
-}
-
-export interface PhysicsDSL {
-  simulation_type: string;
-  topic: string;
-  environment: DSLEnvironment;
-  entities: DSLEntity[];
-  interactions: DSLInteraction[];
-  visualizations: DSLVisualization[];
-  equations: string[];
-}
 
 // =========================================================
 // Simulation Response Types
@@ -74,7 +39,7 @@ export interface AgentGeneratedSimulation {
   description: string;
   topic: SimulationTopicInfo;
   /** Physics DSL JSON — the core output of the compiler pipeline */
-  dsl: PhysicsDSL;
+  dsl: SimulationDSL;
   formula?: string;
   formula_explanation?: string;
   formulas: string[];

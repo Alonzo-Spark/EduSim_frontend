@@ -1,115 +1,93 @@
-export type SimulationType =
-  | "newtons_first_law"
-  | "newtons_second_law"
-  | "newtons_third_law"
-  | "projectile_motion"
-  | "pendulum"
-  | "collision"
-  | "gravity_system"
-  | "inclined_plane"
-  | "circular_motion";
-
 export type Vector2 = {
   x: number;
   y: number;
 };
 
-export type RuntimeEntity = {
+export interface SimulationMeta {
   id: string;
-  type: string;
-  mass: number | null;
-  properties: Record<string, unknown>;
-};
-
-export type RuntimeInteraction = {
-  type: string;
-  target: string;
-  parameters: Record<string, unknown>;
-};
-
-export type RuntimeVisualization = {
-  type: string;
-};
-
-export type SimulationDSL = {
-  simulation_type: SimulationType | string;
+  title: string;
   topic: string;
-  environment: {
-    gravity: number;
-    friction: number;
-    air_resistance: number;
-  };
-  entities: RuntimeEntity[];
-  interactions: RuntimeInteraction[];
-  visualizations: RuntimeVisualization[];
-  equations: string[];
-};
+  difficulty: "beginner" | "intermediate" | "advanced";
+}
 
-export type RuntimeBodyRole =
-  | "primary"
-  | "secondary"
-  | "planet"
-  | "sun"
-  | "bob"
-  | "anchor"
-  | "projectile"
-  | "block";
+export interface SimulationEnvironment {
+  gravity: Vector2;
+  friction: number;
+  air_resistance: number;
+  background?: string;
+}
 
-export type RuntimeBody = {
-  id: string;
-  role: RuntimeBodyRole;
-  type: string;
+export interface ObjectPhysics {
+  mass: number;
   position: Vector2;
   velocity: Vector2;
-  mass: number;
-  radius: number;
-  width: number;
-  height: number;
-  angle: number;
+  acceleration: Vector2;
   angularVelocity: number;
+  angle: number;
+  fixed: boolean;
+}
+
+export interface ObjectVisual {
+  color: string;
+  opacity: number;
+  trail: boolean;
+}
+
+export interface ObjectShape {
+  type: "sphere" | "box" | "circle" | "rect";
+  radius?: number;
+  width?: number;
+  height?: number;
+}
+
+export interface ObjectMaterial {
   restitution: number;
   friction: number;
-  fixed: boolean;
-  color: string;
-  trail: Vector2[];
-  properties: Record<string, unknown>;
-};
+}
 
-export type RuntimeEnvironment = {
-  width: number;
-  height: number;
-  gravity: number;
-  friction: number;
-  airResistance: number;
-  background: string;
-};
+export interface SimulationObject {
+  id: string;
+  name: string;
+  type: string;
+  physics: ObjectPhysics;
+  visual: ObjectVisual;
+  shape: ObjectShape;
+  material: ObjectMaterial;
+  trail?: Vector2[];
+}
 
-export type RuntimeControls = {
-  gravity: number;
-  mass: number;
-  force: number;
-  angle: number;
-  velocity: number;
-  length: number;
-  friction: number;
-  radius: number;
-};
+export interface SimulationInteraction {
+  id: string;
+  type: "slider" | "button" | "toggle";
+  label: string;
+  bind: string; // e.g. "objects[0].physics.mass"
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  value?: number | boolean;
+}
 
-export type RuntimeWorld = {
-  simulationType: SimulationType | string;
-  environment: RuntimeEnvironment;
-  bodies: RuntimeBody[];
-  interactions: RuntimeInteraction[];
-  controls: RuntimeControls;
-};
+export interface SimulationDSL {
+  meta: SimulationMeta;
+  environment: SimulationEnvironment;
+  objects: SimulationObject[];
+  interactions: SimulationInteraction[];
+  equations?: string[];
+}
 
-export type SimulationSnapshot = {
+// Runtime types for engine internal state
+export interface RuntimeWorld {
+  dsl: SimulationDSL;
   time: number;
   paused: boolean;
-  environment: RuntimeEnvironment;
-  bodies: RuntimeBody[];
-  simulationType: SimulationType | string;
-};
+}
+
+export interface SimulationSnapshot {
+  time: number;
+  paused: boolean;
+  dsl: SimulationDSL;
+}
 
 export function toVector2(
   input?: [number, number] | Vector2 | null,
