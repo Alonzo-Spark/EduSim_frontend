@@ -82,9 +82,9 @@ const SubjectsClassIdRoute = SubjectsClassIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const SimulationTopicRoute = SimulationTopicRouteImport.update({
-  id: '/simulation/$topic',
-  path: '/simulation/$topic',
-  getParentRoute: () => rootRouteImport,
+  id: '/$topic',
+  path: '/$topic',
+  getParentRoute: () => SimulationRoute,
 } as any)
 const ChaptersClassIdSubjectRoute = ChaptersClassIdSubjectRouteImport.update({
   id: '/chapters/$classId/$subject',
@@ -99,9 +99,9 @@ const TopicsClassIdSubjectChapterRoute =
   } as any)
 const SimulationClass9PhysicsLawsOfMotionRoute =
   SimulationClass9PhysicsLawsOfMotionRouteImport.update({
-    id: '/simulation/class9/physics/laws-of-motion',
-    path: '/simulation/class9/physics/laws-of-motion',
-    getParentRoute: () => rootRouteImport,
+    id: '/class9/physics/laws-of-motion',
+    path: '/class9/physics/laws-of-motion',
+    getParentRoute: () => SimulationRoute,
   } as any)
 const SimulationClass9PhysicsLawsOfMotionProjectileMotionRoute =
   SimulationClass9PhysicsLawsOfMotionProjectileMotionRouteImport.update({
@@ -233,10 +233,8 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SimulationGeneratorRoute: typeof SimulationGeneratorRoute
   TutorRoute: typeof TutorRoute
-  SimulationTopicRoute: typeof SimulationTopicRoute
   SubjectsClassIdRoute: typeof SubjectsClassIdRoute
   ChaptersClassIdSubjectRoute: typeof ChaptersClassIdSubjectRoute
-  SimulationClass9PhysicsLawsOfMotionRoute: typeof SimulationClass9PhysicsLawsOfMotionRouteWithChildren
   TopicsClassIdSubjectChapterRoute: typeof TopicsClassIdSubjectChapterRoute
 }
 
@@ -321,10 +319,10 @@ declare module '@tanstack/react-router' {
     }
     '/simulation/$topic': {
       id: '/simulation/$topic'
-      path: '/simulation/$topic'
+      path: '/$topic'
       fullPath: '/simulation/$topic'
       preLoaderRoute: typeof SimulationTopicRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SimulationRoute
     }
     '/chapters/$classId/$subject': {
       id: '/chapters/$classId/$subject'
@@ -342,10 +340,10 @@ declare module '@tanstack/react-router' {
     }
     '/simulation/class9/physics/laws-of-motion': {
       id: '/simulation/class9/physics/laws-of-motion'
-      path: '/simulation/class9/physics/laws-of-motion'
+      path: '/class9/physics/laws-of-motion'
       fullPath: '/simulation/class9/physics/laws-of-motion'
       preLoaderRoute: typeof SimulationClass9PhysicsLawsOfMotionRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SimulationRoute
     }
     '/simulation/class9/physics/laws-of-motion/projectile-motion': {
       id: '/simulation/class9/physics/laws-of-motion/projectile-motion'
@@ -356,21 +354,6 @@ declare module '@tanstack/react-router' {
     }
   }
 }
-
-interface SimulationClass9PhysicsLawsOfMotionRouteChildren {
-  SimulationClass9PhysicsLawsOfMotionProjectileMotionRoute: typeof SimulationClass9PhysicsLawsOfMotionProjectileMotionRoute
-}
-
-const SimulationClass9PhysicsLawsOfMotionRouteChildren: SimulationClass9PhysicsLawsOfMotionRouteChildren =
-  {
-    SimulationClass9PhysicsLawsOfMotionProjectileMotionRoute:
-      SimulationClass9PhysicsLawsOfMotionProjectileMotionRoute,
-  }
-
-const SimulationClass9PhysicsLawsOfMotionRouteWithChildren =
-  SimulationClass9PhysicsLawsOfMotionRoute._addFileChildren(
-    SimulationClass9PhysicsLawsOfMotionRouteChildren,
-  )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -383,11 +366,8 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SimulationGeneratorRoute: SimulationGeneratorRoute,
   TutorRoute: TutorRoute,
-  SimulationTopicRoute: SimulationTopicRoute,
   SubjectsClassIdRoute: SubjectsClassIdRoute,
   ChaptersClassIdSubjectRoute: ChaptersClassIdSubjectRoute,
-  SimulationClass9PhysicsLawsOfMotionRoute:
-    SimulationClass9PhysicsLawsOfMotionRouteWithChildren,
   TopicsClassIdSubjectChapterRoute: TopicsClassIdSubjectChapterRoute,
 }
 export const routeTree = rootRouteImport

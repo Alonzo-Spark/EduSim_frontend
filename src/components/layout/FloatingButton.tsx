@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useAgentSimulation } from "@/hooks/useAgentSimulation";
 import { useSavedSimulations } from "@/hooks/useSavedSimulations";
 import { FloatingSimulationWorkspaceOverlay } from "@/components/simulation/FloatingSimulationWorkspaceOverlay";
+import { Link } from "@tanstack/react-router";
 
 export function FloatingButton() {
   const { 
@@ -69,11 +70,12 @@ export function FloatingButton() {
 
   const shouldShow = !loading;
   const hasNoSims = savedSimulations.length === 0;
+  const showTutorGenerator = isTutorPage;
 
   return (
     <>
       <AnimatePresence>
-        {shouldShow && (
+        {showTutorGenerator && shouldShow && (
           <Dialog open={isSimulationModalOpen} onOpenChange={setSimulationModalOpen}>
             <DialogTrigger asChild>
               <motion.button
