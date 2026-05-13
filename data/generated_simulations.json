@@ -1,0 +1,300 @@
+[
+  {
+    "id": "13cc3cc9-6016-4477-988d-224fec2bab38",
+    "title": "Physics Simulation",
+    "description": "AI-synthesized interactive simulation for: Simulate a rescue operation: \n    1. A 50kg supply crate dropped from a height of 100m.\n    2. The crate starts with a horizontal velocity of 25m/s (simulating a moving plane).\n    3. Include a toggle to deploy a parachute (which increases air resistance).\n    4. Include a slider to adjust the mass of the crate.\n    5. Place a static 'Landing Zone' platform on the ground at x=200.",
+    "topic": {
+      "topic": "Physics Simulation",
+      "subject": "physics",
+      "complexity": "medium"
+    },
+    "dsl": {
+      "meta": {
+        "id": "rescue_operation_001",
+        "title": "Rescue Operation",
+        "topic": "Mechanics",
+        "difficulty": "Grade 10",
+        "version": "1.0"
+      },
+      "environment": {
+        "gravity": {
+          "x": 0.0,
+          "y": 9.8
+        },
+        "airResistance": 0.01,
+        "groundFriction": 0.2
+      },
+      "objects": [
+        {
+          "id": "supply_crate",
+          "type": "dynamicBody",
+          "shape": {
+            "type": "rectangle",
+            "width": 2.0,
+            "height": 1.0,
+            "radius": null
+          },
+          "position": {
+            "x": 0.0,
+            "y": 100.0
+          },
+          "rotation": 0.0,
+          "physics": {
+            "mass": 50.0,
+            "movable": true,
+            "isSensor": false
+          },
+          "material": {
+            "friction": 0.3,
+            "restitution": 0.1
+          },
+          "visual": {
+            "color": "#3498db",
+            "label": "Supply Crate"
+          }
+        },
+        {
+          "id": "landing_zone",
+          "type": "staticBody",
+          "shape": {
+            "type": "rectangle",
+            "width": 20.0,
+            "height": 2.0,
+            "radius": null
+          },
+          "position": {
+            "x": 200.0,
+            "y": 0.0
+          },
+          "rotation": 0.0,
+          "physics": {
+            "mass": 1.0,
+            "movable": true,
+            "isSensor": false
+          },
+          "material": {
+            "friction": 0.3,
+            "restitution": 0.1
+          },
+          "visual": {
+            "color": "#2ecc71",
+            "label": "Landing Zone"
+          }
+        }
+      ],
+      "forces": [
+        {
+          "id": "initial_velocity",
+          "type": "applied",
+          "target": "supply_crate",
+          "vector": {
+            "x": 25.0,
+            "y": 0.0
+          },
+          "enabled": true
+        },
+        {
+          "id": "parachute",
+          "type": "applied",
+          "target": "supply_crate",
+          "vector": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "enabled": false
+        }
+      ],
+      "interactions": [
+        {
+          "type": "slider",
+          "label": "Crate Mass",
+          "bind": "objects[0].physics.mass",
+          "min": 1.0,
+          "max": 100.0,
+          "step": 0.1
+        },
+        {
+          "type": "toggle",
+          "label": "Deploy Parachute",
+          "bind": "forces[1].enabled",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 0.1
+        }
+      ]
+    },
+    "formula": "",
+    "formulas": [],
+    "learning_objectives": [],
+    "related_concepts": [],
+    "interactions": [],
+    "context": {
+      "topic": "Physics Simulation",
+      "formulas": [],
+      "constants": [],
+      "laws": [],
+      "definitions": [],
+      "sources": []
+    },
+    "timestamp": "2026-05-11T11:41:41.211135+00:00",
+    "generation_stages": [
+      "Started",
+      "Retrieved",
+      "Synthesized",
+      "Complete"
+    ]
+  },
+  {
+    "id": "c064e4e4-f9f2-4ac5-864e-15b0c7685eb2",
+    "title": "Momentum",
+    "description": "AI-synthesized interactive simulation for: Create a collision simulation between two heavy trucks. Add a button to start the simulation and sliders for mass.",
+    "topic": {
+      "topic": "Momentum",
+      "subject": "physics",
+      "complexity": "medium"
+    },
+    "dsl": {
+      "meta": {
+        "id": "truck_collision_001",
+        "title": "Truck Collision",
+        "topic": "Mechanics",
+        "difficulty": "High School",
+        "version": "1.0"
+      },
+      "environment": {
+        "gravity": {
+          "x": 0.0,
+          "y": 9.8
+        },
+        "airResistance": 0.01,
+        "groundFriction": 0.2
+      },
+      "objects": [
+        {
+          "id": "truck1",
+          "type": "dynamicBody",
+          "shape": {
+            "type": "rectangle",
+            "width": 800.0,
+            "height": 300.0,
+            "radius": null
+          },
+          "position": {
+            "x": 200.0,
+            "y": 400.0
+          },
+          "rotation": 0.0,
+          "physics": {
+            "mass": 20000.0,
+            "movable": true,
+            "isSensor": false
+          },
+          "material": {
+            "friction": 0.5,
+            "restitution": 0.2
+          },
+          "visual": {
+            "color": "#8e44ad",
+            "label": "Truck 1"
+          }
+        },
+        {
+          "id": "truck2",
+          "type": "dynamicBody",
+          "shape": {
+            "type": "rectangle",
+            "width": 800.0,
+            "height": 300.0,
+            "radius": null
+          },
+          "position": {
+            "x": 1000.0,
+            "y": 400.0
+          },
+          "rotation": 0.0,
+          "physics": {
+            "mass": 20000.0,
+            "movable": true,
+            "isSensor": false
+          },
+          "material": {
+            "friction": 0.5,
+            "restitution": 0.2
+          },
+          "visual": {
+            "color": "#e74c3c",
+            "label": "Truck 2"
+          }
+        }
+      ],
+      "forces": [
+        {
+          "id": "truck1_velocity",
+          "type": "applied",
+          "target": "truck1",
+          "vector": {
+            "x": -50.0,
+            "y": 0.0
+          },
+          "enabled": true
+        },
+        {
+          "id": "truck2_velocity",
+          "type": "applied",
+          "target": "truck2",
+          "vector": {
+            "x": 50.0,
+            "y": 0.0
+          },
+          "enabled": true
+        }
+      ],
+      "interactions": [
+        {
+          "type": "slider",
+          "label": "Truck 1 Mass",
+          "bind": "objects[0].physics.mass",
+          "min": 10000.0,
+          "max": 50000.0,
+          "step": 0.1
+        },
+        {
+          "type": "slider",
+          "label": "Truck 2 Mass",
+          "bind": "objects[1].physics.mass",
+          "min": 10000.0,
+          "max": 50000.0,
+          "step": 0.1
+        },
+        {
+          "type": "toggle",
+          "label": "Start Simulation",
+          "bind": "forces[0].enabled",
+          "min": null,
+          "max": null,
+          "step": 0.1
+        }
+      ]
+    },
+    "formula": "",
+    "formulas": [],
+    "learning_objectives": [],
+    "related_concepts": [],
+    "interactions": [],
+    "context": {
+      "topic": "Momentum",
+      "formulas": [],
+      "constants": [],
+      "laws": [],
+      "definitions": [],
+      "sources": []
+    },
+    "timestamp": "2026-05-11T11:31:55.620305+00:00",
+    "generation_stages": [
+      "Started",
+      "Retrieved",
+      "Synthesized",
+      "Complete"
+    ]
+  }
+]

@@ -102,11 +102,10 @@ function StageIndicator({
           return (
             <div
               key={stage}
-              className={`px-2 py-1 rounded-full text-xs transition-colors whitespace-nowrap ${
-                isActive
+              className={`px-2 py-1 rounded-full text-xs transition-colors whitespace-nowrap ${isActive
                   ? "bg-[var(--neon-cyan)] text-black font-semibold"
                   : "bg-slate-900/50 text-muted-foreground border border-white/10"
-              }`}
+                }`}
             >
               {stage}
             </div>
@@ -372,11 +371,10 @@ function AIAgentPage() {
                   <button
                     key={level}
                     onClick={() => setComplexity(level)}
-                    className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all ${
-                      complexity === level
+                    className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all ${complexity === level
                         ? "bg-[var(--neon-cyan)] text-black border-[var(--neon-cyan)]"
                         : "border-white/10 hover:border-white/30 text-muted-foreground"
-                    }`}
+                      }`}
                     disabled={loading}
                   >
                     {level.charAt(0).toUpperCase() + level.slice(1)}

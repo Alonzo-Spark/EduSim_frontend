@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TutorRouteImport } from './routes/tutor'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as RuntimeDemoRouteImport } from './routes/runtime-demo'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as MySimulationsRouteImport } from './routes/my-simulations'
@@ -33,6 +34,11 @@ const TutorRoute = TutorRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RuntimeDemoRoute = RuntimeDemoRouteImport.update({
+  id: '/runtime-demo',
+  path: '/runtime-demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgressRoute = ProgressRouteImport.update({
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/my-simulations': typeof MySimulationsRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
+  '/runtime-demo': typeof RuntimeDemoRoute
   '/settings': typeof SettingsRoute
   '/tutor': typeof TutorRoute
   '/simulation/$topic': typeof SimulationTopicRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/my-simulations': typeof MySimulationsRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
+  '/runtime-demo': typeof RuntimeDemoRoute
   '/settings': typeof SettingsRoute
   '/tutor': typeof TutorRoute
   '/simulation/$topic': typeof SimulationTopicRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/my-simulations': typeof MySimulationsRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
+  '/runtime-demo': typeof RuntimeDemoRoute
   '/settings': typeof SettingsRoute
   '/tutor': typeof TutorRoute
   '/simulation/$topic': typeof SimulationTopicRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/my-simulations'
     | '/profile'
     | '/progress'
+    | '/runtime-demo'
     | '/settings'
     | '/tutor'
     | '/simulation/$topic'
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/my-simulations'
     | '/profile'
     | '/progress'
+    | '/runtime-demo'
     | '/settings'
     | '/tutor'
     | '/simulation/$topic'
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/my-simulations'
     | '/profile'
     | '/progress'
+    | '/runtime-demo'
     | '/settings'
     | '/tutor'
     | '/simulation/$topic'
@@ -218,6 +230,7 @@ export interface RootRouteChildren {
   MySimulationsRoute: typeof MySimulationsRoute
   ProfileRoute: typeof ProfileRoute
   ProgressRoute: typeof ProgressRoute
+  RuntimeDemoRoute: typeof RuntimeDemoRoute
   SettingsRoute: typeof SettingsRoute
   TutorRoute: typeof TutorRoute
   SimulationTopicRoute: typeof SimulationTopicRoute
@@ -241,6 +254,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/runtime-demo': {
+      id: '/runtime-demo'
+      path: '/runtime-demo'
+      fullPath: '/runtime-demo'
+      preLoaderRoute: typeof RuntimeDemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/progress': {
@@ -360,6 +380,7 @@ const rootRouteChildren: RootRouteChildren = {
   MySimulationsRoute: MySimulationsRoute,
   ProfileRoute: ProfileRoute,
   ProgressRoute: ProgressRoute,
+  RuntimeDemoRoute: RuntimeDemoRoute,
   SettingsRoute: SettingsRoute,
   TutorRoute: TutorRoute,
   SimulationTopicRoute: SimulationTopicRoute,
