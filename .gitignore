@@ -69,3 +69,5 @@ build/
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+v1_test_output.json
