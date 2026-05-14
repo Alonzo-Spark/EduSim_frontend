@@ -9,7 +9,7 @@ const { Bodies, Body } = Matter;
  * @returns {Matter.Body}
  */
 export const createBodyFromDSL = (obj) => {
-  const isStatic = obj.type === 'staticBody';
+  const isStatic = obj.bodyType === 'static' || obj.type === 'staticBody';
 
   // Use centralized scaling pipeline
   const x = toPixels(obj.position.x);
@@ -32,7 +32,8 @@ export const createBodyFromDSL = (obj) => {
         shape: obj.shape.type,
         width: obj.shape.width,
         height: obj.shape.height,
-        radius: obj.shape.radius
+        radius: obj.shape.radius,
+        asset: obj.visual?.asset
       }
     }
   };
@@ -69,7 +70,7 @@ export const createBodyFromDSL = (obj) => {
     Body.setMass(body, obj.physics.mass);
   }
 
-  console.log(`[Runtime] Created body: ${obj.id} at (${x}, ${y}) type: ${obj.type}`);
+  console.log(`[Runtime] Created body: ${obj.id} at (${x}, ${y}) type: ${obj.bodyType || obj.type}`);
 
   return body;
 };

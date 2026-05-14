@@ -1,5 +1,6 @@
 import Matter from 'matter-js';
 import { toPixels, toWorld } from '../utils/coordinateUtils';
+import assetCatalog from '../asset_catalog.json';
 
 /**
  * Custom Canvas-based renderer for EduSim
@@ -21,6 +22,46 @@ class EduSimRenderer {
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
+    this.images = new Map();
+  }
+
+  _getAsset(assetId) {
+    if (!assetId) return null;
+    if (this.images.has(assetId)) return this.images.get(assetId);
+
+    // Resolve path from catalog
+    let path = null;
+    
+    // 1. Exact match
+    for (const category in assetCatalog) {
+      const asset = assetCatalog[category].find(a => a.id === assetId);
+      if (asset) {
+        path = asset.path;
+        break;
+      }
+    }
+
+    // 2. Fuzzy match (starts with) - common if AI omits the number (e.g. ball_basket vs ball_basket1)
+    if (!path) {
+      for (const category in assetCatalog) {
+        const asset = assetCatalog[category].find(a => a.id.startsWith(assetId));
+        if (asset) {
+          console.warn(`Asset exact match failed for "${assetId}", using fuzzy match: "${asset.id}"`);
+          path = asset.path;
+          break;
+        }
+      }
+    }
+
+    if (!path) {
+      // Fallback to legacy path if not in catalog
+      path = assetId.includes('.') ? assetId : `/assets/simulations/${assetId}.png`;
+    }
+
+    const img = new Image();
+    img.src = path;
+    this.images.set(assetId, img);
+    return img;
   }
 
   setValidation(results) {
@@ -104,11 +145,55 @@ class EduSimRenderer {
   drawBody(body) {
     const { position, angle, plugin } = body;
     const visual = plugin?.visual;
+    const asset = visual?.asset;
 
     this.ctx.save();
     this.ctx.translate(position.x, position.y);
-    this.ctx.rotate(angle);
 
+    // 1. Try Rendering Asset
+    if (asset?.enabled && asset?.assetId) {
+      const img = this._getAsset(asset.assetId);
+      if (img && img.complete && img.naturalWidth !== 0) {
+        if (asset.rotationSync !== false) {
+          this.ctx.rotate(angle);
+        }
+
+        const scale = asset.scale || 1.0;
+        const anchor = asset.anchor || { x: 0.5, y: 0.5 };
+
+        // Determine target dimensions based on shape
+        let targetW, targetH;
+        if (visual.shape === 'circle') {
+          targetW = targetH = toPixels(visual.radius || 1) * 2;
+        } else {
+          targetW = toPixels(visual.width || 1);
+          targetH = toPixels(visual.height || 1);
+        }
+
+        const drawW = targetW * scale;
+        const drawH = targetH * scale;
+
+        this.ctx.drawImage(
+          img,
+          -drawW * anchor.x,
+          -drawH * anchor.y,
+          drawW,
+          drawH
+        );
+        this.ctx.restore();
+        this._drawLabel(body);
+        return;
+      }
+    }
+
+    // 2. Fallback to Primitive Rendering
+    this.ctx.rotate(angle);
+    this._drawShape(visual);
+    this.ctx.restore();
+    this._drawLabel(body);
+  }
+
+  _drawShape(visual) {
     this.ctx.fillStyle = visual?.color || '#3b82f6';
     this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
     this.ctx.lineWidth = 2;
@@ -125,19 +210,21 @@ class EduSimRenderer {
       this.ctx.fillRect(-width / 2, -height / 2, width, height);
       this.ctx.strokeRect(-width / 2, -height / 2, width, height);
     }
+  }
 
+  _drawLabel(body) {
+    const { position, plugin } = body;
+    const visual = plugin?.visual;
+    if (!visual?.label) return;
+
+    this.ctx.save();
+    this.ctx.translate(position.x, position.y);
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = 'bold 12px Inter, sans-serif';
+    this.ctx.textAlign = 'center';
+    const offset = visual?.shape === 'circle' ? toPixels(visual.radius || 1) : toPixels(visual?.height || 1) / 2;
+    this.ctx.fillText(visual.label, 0, -offset - 10);
     this.ctx.restore();
-
-    if (visual?.label) {
-      this.ctx.save();
-      this.ctx.translate(position.x, position.y);
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.font = 'bold 12px Inter, sans-serif';
-      this.ctx.textAlign = 'center';
-      const offset = visual?.shape === 'circle' ? toPixels(visual.radius || 1) : toPixels(visual?.height || 1) / 2;
-      this.ctx.fillText(visual.label, 0, -offset - 10);
-      this.ctx.restore();
-    }
   }
 
   drawConstraint(constraint) {
@@ -158,7 +245,7 @@ class EduSimRenderer {
   drawHUD() {
     const pixelRatio = window.devicePixelRatio;
     const ctx = this.ctx;
-    
+
     ctx.save();
     ctx.scale(pixelRatio, pixelRatio);
 
@@ -187,7 +274,7 @@ class EduSimRenderer {
       ctx.fillStyle = '#cbd5e1';
       ctx.font = 'bold 10px Inter';
       ctx.fillText('RELEVANT FORMULAS:', 20, 65);
-      
+
       formulas.forEach((f, i) => {
         const isActive = activeFormula && f.includes(activeFormula.replace(/[π√()]/g, ''));
         // Simplified matching: check if formula string contains the core logic
@@ -211,12 +298,12 @@ class EduSimRenderer {
       ctx.fillStyle = '#94a3b8';
       ctx.font = 'bold 9px Inter';
       ctx.fillText('ACTIVE VERIFICATION: ' + res.type.toUpperCase(), 20, 155);
-      
+
       ctx.fillStyle = '#ffffff';
       ctx.font = '10px Inter';
       const label = res.unit || 'Value';
       ctx.fillText(`${label}:`, 20, 175);
-      
+
       ctx.fillStyle = '#fbbf24';
       ctx.fillText(`THEORY: ${Object.values(res.expected)[0]?.toFixed(2)}`, 90, 175);
       ctx.fillStyle = '#10b981';

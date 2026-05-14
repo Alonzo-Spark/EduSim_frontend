@@ -94,12 +94,14 @@ export class SimulationLoader {
 
   _applyRuntimeLogic() {
     this.forceMap.forEach(force => {
-      if (!force.enabled) return;
+      if (force.enabled === false) return;
       const body = this.bodyMap.get(force.target);
       if (body) {
+        // Use a multiplier that makes slider values feel physically significant
+        const multiplier = 0.005; 
         Matter.Body.applyForce(body, body.position, {
-          x: force.vector.x * 0.001, 
-          y: force.vector.y * 0.001
+          x: force.vector.x * multiplier, 
+          y: force.vector.y * multiplier
         });
       }
     });
@@ -158,6 +160,9 @@ export class SimulationLoader {
 
   play() {
     if (this.runner && this.engine) {
+      console.log('[Runtime] Starting physics runner...');
+      // Ensure we don't double-run by stopping first
+      Matter.Runner.stop(this.runner);
       Matter.Runner.run(this.runner, this.engine);
       if (this.renderer) this.renderer.start();
     }
@@ -191,18 +196,19 @@ export class SimulationLoader {
       const dslObject = this.dsl.objects[index];
       const body = this.bodyMap.get(dslObject.id);
       if (body) {
-        if (property === 'physics.mass') Matter.Body.setMass(body, value);
+        if (property === 'physics.mass' || property === 'mass') {
+          Matter.Body.setStatic(body, false); // Ensure it's not static if we're changing mass
+          Matter.Body.setMass(body, parseFloat(value));
+        }
         if (property === 'material.friction') body.friction = value;
         if (property === 'material.restitution') body.restitution = value;
         if (property === 'velocity.x') Matter.Body.setVelocity(body, { x: toPixels(value), y: body.velocity.y });
         if (property === 'velocity.y') Matter.Body.setVelocity(body, { x: body.velocity.x, y: toPixels(value) });
         
-        // Update initial state for validator if property is changed while paused
-        if (!this.runner || !this.runner.enabled) {
-          const state = this.liveState.initialStates.get(dslObject.id);
-          if (state) {
-            if (property === 'velocity.y') state.u0y = value;
-          }
+        // Update initial state for validator
+        const state = this.liveState.initialStates.get(dslObject.id);
+        if (state) {
+          if (property === 'velocity.y') state.u0y = value;
         }
       }
     }
@@ -225,8 +231,18 @@ export class SimulationLoader {
       const force = this.dsl.forces[index];
       if (force) {
         if (property === 'enabled') force.enabled = value;
-        if (property === 'vector.x') force.vector.x = value;
-        if (property === 'vector.y') force.vector.y = value;
+        if (property === 'vector.x') force.vector.x = parseFloat(value);
+        if (property === 'vector.y') force.vector.y = parseFloat(value);
+        if (property === 'magnitude') {
+           // If it's a magnitude slider, assume x-direction or existing direction
+           const angle = Math.atan2(force.vector.y, force.vector.x);
+           force.vector.x = Math.cos(angle) * value;
+           force.vector.y = Math.sin(angle) * value;
+        }
+        
+        // Ensure the body it's attached to is not static
+        const body = this.bodyMap.get(force.target);
+        if (body && force.enabled) Matter.Body.setStatic(body, false);
       }
     }
 
@@ -238,6 +254,64 @@ export class SimulationLoader {
       if (behavior) {
         if (property === 'enabled') behavior.enabled = value;
       }
+    }
+  }
+
+  /**
+   * Triggers a custom action defined in the DSL (e.g. impulses, state resets)
+   */
+  triggerAction(actionName) {
+    const action = this.dsl.controls.actions.find(a => a.action === actionName);
+    const label = action?.label?.toLowerCase() || "";
+    
+    if (!action) {
+      console.warn(`[Runtime] Action "${actionName}" not found in DSL.`);
+      return;
+    }
+
+    console.log(`[Runtime] Executing action: ${action.label} (${actionName})`);
+
+    // Smart Detection: If label implies a force, treat it as an impulse even if type is generic
+    const isImpulse = action.type === 'impulse' || 
+                      actionName.includes('Force') || 
+                      actionName.includes('Impulse') ||
+                      label.includes('force') || 
+                      label.includes('push');
+
+    // 1. Apply Impulse / Force
+    if (isImpulse) {
+      const targetId = action.params?.target || this.dsl.objects.find(o => !o.isStatic)?.id;
+      const body = this.bodyMap.get(targetId);
+      if (body) {
+        // Significant impulse scaled by mass for visibility
+        const force = action.params?.vector || { x: 0.2 * body.mass, y: 0 };
+        
+        console.log(`[Runtime] Applying smart impulse to ${targetId}:`, force);
+        
+        Matter.Body.applyForce(body, body.position, {
+          x: force.x,
+          y: force.y
+        });
+      } else {
+        console.warn(`[Runtime] Action target "${targetId}" not found for impulse.`);
+      }
+    }
+
+    // 2. Set Velocity
+    if (action.type === 'setVelocity') {
+      const targetId = action.params?.target || this.dsl.objects.find(o => !o.isStatic)?.id;
+      const body = this.bodyMap.get(targetId);
+      if (body && action.params?.velocity) {
+        Matter.Body.setVelocity(body, {
+          x: toPixels(action.params.velocity.x),
+          y: toPixels(action.params.velocity.y)
+        });
+      }
+    }
+
+    // 3. Reset Simulation (Custom)
+    if (actionName === 'resetSimulation') {
+      this.reset();
     }
   }
 
@@ -270,13 +344,37 @@ export class SimulationLoader {
 
     // Extract current values for all objects
     this.bodyMap.forEach((body, id) => {
+      const mass = body.mass || 1;
+      
+      // Calculate net force applied to this body
+      let netForceX = 0;
+      let netForceY = 0;
+      this.forceMap.forEach(f => {
+        if (f.target === id && f.enabled !== false) {
+          netForceX += f.vector.x;
+          netForceY += f.vector.y;
+        }
+      });
+
       state.values[`objects.${id}.position.x`] = toWorld(body.position.x);
       state.values[`objects.${id}.position.y`] = toWorld(body.position.y);
       state.values[`objects.${id}.velocity.x`] = toWorld(body.velocity.x);
       state.values[`objects.${id}.velocity.y`] = toWorld(body.velocity.y);
       state.values[`objects.${id}.velocity.magnitude`] = toWorld(Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2));
-      state.values[`objects.${id}.physics.mass`] = body.mass;
+      state.values[`objects.${id}.physics.mass`] = mass;
+      
+      // Add acceleration (F/m)
+      state.values[`objects.${id}.acceleration.x`] = netForceX / mass;
+      state.values[`objects.${id}.acceleration.y`] = netForceY / mass;
+      state.values[`objects.${id}.acceleration.magnitude`] = Math.sqrt(netForceX**2 + netForceY**2) / mass;
     });
+
+    // Add legacy support for generic keys if there is only one object
+    const firstBody = Array.from(this.bodyMap.values())[0];
+    if (firstBody) {
+      state.values['acceleration'] = state.values[`objects.${Array.from(this.bodyMap.keys())[0]}.acceleration.magnitude`];
+      state.values['velocity'] = state.values[`objects.${Array.from(this.bodyMap.keys())[0]}.velocity.magnitude`];
+    }
 
     // Add calculated fields from liveState
     state.values['runtime.calculated.period'] = this.liveState.lastMeasuredPeriod;

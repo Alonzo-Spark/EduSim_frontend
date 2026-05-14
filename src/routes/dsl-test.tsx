@@ -146,7 +146,7 @@ function DSLTestPage() {
                 </div>
 
                 <TabsContent value="simulation" className="mt-0 outline-none">
-                  <DSLRuntime dsl={result.dsl} />
+                  <DSLRuntime dsl={{ ...result.dsl, knowledge: result.knowledge }} />
                 </TabsContent>
 
                 <TabsContent value="dsl" className="mt-0 outline-none">

@@ -14,7 +14,7 @@ export const validateSimulation = (dsl, liveState) => {
   };
 
   // 1. Detect Scenario: Pendulum
-  const rope = constraints?.find(c => c.type === 'rope' || c.type === 'string');
+  const rope = constraints?.find(c => c.type === 'rope' || c.type === 'string' || c.type === 'link' || c.length > 0);
   if (rope) {
     const L = rope.length;
     const g = environment.gravity.y;
@@ -30,7 +30,7 @@ export const validateSimulation = (dsl, liveState) => {
 
   // 2. Detect Scenario: Free Fall / Projectile
   else if (environment.gravity.y !== undefined && objects.length > 0) {
-    const dynamicObj = objects.find(obj => obj.type === 'dynamicBody');
+    const dynamicObj = objects.find(obj => obj.bodyType === 'dynamic' || obj.type === 'dynamicBody');
     const initialState = liveState.initialStates.get(dynamicObj?.id);
     
     if (dynamicObj && initialState) {
