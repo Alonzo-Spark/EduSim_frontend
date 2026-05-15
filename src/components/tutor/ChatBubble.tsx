@@ -1,6 +1,11 @@
 import React from "react";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+
+import "katex/dist/katex.min.css";
 import { User, Bot } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -13,6 +18,18 @@ interface ChatBubbleProps {
 export function ChatBubble({ content, role, timestamp }: ChatBubbleProps) {
   const isAi = role === "ai";
   const { theme } = useTheme();
+
+  const warningText1 = "This topic is not available in the provided textbook context.";
+  const warningText2 = "The following explanation is AI-generated and may not exactly match your textbook.";
+  
+  const hasWarning = content.includes(warningText1) || content.includes(warningText2);
+  let cleanContent = content;
+  if (hasWarning) {
+      cleanContent = cleanContent
+        .replace(warningText1, "")
+        .replace(warningText2, "")
+        .trim();
+  }
 
   return (
     <motion.div
@@ -37,9 +54,18 @@ export function ChatBubble({ content, role, timestamp }: ChatBubbleProps) {
               : "bg-primary/10 border border-primary/30 text-foreground"
           }`}
         >
-          <div className={`prose prose-sm max-w-none ${theme === 'dark' ? 'prose-invert' : ''}`}>
-            <ReactMarkdown>
-              {content}
+          <div className={`prose max-w-none ${theme === 'dark' ? 'prose-invert' : ''}`}>
+            {hasWarning && (
+              <div className="text-red-500 font-semibold mb-4 space-y-1">
+                <p>{warningText1}</p>
+                <p>{warningText2}</p>
+              </div>
+            )}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+            >
+              {cleanContent}
             </ReactMarkdown>
           </div>
         </div>

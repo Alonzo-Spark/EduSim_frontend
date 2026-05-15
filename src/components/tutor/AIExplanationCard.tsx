@@ -60,16 +60,7 @@ export function AIExplanationCard({ content, isLoading }: AIExplanationCardProps
       </div>
 
       <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar">
-        <div className={`prose prose-indigo max-w-none ${theme === "dark" ? "prose-invert" : ""}
-          prose-headings:text-primary dark:prose-headings:text-primary prose-headings:font-bold prose-headings:mt-6 prose-headings:mb-4
-          prose-p:text-foreground/90 prose-p:leading-relaxed prose-p:mb-4
-          prose-strong:text-foreground prose-strong:font-bold
-          prose-ul:list-disc prose-ul:pl-6 prose-ul:mb-4 prose-ul:space-y-2
-          prose-ol:list-decimal prose-ol:pl-6 prose-ol:mb-4 prose-ol:space-y-2
-          prose-li:text-foreground/90
-          prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none
-          prose-blockquote:border-l-primary prose-blockquote:bg-secondary/30 prose-blockquote:px-4 prose-blockquote:py-1 prose-blockquote:rounded-r-lg
-        `}>
+        <div className={`prose max-w-none ${theme === "dark" ? "prose-invert" : ""}`}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkMath]}
             rehypePlugins={[rehypeKatex]}
