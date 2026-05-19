@@ -1,0 +1,213 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+@import "katex/dist/katex.min.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+
+  --color-indigo-glow: var(--indigo-glow);
+  --color-cyan-glow: var(--cyan-glow);
+  --color-purple-glow: var(--purple-glow);
+  --color-emerald-glow: var(--emerald-glow);
+  --color-amber-glow: var(--amber-glow);
+
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border-glow: var(--border-glow);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --shadow-glow-indigo: 0 0 30px -8px oklch(0.65 0.22 280 / 0.55);
+  --shadow-glow-cyan: 0 0 30px -8px oklch(0.78 0.16 210 / 0.55);
+  --shadow-glow-purple: 0 0 30px -8px oklch(0.7 0.22 310 / 0.55);
+  --shadow-glow-emerald: 0 0 30px -8px oklch(0.75 0.18 160 / 0.55);
+}
+
+:root {
+  --radius: 0.875rem;
+
+  /* Deep cosmic background */
+  --background: oklch(0.15 0.03 270);
+  --foreground: oklch(0.97 0.01 250);
+
+  --surface: oklch(0.19 0.035 270);
+  --surface-elevated: oklch(0.23 0.04 270);
+
+  --card: oklch(0.21 0.035 270);
+  --card-foreground: oklch(0.97 0.01 250);
+  --popover: oklch(0.21 0.04 270);
+  --popover-foreground: oklch(0.97 0.01 250);
+
+  --primary: oklch(0.68 0.21 280);
+  --primary-foreground: oklch(0.98 0.005 250);
+
+  --secondary: oklch(0.27 0.04 270);
+  --secondary-foreground: oklch(0.97 0.01 250);
+
+  --muted: oklch(0.25 0.035 270);
+  --muted-foreground: oklch(0.72 0.03 260);
+
+  --accent: oklch(0.78 0.16 210);
+  --accent-foreground: oklch(0.15 0.03 270);
+
+  --destructive: oklch(0.65 0.24 27);
+  --destructive-foreground: oklch(0.98 0.005 250);
+
+  --border: oklch(1 0 0 / 8%);
+  --border-glow: oklch(0.68 0.21 280 / 30%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.68 0.21 280 / 60%);
+
+  --indigo-glow: oklch(0.68 0.21 280);
+  --cyan-glow: oklch(0.78 0.16 210);
+  --purple-glow: oklch(0.7 0.22 310);
+  --emerald-glow: oklch(0.75 0.18 160);
+  --amber-glow: oklch(0.82 0.17 70);
+
+  --chart-1: oklch(0.68 0.21 280);
+  --chart-2: oklch(0.78 0.16 210);
+  --chart-3: oklch(0.7 0.22 310);
+  --chart-4: oklch(0.75 0.18 160);
+  --chart-5: oklch(0.82 0.17 70);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html, body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.68 0.21 280 / 0.18), transparent),
+      radial-gradient(ellipse 60% 50% at 90% 100%, oklch(0.78 0.16 210 / 0.12), transparent),
+      radial-gradient(ellipse 50% 40% at 10% 80%, oklch(0.7 0.22 310 / 0.1), transparent);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .glow-card {
+    background: color-mix(in oklab, var(--card) 80%, transparent);
+    border: 1px solid var(--border-glow);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-radius: var(--radius-lg);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .glow-card:hover {
+    border-color: color-mix(in oklab, var(--indigo-glow) 60%, transparent);
+    box-shadow: var(--shadow-glow-indigo);
+    transform: translateY(-2px);
+  }
+
+  .glow-border {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border-glow);
+  }
+
+  .glow-border::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--indigo-glow), var(--cyan-glow), var(--purple-glow));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .gradient-text {
+    background: linear-gradient(120deg, var(--indigo-glow), var(--cyan-glow), var(--purple-glow));
+    -webkit-background-clip: text;
+            background-clip: text;
+    color: transparent;
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklab, var(--indigo-glow) 20%, transparent) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer-sweep 2s linear infinite;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-glow) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--border-glow);
+    border-radius: 999px;
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.68 0.21 280 / 0.45); }
+  50%      { box-shadow: 0 0 0 12px oklch(0.68 0.21 280 / 0); }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+.animate-pulse-glow { animation: pulse-glow 2.4s ease-in-out infinite; }
+.animate-float-slow { animation: float-slow 4s ease-in-out infinite; }

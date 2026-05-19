@@ -1,0 +1,42 @@
+{
+  "textbooks": [
+    {
+      "sourceKey": "class-9-physics-ncert",
+      "file": "data/textbooks/class-9/physics/ncert-physics.pdf",
+      "title": "NCERT Class 9 Science - Physics sections",
+      "sourceName": "NCERT Class 9 Physics",
+      "language": "en",
+      "metadata": {
+        "grade": 9,
+        "subject": "Physics",
+        "chapter": "Motion",
+        "curriculum": "NCERT"
+      }
+    },
+    {
+      "sourceKey": "class-9-biology-ncert",
+      "file": "data/textbooks/class-9/biology/ncert-biology.pdf",
+      "title": "NCERT Class 9 Science - Biology sections",
+      "sourceName": "NCERT Class 9 Biology",
+      "language": "en",
+      "metadata": {
+        "grade": 9,
+        "subject": "Biology",
+        "chapter": "The Fundamental Unit of Life",
+        "curriculum": "NCERT"
+      }
+    },
+    {
+      "sourceKey": "class-9-maths-ncert",
+      "file": "data/textbooks/class-9/maths/ncert-maths.pdf",
+      "title": "NCERT Class 9 Mathematics",
+      "sourceName": "NCERT Class 9 Maths",
+      "language": "en",
+      "metadata": {
+        "grade": 9,
+        "subject": "Mathematics",
+        "curriculum": "NCERT"
+      }
+    }
+  ]
+}
