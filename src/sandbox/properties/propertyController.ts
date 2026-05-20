@@ -144,6 +144,12 @@ export class PropertyController {
         }
         break;
 
+      case 'lockRotation':
+        if (typeof value !== 'boolean') {
+          return { valid: false, error: 'lockRotation must be a boolean.' };
+        }
+        break;
+
       case 'opacity':
         if (typeof value !== 'number' || value < 0 || value > 1 || !isFinite(value)) {
           return { valid: false, error: 'Opacity must be a number between 0 and 1.' };
@@ -346,6 +352,28 @@ export class PropertyController {
         // Keeps both graphics and physics aligned
         Matter.Body.setAngle(body, value);
         display.rotation = value;
+        break;
+
+      case 'lockRotation':
+        if (value) {
+          // Lock rotation: set inertia to Infinity, preventing torque from rotating the body
+          if (body.inertia !== Infinity) {
+            (body as any)._originalInertia = body.inertia;
+          }
+          Matter.Body.setInertia(body, Infinity);
+          Matter.Body.setAngularVelocity(body, 0);
+          Matter.Body.setAngle(body, 0); // snap back flat
+          display.rotation = 0;
+        } else {
+          // Unlock rotation: restore original inertia or calculate standard inertia
+          const original = (body as any)._originalInertia;
+          if (original && original !== Infinity) {
+            Matter.Body.setInertia(body, original);
+          } else {
+            const defaultInertia = body.mass * 100;
+            Matter.Body.setInertia(body, defaultInertia);
+          }
+        }
         break;
 
       case 'fillColor':

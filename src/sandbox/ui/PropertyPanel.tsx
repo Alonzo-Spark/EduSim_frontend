@@ -518,6 +518,26 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 {body.isStatic ? '🔒 Static Boundary' : '🔓 Dynamic Physics'}
               </button>
             </div>
+
+            {/* Lock Rotation Toggle */}
+            <div style={S.toggleRow}>
+              <span style={S.controlLabel}>Rotation Lock</span>
+              <button
+                onClick={() => {
+                  const isLocked = body.inertia === Infinity;
+                  propertyController.updateProperty(selected.id, 'lockRotation', !isLocked);
+                  setPropertyVersion((v) => v + 1); // trigger state update to force UI repaint
+                }}
+                style={{
+                  ...S.toggleBtn,
+                  backgroundColor: body.inertia === Infinity ? 'rgba(167, 139, 250, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                  borderColor: body.inertia === Infinity ? 'rgba(167, 139, 250, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+                  color: body.inertia === Infinity ? '#c084fc' : '#94a3b8',
+                }}
+              >
+                {body.inertia === Infinity ? '🔒 Rotation Locked' : '🔓 Free Rotation'}
+              </button>
+            </div>
           </div>
         )}
       </div>

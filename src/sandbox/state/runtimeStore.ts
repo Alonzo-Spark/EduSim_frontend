@@ -75,7 +75,11 @@ export class RuntimeStore {
 
   addObject(obj: RuntimeObject): void {
     this.registry.add(obj);
-    this.metadata.set(obj.id, {});
+    // Seed metadata from the object's own metadata so educationalTags survive
+    this.metadata.set(obj.id, {
+      label: obj.metadata?.label,
+      educationalTags: obj.metadata?.educationalTags ?? [],
+    });
     this.notify('objectAdded', obj);
   }
 

@@ -8,6 +8,8 @@ import { ObservableEngine } from '../observables/observableEngine';
 import { RuntimeStore } from '../state/runtimeStore';
 import { PropertyController } from '../properties/propertyController';
 import { PropertyPanel } from '../ui/PropertyPanel';
+import { TutorOverlay } from '../ui/TutorOverlay';
+import { inferActiveTopics, topicChanged, type TopicResult } from '../intelligence/topicInference';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -193,7 +195,7 @@ export const SandboxCanvas: React.FC = () => {
   }, [selected, propertyVersion]);
 
   // Panel drag-and-drop state
-  type PanelDragType = 'circle' | 'rectangle' | 'pivot' | 'spring' | 'rope' | null;
+  type PanelDragType = 'circle' | 'rectangle' | 'pendulum-rope' | 'pivot' | 'spring' | 'rope' | null;
   const panelDragRef = useRef<PanelDragType>(null);          // type being dragged
   const didDragRef = useRef(false);                        // suppresses onClick after a real drag
   const hoveredBodyRef = useRef<Body | null>(null);
@@ -209,12 +211,14 @@ export const SandboxCanvas: React.FC = () => {
     if (!rt || !creg) return;
 
     const allBodies = rt.physics.getWorld().bodies;
-    const sensors = allBodies.filter(b => b.label && b.label.startsWith("sensor-target:"));
+    const sensors = allBodies.filter(b => b.label && b.label.startsWith('sensor-target:'));
 
     for (const sensor of sensors) {
       const dist = Math.hypot(newBody.position.x - sensor.position.x, newBody.position.y - sensor.position.y);
-      if (dist < 40) { // snap tolerance radius
-        const constraintId = sensor.label.split(":")[1];
+      if (dist < 100) { // generous snap tolerance so user can drop anywhere near the bottom of the rope
+        const parts = sensor.label.split(':');
+        const constraintId = parts[1];
+        const syncDisplayId = parts[2]; // populated by spawnPendulumRope for its visible drop-zone
         const rc = creg.getAll().find(c => c.id === constraintId);
         if (rc) {
           // Relink constraint from temporary sensor bob to real dropped shape
@@ -228,8 +232,19 @@ export const SandboxCanvas: React.FC = () => {
             rc.constraint.bodyA = newBody;
           }
 
-          // Cleanly remove sensor target bob from physics engine
+          // Remove physics sensor body
           rt.physics.removeBodies(sensor);
+
+          // Remove the visible drop-zone display that was synced to the sensor
+          if (syncDisplayId) {
+            const pair = rt.sync.getPairs().get(syncDisplayId);
+            if (pair) {
+              pair.displayObject.parent?.removeChild(pair.displayObject);
+              pair.displayObject.destroy();
+              rt.sync.unregister(syncDisplayId);
+            }
+          }
+
           break;
         }
       }
@@ -280,6 +295,46 @@ export const SandboxCanvas: React.FC = () => {
         propertyController.subscribe('constraintUpdated', () => {
           setPropertyVersion((v) => v + 1);
         });
+
+        // ── Topic inference ─────────────────────────────────────────────────
+        // Track last fired topic so we don't repeat the same message on every
+        // small update (e.g. spawning rope segments one by one).
+        let lastTopicResult: TopicResult | null = null;
+        let inferDebounceId: ReturnType<typeof setTimeout> | null = null;
+
+        const runTopicInference = () => {
+          // Debounce by one tick so that multi-body spawns (rope chain)
+          // resolve before we inspect the store.
+          if (inferDebounceId) clearTimeout(inferDebounceId);
+          inferDebounceId = setTimeout(() => {
+            const result = inferActiveTopics(store);
+            if (topicChanged(lastTopicResult, result) && result) {
+              lastTopicResult = result;
+              // Fire tutor overlay message
+              window.showTutorMessage?.({ 
+                type: result.messageType,
+                title: result.tutorTitle,
+                message: result.tutorMessage,
+                formula: result.formula,
+                duration: 7500,
+              });
+              // Auto-register recommended observables on all current dynamic objects
+              const dynamicObjs = store.getAllObjects().filter((o) => !o.body.isStatic);
+              dynamicObjs.forEach((obj) => {
+                observableEngineRef.current?.registerObservable({
+                  objectId: obj.id,
+                  types: result.recommendedObservables,
+                  label: obj.metadata?.label || obj.id,
+                  color: 0xffffff,
+                });
+              });
+            }
+          }, 120);
+        };
+
+        store.subscribe('objectAdded', runTopicInference);
+        store.subscribe('constraintAdded', runTopicInference);
+        store.subscribe('constraintRemoved', runTopicInference);
 
         // 1. Init renderer
         await rt.init(el);
@@ -751,6 +806,107 @@ export const SandboxCanvas: React.FC = () => {
     await spawnConstraintAt(type, x, y, null);
   }, [ready, spawnConstraintAt]);
 
+  /**
+   * Spawn a pendulum-rope asset at the given canvas position.
+   *
+   * Drops a complete, ready-to-swing pendulum arm:
+   *   • A static ceiling anchor pin (the pivot)
+   *   • N small rope-link circles connected by rope constraints
+   *   • A glowing receptor sensor bob at the bottom that accepts any
+   *     dropped circle or rectangle via checkConstraintSnapping()
+   *
+   * The user can then drag any Shape asset and drop it onto the
+   * blinking bob to attach it as the pendulum weight.
+   */
+  const spawnPendulumRope = useCallback(async (
+    canvasX: number,
+    canvasY: number,
+  ) => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const creg = constraintRegRef.current;
+    const store = storeRef.current;
+    if (!rt || !ia || !creg || !store || !ready) return;
+
+    const { createObject } = await import('../objects/objectFactory');
+    const { createConstraint } = await import('../constraints/constraintFactory');
+    const Matter = await import('matter-js');
+    const vp = rt.renderer.getViewport();
+
+    const ARM_LEN = 160; // px — pendulum arm length (pin → bob)
+
+    // ── 1. Static ceiling anchor pin ──────────────────────────────────────
+    const pin = createObject({
+      id: uid('rope-pin'), type: 'circle',
+      x: canvasX, y: canvasY, radius: 7,
+      isStatic: true,
+      fillColor: 0x1e293b, strokeColor: 0x6366f1, strokeWidth: 2.5,
+    });
+    vp.addChild(pin.display);
+    rt.physics.addBodies(pin.body);
+    rt.sync.register(pin.id, pin.body, pin.display);
+
+    // ── 2. Terminal receptor sensor with visible drop-zone display ──────────
+    const terminalId   = uid('rope-terminal');
+    const sensorDispId = uid('rope-sensor-disp');
+
+    const sensor = Matter.Bodies.circle(
+      canvasX,
+      canvasY + ARM_LEN,
+      16,
+      {
+        isSensor: true,
+        // Encode both IDs so checkConstraintSnapping can clean up the display
+        label: `sensor-target:${terminalId}:${sensorDispId}`,
+        density: 0.0005,
+        frictionAir: 0.04,
+      },
+    );
+    rt.physics.addBodies(sensor);
+
+    creg.add(createConstraint({
+      id: terminalId,
+      type: 'rope',
+      bodyA: pin.body,
+      bodyB: sensor,
+      length: ARM_LEN,
+      stiffness: 1,
+      damping: 0,
+    }));
+
+    // ── 4. Visible drop-zone ring that tracks the sensor via SyncRegistry ───
+    const PIXI = await import('pixi.js');
+    const dropZone = new PIXI.Container();
+
+    const ring = new PIXI.Graphics();
+    // Outer glow rings
+    ring.lineStyle(2.5, 0x6366f1, 0.9);
+    ring.drawCircle(0, 0, 20);
+    ring.lineStyle(1.5, 0x818cf8, 0.35);
+    ring.drawCircle(0, 0, 32);
+    // Inner filled dot
+    ring.beginFill(0x4f46e5, 0.35);
+    ring.drawCircle(0, 0, 10);
+    ring.endFill();
+    // Crosshair guides
+    ring.lineStyle(1, 0x818cf8, 0.6);
+    ring.moveTo(-16, 0); ring.lineTo(16, 0);
+    ring.moveTo(0, -16); ring.lineTo(0, 16);
+
+    dropZone.addChild(ring);
+    dropZone.x = canvasX;
+    dropZone.y = canvasY + ARM_LEN;
+    vp.addChild(dropZone);
+
+    // Register so the sync loop keeps the ring over the dangling sensor each frame
+    rt.sync.register(sensorDispId, sensor, dropZone);
+
+    // Track the pin so bodyCount reflects the new system
+    dynRef.current.push(pin.body);
+    setBodyCount(dynRef.current.length);
+  }, [ready]);
+
+
   // Spawn at a specific canvas-relative position (used by drop handler)
   const spawnAt = useCallback(async (
     type: 'circle' | 'rectangle',
@@ -865,6 +1021,8 @@ export const SandboxCanvas: React.FC = () => {
       const canvasY = e.clientY - r.top;
       if (['pivot', 'spring', 'rope'].includes(type)) {
         spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', canvasX, canvasY, hoveredBody);
+      } else if (type === 'pendulum-rope') {
+        spawnPendulumRope(canvasX, canvasY);
       } else {
         spawnAt(type as 'circle' | 'rectangle', canvasX, canvasY);
       }
@@ -927,6 +1085,36 @@ export const SandboxCanvas: React.FC = () => {
             onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnShape('circle'); }}
             onPointerDown={onPanelPointerDown('circle')}
           >● Circle</button>
+        </div>
+        {/* Rope as a first-class shape asset */}
+        <div
+          style={{ ...S.row, marginTop: -2 }}
+          onPointerMove={onPanelPointerMove}
+          onPointerUp={onPanelPointerUp}
+        >
+          <button
+            style={{
+              ...S.btn,
+              width: '100%',
+              cursor: ready ? 'grab' : 'not-allowed',
+              background: 'rgba(99,102,241,0.13)',
+              color: '#a5b4fc',
+              borderColor: 'rgba(99,102,241,0.28)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+            disabled={!ready}
+            onClick={() => {
+              if (didDragRef.current) { didDragRef.current = false; return; }
+              const el = mountRef.current;
+              if (!el) return;
+              const W = el.clientWidth || 800;
+              spawnPendulumRope(120 + Math.random() * (W - 240), 40 + Math.random() * 30);
+            }}
+            onPointerDown={onPanelPointerDown('pendulum-rope')}
+          >
+            <span style={{ fontSize: 13 }}>🪢</span>
+            <span>Rope  <span style={{ fontSize: 9, opacity: 0.65 }}>— drop bob to complete pendulum</span></span>
+          </button>
         </div>
 
         <Sep label="Spawn Constraints — click or drag" />
@@ -1105,6 +1293,9 @@ export const SandboxCanvas: React.FC = () => {
           Drag shapes & constraints · Drop anywhere
         </div>
 
+        {/* AI Tutor Overlay — driven by live topic inference */}
+        <TutorOverlay />
+
         {/* Floating glassmorphic STEM Laboratory HUD Overlay */}
         {selected && (
           <div style={S.floatingHud}>
@@ -1154,22 +1345,32 @@ export const SandboxCanvas: React.FC = () => {
             left: ghostPos.x,
             top: ghostPos.y,
             transform: 'translate(-50%, -50%)',
-            width: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48 : (panelDragRef.current === 'circle' ? 44 : 40),
-            height: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48 : (panelDragRef.current === 'circle' ? 44 : 40),
-            borderRadius: panelDragRef.current === 'circle' || panelDragRef.current === 'pivot' ? '50%' : 10,
+            width:  ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
+                  : panelDragRef.current === 'pendulum-rope' ? 52
+                  : (panelDragRef.current === 'circle' ? 44 : 40),
+            height: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
+                  : panelDragRef.current === 'pendulum-rope' ? 52
+                  : (panelDragRef.current === 'circle' ? 44 : 40),
+            borderRadius: panelDragRef.current === 'circle' || panelDragRef.current === 'pivot' ? '50%'
+                        : panelDragRef.current === 'pendulum-rope' ? 12
+                        : 10,
             background: panelDragRef.current === 'circle'
               ? 'rgba(16,185,129,0.55)'
               : panelDragRef.current === 'rectangle'
                 ? 'rgba(99,102,241,0.55)'
-                : panelDragRef.current === 'pivot'
-                  ? 'rgba(139,92,246,0.55)'
-                  : panelDragRef.current === 'spring'
-                    ? 'rgba(16,185,129,0.55)'
-                    : 'rgba(251,191,36,0.55)',
-            border: `2px solid ${panelDragRef.current === 'circle' || panelDragRef.current === 'spring' ? '#6ee7b7' :
-                panelDragRef.current === 'rectangle' ? '#a5b4fc' :
-                  panelDragRef.current === 'pivot' ? '#c084fc' : '#fde047'
-              }`,
+                : panelDragRef.current === 'pendulum-rope'
+                  ? 'rgba(99,102,241,0.45)'
+                  : panelDragRef.current === 'pivot'
+                    ? 'rgba(139,92,246,0.55)'
+                    : panelDragRef.current === 'spring'
+                      ? 'rgba(16,185,129,0.55)'
+                      : 'rgba(251,191,36,0.55)',
+            border: `2px solid ${
+              panelDragRef.current === 'pendulum-rope' ? '#818cf8' :
+              panelDragRef.current === 'circle' || panelDragRef.current === 'spring' ? '#6ee7b7' :
+              panelDragRef.current === 'rectangle' ? '#a5b4fc' :
+              panelDragRef.current === 'pivot' ? '#c084fc' : '#fde047'
+            }`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1187,8 +1388,10 @@ export const SandboxCanvas: React.FC = () => {
           {panelDragRef.current === 'pivot' && '📌'}
           {panelDragRef.current === 'spring' && '🌀'}
           {panelDragRef.current === 'rope' && '🔗'}
+          {panelDragRef.current === 'pendulum-rope' && '🪢'}
         </div>
       )}
+
     </div>
   );
 };
