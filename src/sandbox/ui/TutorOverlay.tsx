@@ -76,7 +76,7 @@ export const TutorOverlay: React.FC = () => {
   const [progress, setProgress] = useState(100);
   const [isVisible, setIsVisible] = useState(false);
 
-  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimerRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
 
   // Expose showTutorMessage globally for loose coupling
@@ -118,7 +118,7 @@ export const TutorOverlay: React.FC = () => {
 
     let charIdx = 0;
     const msgText = current.message;
-    typingTimerRef.current = setInterval(() => {
+    typingTimerRef.current = window.setInterval(() => {
       setDisplayedText((prev) => prev + msgText.charAt(charIdx));
       charIdx++;
       if (charIdx >= msgText.length) {

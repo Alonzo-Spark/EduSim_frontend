@@ -133,8 +133,8 @@ export class ConstraintRenderer {
    * A constraint endpoint is either a body (+ optional local offset) or a raw world point.
    */
   private resolveEndpoint(
-    body:  Matter.Body | undefined,
-    point: Matter.Vector | undefined,
+    body:  Matter.Body | null | undefined,
+    point: Matter.Vector | null | undefined,
   ): { x: number; y: number } | null {
     if (body) {
       const offset = point ?? { x: 0, y: 0 };
