@@ -4,6 +4,9 @@
  */
 
 import { SimulationConfig, validateSimulationConfig } from "@/types/simulation";
+import { fetchJsonWithRetry, logApiEvent } from "@/services/apiClient";
+import { joinUrl } from "@/utils/urlUtils";
+import { getApiUrl } from "@/config/api";
 
 export interface GenerateSimulationRequest {
   prompt: string;
@@ -23,8 +26,8 @@ class SimulationGeneratorService {
   private readonly cacheStorageKey = "edusim.simulation-generator-cache";
 
   constructor() {
-    // Get API base URL from environment or use default
-    this.apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+    // Get API base URL from central config
+    this.apiBaseUrl = getApiUrl("");
     this.loadCacheFromStorage();
   }
 
@@ -76,7 +79,7 @@ class SimulationGeneratorService {
       const cacheKey = this.normalizeKey(prompt, educationalContext);
       const cached = this.cache.get(cacheKey);
       if (cached) {
-        console.log("[simulationGenerator] cache hit", { cacheKey });
+        logApiEvent("simulationGenerator", "cache hit", { cacheKey });
         return cached;
       }
 
@@ -85,29 +88,59 @@ class SimulationGeneratorService {
         educational_context: educationalContext,
       };
 
-      console.log("[simulationGenerator] request start", { prompt: prompt.trim() });
-
-      const response = await fetch(`${this.apiBaseUrl}/api/generate-simulation`, {
+      const data = await fetchJsonWithRetry<{ success?: boolean; simulation?: SimulationConfig; scene?: any; config?: any; reasoning?: string; detail?: string }>(
+        joinUrl(this.apiBaseUrl, "/api/generate"),
+        {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(request),
         signal,
-      });
+        timeoutMs: 45000,
+        retries: 2,
+        retryDelayMs: 600,
+        scope: "simulationGenerator",
+      },
+      );
 
-      if (!response.ok) {
-        const error = await response.json();
-        return {
-          success: false,
-          error: error.detail || `API error: ${response.status}`,
+      // Extract and transform simulation data from backend response to match frontend expectations
+      const backendScene = data.scene || data.config?.scene || data.simulation || data.config;
+      let simulationConfig: any = null;
+
+      if (backendScene) {
+        // Transform backend format to frontend SimulationConfig format
+        simulationConfig = {
+          title: backendScene.title || '',
+          description: backendScene.description || '',
+          environment: {
+            width: backendScene.environment?.world?.width || 800,
+            height: backendScene.environment?.world?.height || 600,
+            gravity: backendScene.environment?.gravity?.y || 9.8, // Use y-component of gravity
+            airResistance: backendScene.environment?.airResistance || 0.005,
+            timeScale: backendScene.environment?.timeScale || 1
+          },
+          objects: (backendScene.objects || []).map((obj: any) => ({
+            id: obj.id || '',
+            type: obj.type || '',
+            position: [obj.position?.x || 0, obj.position?.y || 0],
+            velocity: obj.velocity ? [obj.velocity?.x || 0, obj.velocity?.y || 0] : undefined,
+            mass: obj.physics?.mass || obj.mass,
+            radius: obj.shape?.type === 'circle' ? obj.shape?.radius : undefined,
+            width: obj.shape?.type === 'rectangle' ? obj.shape?.width : undefined,
+            height: obj.shape?.type === 'rectangle' ? obj.shape?.height : undefined,
+            angle: obj.rotation || 0,
+            physics: {
+              static: obj.physics?.isStatic || false,
+              restitution: obj.material?.restitution || 0,
+              bounce: obj.material?.restitution > 0
+            }
+          }))
         };
       }
 
-      const data = await response.json();
-
-      // Validate the returned simulation config
-      if (!validateSimulationConfig(data.simulation)) {
+      // Validate the transformed simulation config
+      if (!simulationConfig || !validateSimulationConfig(simulationConfig)) {
         return {
           success: false,
           error: "Invalid simulation configuration returned from API",
@@ -117,15 +150,15 @@ class SimulationGeneratorService {
 
       this.cache.set(cacheKey, {
         success: true,
-        simulation: data.simulation,
+        simulation: simulationConfig,
         reasoning: data.reasoning,
       });
       this.persistCacheToStorage();
-      console.log("[simulationGenerator] request success", { cacheKey });
+      logApiEvent("simulationGenerator", "request success", { cacheKey });
 
       return {
         success: true,
-        simulation: data.simulation,
+        simulation: simulationConfig,
         reasoning: data.reasoning,
       };
     } catch (error) {

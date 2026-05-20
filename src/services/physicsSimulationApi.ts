@@ -1,3 +1,6 @@
+import { getApiUrl } from "@/config/api";
+import { joinUrl } from "@/utils/urlUtils";
+
 export interface SimulationResponse<T> {
   success: boolean;
   data?: T;
@@ -42,12 +45,12 @@ class PhysicsSimulationApi {
   private apiBaseUrl: string;
 
   constructor() {
-    this.apiBaseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+    this.apiBaseUrl = getApiUrl("");
   }
 
   async simulateMomentum(mass: number, force: number): Promise<SimulationResponse<MomentumData>> {
     try {
-      const response = await fetch(`${this.apiBaseUrl}/api/simulations/momentum`, {
+      const response = await fetch(joinUrl(this.apiBaseUrl, "/api/simulations/momentum"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -73,7 +76,7 @@ class PhysicsSimulationApi {
     force: number,
   ): Promise<SimulationResponse<ActionReactionData>> {
     try {
-      const response = await fetch(`${this.apiBaseUrl}/api/simulations/action-reaction`, {
+      const response = await fetch(joinUrl(this.apiBaseUrl, "/api/simulations/action-reaction"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -95,7 +98,7 @@ class PhysicsSimulationApi {
 
   async queryRag(query: string): Promise<SimulationResponse<RagResponseData>> {
     try {
-      const response = await fetch(`${this.apiBaseUrl}/api/rag/query`, {
+      const response = await fetch(joinUrl(this.apiBaseUrl, "/api/rag/query"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

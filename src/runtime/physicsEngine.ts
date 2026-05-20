@@ -5,17 +5,67 @@ import {
   SimulationObject,
 } from "./dsl";
 import { getValueAtPath, setValueAtPath } from "./controlBindings";
+import runtimeEvents from "@/runtime/events/runtimeEvents";
 
 type SnapshotListener = (snapshot: SimulationSnapshot) => void;
 
 const METER_TO_PIXEL = 50;
 const CLAMP_DT = 0.033; // Max delta time to prevent physics tunneling
 
+function safeNumber(value: any, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeVector(input?: { x?: number; y?: number } | null, fallback = { x: 0, y: 0 }) {
+  return {
+    x: safeNumber(input?.x, fallback.x),
+    y: safeNumber(input?.y, fallback.y),
+  };
+}
+
+function getShapeRadius(object: SimulationObject) {
+  const shape = object.shape;
+  if (shape.type === "circle" || shape.type === "sphere") {
+    return Math.max(0.1, safeNumber(shape.radius, 0.5));
+  }
+
+  if (shape.type === "rect" || shape.type === "box") {
+    const halfWidth = Math.max(0.1, safeNumber(shape.width, 1) / 2);
+    const halfHeight = Math.max(0.1, safeNumber(shape.height, 1) / 2);
+    return Math.hypot(halfWidth, halfHeight);
+  }
+
+  return Math.max(0.1, safeNumber(shape.radius ?? Math.max(shape.width ?? 1, shape.height ?? 1) / 2, 0.5));
+}
+
+function getObjectPosition(object: SimulationObject) {
+  return normalizeVector(object.physics?.position, object.position || { x: 0, y: 0 });
+}
+
+function getObjectVelocity(object: SimulationObject) {
+  return normalizeVector(object.physics?.velocity, object.velocity || { x: 0, y: 0 });
+}
+
+function getObjectMass(object: SimulationObject) {
+  const mass = safeNumber(object.physics?.mass, 1);
+  return mass > 0 ? mass : 1;
+}
+
+function getObjectRestitution(object: SimulationObject) {
+  return Math.min(1, Math.max(0, safeNumber(object.material?.restitution, 0.8)));
+}
+
+function getObjectFriction(object: SimulationObject) {
+  return Math.max(0, safeNumber(object.material?.friction, 0));
+}
+
 export class PhysicsEngine {
   private world: RuntimeWorld;
   private listeners = new Set<SnapshotListener>();
   private rafId: number | null = null;
   private lastTime = 0;
+  private speed = 1;
 
   constructor(dsl: SimulationDSL) {
     this.world = {
@@ -25,10 +75,11 @@ export class PhysicsEngine {
     };
     
     // Initialize objects with empty trails if enabled
-    this.world.dsl.objects.forEach(obj => {
-      if (obj.visual.trail) {
+    this.world.dsl.objects.forEach((obj) => {
+      if (obj.visual?.trail) {
         obj.trail = [];
       }
+      runtimeEvents.emit("entity_spawned", { entityId: obj.id, object: obj });
     });
   }
 
@@ -59,10 +110,14 @@ export class PhysicsEngine {
     if (this.rafId !== null) return;
     this.lastTime = performance.now();
     const tick = (now: number) => {
-      const dt = Math.min((now - this.lastTime) / 1000, CLAMP_DT);
+      let dt = Math.min(Math.max((now - this.lastTime) / 1000, 0), CLAMP_DT);
+      dt *= this.speed;
       this.lastTime = now;
-      this.step(dt);
-      this.emit();
+      if (!this.world.paused) {
+        this.step(dt);
+      } else {
+        this.emit();
+      }
       this.rafId = window.requestAnimationFrame(tick);
     };
     this.rafId = window.requestAnimationFrame(tick);
@@ -78,11 +133,13 @@ export class PhysicsEngine {
   pause() {
     this.world.paused = true;
     this.emit();
+    runtimeEvents.emit("runtime_paused", { time: this.world.time });
   }
 
   resume() {
     this.world.paused = false;
     this.emit();
+    runtimeEvents.emit("runtime_resumed", { time: this.world.time });
   }
 
   reset(newDsl?: SimulationDSL) {
@@ -95,6 +152,7 @@ export class PhysicsEngine {
       if (obj.visual.trail) obj.trail = [];
     });
     this.emit();
+    runtimeEvents.emit("runtime_state_changed", { state: this.world.paused ? "PAUSED" : "READY" });
   }
 
   setControl(path: string, value: any) {
@@ -102,49 +160,63 @@ export class PhysicsEngine {
     this.emit();
   }
 
+  setSpeed(multiplier: number) {
+    this.speed = Math.max(0, Number(multiplier) || 1);
+    this.emit();
+  }
+
   getControl(path: string): any {
     return getValueAtPath(this.world.dsl, path);
   }
 
-  step(dt: number) {
-    if (this.world.paused) return;
-    this.world.time += dt;
+  step(dt: number = 1 / 60) {
+    const stepDt = Math.min(Math.max(safeNumber(dt, 1 / 60), 0), CLAMP_DT);
+    if (stepDt <= 0) {
+      this.emit();
+      return;
+    }
+
+    this.world.time += stepDt;
 
     const { objects, environment } = this.world.dsl;
-    
+
     // 1. Integration Step
-    objects.forEach(obj => {
-      if (obj.physics.fixed) return;
+    objects.forEach((obj) => {
+      if (obj.physics?.fixed) return;
 
       const p = obj.physics;
-      
-      // Calculate acceleration (F/m + g)
-      // Gravity is in m/s^2, convert to px/s^2 for internal calculations or keep SI and scale at render
-      // Let's keep internal units in SI and scale during visual mapping/rendering for accuracy
-      
-      const gravity = environment.gravity;
-      const ax = gravity.x;
-      const ay = gravity.y;
+
+      const gravity = normalizeVector(environment.gravity, { x: 0, y: 0 });
+      const ax = safeNumber(gravity.x, 0);
+      const ay = safeNumber(gravity.y, 0);
 
       // Update velocity: v = v + a*dt
-      p.velocity.x += ax * dt;
-      p.velocity.y += ay * dt;
+      p.velocity.x = safeNumber(p.velocity?.x, 0) + ax * stepDt;
+      p.velocity.y = safeNumber(p.velocity?.y, 0) + ay * stepDt;
 
       // Apply damping (friction/air resistance)
-      const damping = 1 - (environment.air_resistance * dt);
+      const airResistance = Math.max(0, safeNumber(environment.air_resistance, 0));
+      const surfaceFriction = Math.max(0, safeNumber(environment.friction, 0));
+      const damping = Math.max(0, 1 - ((airResistance + surfaceFriction * 0.25) * stepDt));
       p.velocity.x *= damping;
       p.velocity.y *= damping;
 
       // Update position: s = s + v*dt
-      p.position.x += p.velocity.x * dt;
-      p.position.y += p.velocity.y * dt;
+      p.position.x = safeNumber(p.position?.x, 0) + p.velocity.x * stepDt;
+      p.position.y = safeNumber(p.position?.y, 0) + p.velocity.y * stepDt;
       
       // Update rotation
-      p.angle += p.angularVelocity * dt;
+      p.angle = safeNumber(p.angle, 0) + safeNumber(p.angularVelocity, 0) * stepDt;
+
+      if (!Number.isFinite(p.position.x)) p.position.x = 0;
+      if (!Number.isFinite(p.position.y)) p.position.y = 0;
+      if (!Number.isFinite(p.velocity.x)) p.velocity.x = 0;
+      if (!Number.isFinite(p.velocity.y)) p.velocity.y = 0;
+      if (!Number.isFinite(p.angle)) p.angle = 0;
 
       // Update trail
-      if (obj.visual.trail && obj.trail) {
-        if (this.world.time % 0.1 < dt) { // Add point every 0.1s
+      if (obj.visual?.trail && obj.trail) {
+        if (this.world.time % 0.1 < stepDt) {
           obj.trail.push({ ...p.position });
           if (obj.trail.length > 50) obj.trail.shift();
         }
@@ -153,6 +225,7 @@ export class PhysicsEngine {
 
     // 2. Collision Detection & Resolution (Basic implementation)
     this.resolveCollisions(objects);
+    this.emit();
   }
 
   private resolveCollisions(objects: SimulationObject[]) {
@@ -160,67 +233,113 @@ export class PhysicsEngine {
       for (let j = i + 1; j < objects.length; j++) {
         const a = objects[i];
         const b = objects[j];
-        
-        if (a.shape.type === 'sphere' && b.shape.type === 'sphere') {
-          this.resolveSphereCollision(a, b);
-        }
+
+        this.resolvePairCollision(a, b);
       }
     }
   }
 
-  private resolveSphereCollision(a: SimulationObject, b: SimulationObject) {
-    const r1 = a.shape.radius || 0.5;
-    const r2 = b.shape.radius || 0.5;
-    
-    const dx = b.physics.position.x - a.physics.position.x;
-    const dy = b.physics.position.y - a.physics.position.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const minDistance = r1 + r2;
+  private resolvePairCollision(a: SimulationObject, b: SimulationObject) {
+    const positionA = getObjectPosition(a);
+    const positionB = getObjectPosition(b);
+    const velocityA = getObjectVelocity(a);
+    const velocityB = getObjectVelocity(b);
+    const massA = getObjectMass(a);
+    const massB = getObjectMass(b);
+    const radiusA = getShapeRadius(a);
+    const radiusB = getShapeRadius(b);
+    const dx = positionB.x - positionA.x;
+    const dy = positionB.y - positionA.y;
+    const distance = Math.hypot(dx, dy);
+    const minimumDistance = radiusA + radiusB;
 
-    if (distance < minDistance) {
-      // Collision detected
-      const nx = dx / distance;
-      const ny = dy / distance;
-      
-      // Relative velocity
-      const rvx = b.physics.velocity.x - a.physics.velocity.x;
-      const rvy = b.physics.velocity.y - a.physics.velocity.y;
-      const velAlongNormal = rvx * nx + rvy * ny;
+    if (distance >= minimumDistance) {
+      return;
+    }
 
-      // Do not resolve if velocities are separating
-      if (velAlongNormal > 0) return;
+    const normal = distance > 1e-6 ? { x: dx / distance, y: dy / distance } : { x: 1, y: 0 };
+    const relativeVelocity = {
+      x: velocityB.x - velocityA.x,
+      y: velocityB.y - velocityA.y,
+    };
+    const velocityAlongNormal = relativeVelocity.x * normal.x + relativeVelocity.y * normal.y;
+    const restitution = Math.min(getObjectRestitution(a), getObjectRestitution(b));
 
-      const e = Math.min(a.material.restitution, b.material.restitution);
-      let j = -(1 + e) * velAlongNormal;
-      j /= (1 / a.physics.mass + 1 / b.physics.mass);
+    runtimeEvents.emit("collision_start", {
+      bodyA: a,
+      bodyB: b,
+      kind: `${a.shape.type}_${b.shape.type}`,
+      contactPoint: {
+        x: (positionA.x + positionB.x) / 2,
+        y: (positionA.y + positionB.y) / 2,
+      },
+      preVelocityA: velocityA,
+      preVelocityB: velocityB,
+      restitution,
+    });
 
-      const impulseX = j * nx;
-      const impulseY = j * ny;
+    if (velocityAlongNormal < 0) {
+      const inverseMassA = a.physics?.fixed ? 0 : 1 / massA;
+      const inverseMassB = b.physics?.fixed ? 0 : 1 / massB;
+      const inverseMassSum = inverseMassA + inverseMassB;
 
-      if (!a.physics.fixed) {
-        a.physics.velocity.x -= (1 / a.physics.mass) * impulseX;
-        a.physics.velocity.y -= (1 / a.physics.mass) * impulseY;
-      }
-      if (!b.physics.fixed) {
-        b.physics.velocity.x += (1 / b.physics.mass) * impulseX;
-        b.physics.velocity.y += (1 / b.physics.mass) * impulseY;
-      }
+      if (inverseMassSum > 0) {
+        const impulseMagnitude = -(1 + restitution) * velocityAlongNormal / inverseMassSum;
+        const impulse = {
+          x: impulseMagnitude * normal.x,
+          y: impulseMagnitude * normal.y,
+        };
 
-      // Positional correction to prevent sticking
-      const percent = 0.2;
-      const slop = 0.01;
-      const correction = Math.max(distance - minDistance, 0) / (1 / a.physics.mass + 1 / b.physics.mass) * percent;
-      const cx = correction * nx;
-      const cy = correction * ny;
-      
-      if (!a.physics.fixed) {
-        a.physics.position.x -= (1 / a.physics.mass) * cx;
-        a.physics.position.y -= (1 / a.physics.mass) * cy;
-      }
-      if (!b.physics.fixed) {
-        b.physics.position.x += (1 / b.physics.mass) * cx;
-        b.physics.position.y += (1 / b.physics.mass) * cy;
+        if (!a.physics?.fixed) {
+          a.physics.velocity.x = safeNumber(a.physics.velocity?.x, 0) - impulse.x * inverseMassA;
+          a.physics.velocity.y = safeNumber(a.physics.velocity?.y, 0) - impulse.y * inverseMassA;
+        }
+
+        if (!b.physics?.fixed) {
+          b.physics.velocity.x = safeNumber(b.physics.velocity?.x, 0) + impulse.x * inverseMassB;
+          b.physics.velocity.y = safeNumber(b.physics.velocity?.y, 0) + impulse.y * inverseMassB;
+        }
+
+        const penetration = Math.max(0, minimumDistance - distance);
+        const correctionMagnitude = (penetration / inverseMassSum) * 0.85;
+        const correction = {
+          x: correctionMagnitude * normal.x,
+          y: correctionMagnitude * normal.y,
+        };
+
+        if (!a.physics?.fixed) {
+          a.physics.position.x = safeNumber(a.physics.position?.x, 0) - correction.x * inverseMassA;
+          a.physics.position.y = safeNumber(a.physics.position?.y, 0) - correction.y * inverseMassA;
+        }
+
+        if (!b.physics?.fixed) {
+          b.physics.position.x = safeNumber(b.physics.position?.x, 0) + correction.x * inverseMassB;
+          b.physics.position.y = safeNumber(b.physics.position?.y, 0) + correction.y * inverseMassB;
+        }
+
+        runtimeEvents.emit("equation_updated", {
+          kind: "collision",
+          bodyA: a,
+          bodyB: b,
+          impulseMagnitude,
+          restitution,
+          momentum: massA * Math.hypot(a.physics.velocity.x, a.physics.velocity.y) + massB * Math.hypot(b.physics.velocity.x, b.physics.velocity.y),
+        });
       }
     }
+
+    runtimeEvents.emit("collision_end", {
+      bodyA: a,
+      bodyB: b,
+      kind: `${a.shape.type}_${b.shape.type}`,
+      contactPoint: {
+        x: (positionA.x + positionB.x) / 2,
+        y: (positionA.y + positionB.y) / 2,
+      },
+      restitution,
+      friction: Math.max(getObjectFriction(a), getObjectFriction(b)),
+      postVelocityA: getObjectVelocity(a),
+      postVelocityB: getObjectVelocity(b),
+    });
   }
 }

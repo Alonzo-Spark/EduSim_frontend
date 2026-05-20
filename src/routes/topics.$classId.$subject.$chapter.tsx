@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 import { getClass } from "@/data/curriculum";
 import { PageWrapper } from "@/components/Card";
 import { Crumbs } from "@/components/Crumbs";
-import { Play } from "lucide-react";
+import { Play, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { FloatingSimulationWorkspaceOverlay } from "@/components/simulation/FloatingSimulationWorkspaceOverlay";
 
 export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
   beforeLoad: ({ params }) => {
@@ -30,13 +32,27 @@ export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
     const chapter = s.chapters.find((ch) => ch.name === params.chapter);
     if (!chapter) throw notFound();
 
-    return { c, s, chapter };
+    return { c, s, chapter, classId: params.classId, subjectId: params.subject };
   },
 });
 
 function TopicsPage() {
-  const { c, s, chapter } = Route.useLoaderData();
+  const { c, s, chapter, classId, subjectId } = Route.useLoaderData();
   const navigate = useNavigate();
+  
+  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<any>(null);
+
+  const handleGenerateSimulation = (topic: any) => {
+    setSelectedTopic({
+      ...topic,
+      classId,
+      subject: subjectId,
+      chapter: chapter.name,
+      title: topic.name
+    });
+    setIsOverlayOpen(true);
+  };
 
   return (
     <PageWrapper>
@@ -77,30 +93,45 @@ function TopicsPage() {
                 <h3 className="font-semibold">{topic.name}</h3>
 
                 <p className="text-xs text-muted-foreground">
-                  {topic.hasSimulation ? "Interactive simulation available" : "Theory topic"}
+                  {topic.hasSimulation ? "Premium simulation available" : "Theory topic"}
                 </p>
               </div>
             </div>
 
-            {topic.hasSimulation && topic.simulationRoute ? (
+            <div className="flex items-center gap-2">
+              {topic.hasSimulation && topic.simulationRoute ? (
+                <motion.button
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() =>
+                    navigate({
+                      to: topic.simulationRoute,
+                    })
+                  }
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 text-white text-sm font-medium border border-white/5 hover:bg-slate-700 transition-shadow"
+                >
+                  <Play className="w-4 h-4" /> Lab
+                </motion.button>
+              ) : null}
+
               <motion.button
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.96 }}
-                onClick={() =>
-                  navigate({
-                    to: topic.simulationRoute,
-                  })
-                }
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white text-sm font-medium hover:glow-purple transition-shadow"
+                onClick={() => handleGenerateSimulation(topic)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white text-sm font-medium hover:glow-purple transition-shadow shadow-lg shadow-indigo-500/20"
               >
-                <Play className="w-4 h-4" /> Simulate
+                <Sparkles className="w-4 h-4" /> Generate Simulation
               </motion.button>
-            ) : (
-              <div className="text-xs text-muted-foreground">No simulation</div>
-            )}
+            </div>
           </motion.div>
         ))}
       </div>
+
+      <FloatingSimulationWorkspaceOverlay 
+        isOpen={isOverlayOpen} 
+        onClose={() => setIsOverlayOpen(false)}
+        simulation={selectedTopic}
+      />
     </PageWrapper>
   );
 }

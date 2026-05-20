@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Sparkles, Wand2, Lightbulb } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSimulationStore } from "@/store/useSimulationStore";
-import { useRouterState } from "@tanstack/react-router";
+
 import { SimulationPromptPanel } from "@/components/simulation/SimulationPromptPanel";
 import { toast } from "sonner";
 import { useAgentSimulation } from "@/hooks/useAgentSimulation";
 import { useSavedSimulations } from "@/hooks/useSavedSimulations";
 import { FloatingSimulationWorkspaceOverlay } from "@/components/simulation/FloatingSimulationWorkspaceOverlay";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 
 export function FloatingButton() {
   const { 
@@ -22,55 +22,106 @@ export function FloatingButton() {
     savedSimulations,
     setGeneratingSimulation
   } = useSimulationStore();
+
+  useEffect(() => {
+    import("@/services/agentSimulationService").then(({ agentSimulationService }) => {
+      agentSimulationService.ping().then(status => {
+        if (status.success) {
+          console.log("✅ EduSim_API Connection Verified:", status.message);
+        } else {
+          console.error("❌ EduSim_API Connection Failed:", status.message);
+        }
+      });
+    });
+  }, []);
   
   const routerState = useRouterState();
   const isTutorPage = routerState.location.pathname === "/tutor";
 
-  const { generateStream, loading, simulation, error } = useAgentSimulation();
+  const { generateStream, loading, simulation, error, progress, progressPercentage } = useAgentSimulation();
   const { saveSimulation } = useSavedSimulations();
 
   const [isWorkspaceOverlayOpen, setIsWorkspaceOverlayOpen] = useState(false);
   const [overlaySimData, setOverlaySimData] = useState<any>(null);
+  const [currentPromptState, setCurrentPromptState] = useState<string>("");
 
   const handleGenerate = async (prompt: string) => {
     toast.info("Initializing AI simulation agent...");
-    
-    // Immediately open our custom workspace overlay with high-fidelity contextual layout parameters
-    const synthesizedSim = {
-      title: prompt.split(".")[0] || "Custom Physics Studio",
-      topic: { topic: prompt.split(".")[0] || "Custom Physics Studio" }
-    };
-    setOverlaySimData(synthesizedSim);
-    setIsWorkspaceOverlayOpen(true);
     setSimulationModalOpen(false);
-
-    await generateStream(prompt);
+    setCurrentPromptState(prompt);
+    
+    // Open overlay immediately with initial context state to guarantee UX flow continuity
+    setOverlaySimData({
+      title: prompt.split(".")[0] || "Synthesizing AI Scenario",
+      isGeneratingStream: true,
+      prompt,
+      loading: true,
+      error: null,
+      progressPercentage: 5,
+      progressStage: "Initializing AI simulation agent...",
+      onRetry: () => handleGenerate(prompt)
+    });
+    setIsWorkspaceOverlayOpen(true);
+    
+    console.log("Starting simulation generation");
+    try {
+      await generateStream(prompt);
+      console.log("AI response received");
+      console.log("DSL generated");
+      console.log("Loading complete");
+    } catch (err: any) {
+      console.error("Generation failed:", err);
+      // Ensure local loading state in overlaySimData is cleared so UI recovers cleanly
+      setOverlaySimData((prev: any) => ({
+        ...prev,
+        loading: false,
+        error: err?.message || "Connection timeout during AI pipeline execution.",
+      }));
+    } finally {
+      // Guarantee loading overlay unblocks regardless of Promise status
+      setOverlaySimData((prev: any) => prev ? ({ ...prev, loading: false }) : null);
+    }
   };
 
+  // Synchronize dynamic updates during live SSE synthesis frames
   useEffect(() => {
-    if (simulation) {
-      saveSimulation({
-        id: simulation.id,
-        title: simulation.title,
-        subject: simulation.topic?.subject || "Physics",
-        type: "dsl",
-        simulation: simulation.dsl,
-      });
-      toast.success("Simulation generated and saved to library!");
-      setOverlaySimData(simulation);
-      setIsWorkspaceOverlayOpen(true);
+    if (isWorkspaceOverlayOpen) {
+      setOverlaySimData((prev: any) => ({
+        ...prev,
+        ...simulation,
+        dsl: simulation?.dsl || prev?.dsl,
+        title: simulation?.title || prev?.title || "Dynamic Physics Laboratory",
+        loading,
+        error: error || prev?.error || null,
+        progressPercentage: progressPercentage || prev?.progressPercentage || 10,
+        progressStage: progress?.stage || prev?.progressStage || "Synthesizing scenario parameters...",
+        prompt: currentPromptState || prev?.prompt,
+        onRetry: () => handleGenerate(currentPromptState || prev?.prompt || "")
+      }));
     }
-  }, [simulation, saveSimulation]);
+  }, [simulation, loading, error, progressPercentage, progress, isWorkspaceOverlayOpen, currentPromptState]);
 
+  const hasSavedSimRef = useRef<string | null>(null);
   useEffect(() => {
-    if (error) {
-      toast.error(error);
+    if (simulation && simulation.dsl && !loading) {
+      const targetId = simulation.id || simulation.title;
+      if (hasSavedSimRef.current !== targetId) {
+        hasSavedSimRef.current = targetId;
+        saveSimulation({
+          id: simulation.id,
+          title: simulation.title,
+          subject: simulation.topic?.subject || "Physics",
+          type: "dsl",
+          simulation: simulation.dsl,
+        });
+        toast.success("Simulation generated and saved to library!");
+      }
     }
-  }, [error]);
+  }, [simulation, loading, saveSimulation]);
 
   const shouldShow = !loading;
   const hasNoSims = savedSimulations.length === 0;
-  const showTutorGenerator = isTutorPage;
+  const showTutorGenerator = !isTutorPage;
 
   return (
     <>

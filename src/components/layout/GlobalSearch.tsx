@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, GraduationCap, Loader } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "@tanstack/react-router";
+import { getApiUrl } from "@/config/api";
+import { joinUrl } from "@/utils/urlUtils";
 
 interface SearchResult {
   type: "topic" | "chapter" | "subject" | "class";
@@ -46,7 +48,7 @@ const TYPE_META: Record<SearchResult["type"], { label: string; singular: string;
   },
 };
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = getApiUrl("");
 
 export function GlobalSearch() {
   const [query, setQuery] = useState("");
@@ -95,7 +97,7 @@ export function GlobalSearch() {
     const timer = setTimeout(async () => {
       try {
         const response = await fetch(
-          `${API_BASE}/api/tutor/autocomplete?q=${encodeURIComponent(query)}`
+          joinUrl(API_BASE, `/api/tutor/autocomplete?q=${encodeURIComponent(query)}`)
         );
         const data = await response.json();
         const nextSuggestions = data.suggestions || data.results || [];

@@ -1,3 +1,6 @@
+import { getApiUrl } from "@/config/api";
+import { joinUrl } from "@/utils/urlUtils";
+
 export interface TutorAnalysisResponse {
   success: boolean;
   data: {
@@ -17,20 +20,22 @@ export interface TutorAnalysisResponse {
   };
 }
 
-const API_BASE = "http://localhost:8000/api/tutor";
+const API_BASE = getApiUrl("");
 
 export const TutorService = {
-  analyzeQuery: async (query: string): Promise<TutorAnalysisResponse> => {
-    const response = await fetch(`${API_BASE}/analyze`, {
+  analyzeQuery: async (query: string, signal?: AbortSignal): Promise<TutorAnalysisResponse> => {
+    const response = await fetch(joinUrl(API_BASE, "/api/tutor/analyze"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ query }),
+      signal,
     });
 
     if (!response.ok) {
-      throw new Error("Failed to analyze query");
+      const text = await response.text().catch(() => "");
+      throw new Error(text || "Failed to analyze query");
     }
 
     return response.json();

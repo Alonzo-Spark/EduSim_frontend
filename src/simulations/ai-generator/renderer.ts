@@ -5,6 +5,42 @@
 
 import { PhysicsObject } from "@/types/simulation";
 import { SimulationState } from "./engine";
+import { resolveBestAsset, getAssetDimensions } from "@/utils/assetCatalogResolver";
+import { imageSafeLoader } from "@/utils/imageSafeLoader";
+
+const imageCache: Record<string, HTMLImageElement> = {};
+
+function getSpritePath(obj: PhysicsObject): string | null {
+  const directPath = (obj as any).assetUrl || (obj as any).asset || (obj as any).image || (obj as any).sprite;
+  if (typeof directPath === "string" && directPath.startsWith("/assets/")) {
+    return directPath;
+  }
+
+  const resolvedAsset = resolveBestAsset(obj.type || obj.name || obj.id || "block");
+  return resolvedAsset?.path || null;
+}
+
+function warmImage(path: string): void {
+  if (!path || imageCache[path]) {
+    return;
+  }
+
+  void imageSafeLoader.load(path).then((img) => {
+    imageCache[path] = img;
+  });
+}
+
+function getContainSize(naturalWidth: number, naturalHeight: number, maxWidth: number, maxHeight: number) {
+  if (!naturalWidth || !naturalHeight) {
+    return { width: maxWidth, height: maxHeight };
+  }
+
+  const scale = Math.min(maxWidth / naturalWidth, maxHeight / naturalHeight);
+  return {
+    width: naturalWidth * scale,
+    height: naturalHeight * scale,
+  };
+}
 
 export class SimulationRenderer {
   private canvas: HTMLCanvasElement;
@@ -87,49 +123,66 @@ export class SimulationRenderer {
   private drawObject(obj: PhysicsObject): void {
     const [x, y] = obj.position;
     const color = obj.color || "#3b82f6";
+    const imagePath = getSpritePath(obj);
+    const resolvedAsset = resolveBestAsset(obj.type || obj.name || obj.id || "block");
+    const assetDims = resolvedAsset ? getAssetDimensions(resolvedAsset.id) : null;
 
     this.ctx.save();
     this.ctx.translate(x, y);
     this.ctx.rotate(obj.rotation || 0);
 
-    switch (obj.type) {
-      case "ball":
-      case "planet":
-        this.drawCircle(color, obj.radius || 10);
-        break;
+    let isSpriteRendered = false;
 
-      case "projectile":
-        this.drawProjectile(color, obj.radius || 5);
-        break;
+    if (imagePath) {
+      const w = Number(assetDims?.width || obj.width || (obj.radius ? obj.radius * 2 : 30));
+      const h = Number(assetDims?.height || obj.height || (obj.radius ? obj.radius * 2 : 20));
 
-      case "block":
-        this.drawBlock(color, obj.width || 30, obj.height || 20);
-        break;
+      warmImage(imagePath);
 
-      case "pendulum":
-        this.drawPendulum(obj);
-        break;
+      if (imageCache[imagePath]?.complete && imageCache[imagePath].naturalWidth > 0) {
+        const img = imageCache[imagePath];
+        const contain = getContainSize(img.naturalWidth, img.naturalHeight, w, h);
+        this.ctx.drawImage(img, -contain.width / 2, -contain.height / 2, contain.width, contain.height);
+        isSpriteRendered = true;
+      }
+    }
 
-      case "spring":
-        this.drawSpring(obj);
-        break;
-
-      case "wave":
-        this.drawWave(obj);
-        break;
-
-      default:
-        this.drawCircle(color, 5);
+    if (!isSpriteRendered) {
+      switch (obj.type) {
+        case "ball":
+        case "planet":
+          this.drawCircle(color, obj.radius || 10);
+          break;
+        case "projectile":
+          this.drawProjectile(color, obj.radius || 5);
+          break;
+        case "block":
+          this.drawBlock(color, obj.width || 30, obj.height || 20);
+          break;
+        case "pendulum":
+          this.drawPendulum(obj);
+          break;
+        case "spring":
+          this.drawSpring(obj);
+          break;
+        case "wave":
+          this.drawWave(obj);
+          break;
+        default:
+          this.drawCircle(color, 5);
+      }
     }
 
     this.ctx.restore();
 
-    // Draw label if present
-    if (obj.label) {
-      this.ctx.fillStyle = "#e2e8f0";
-      this.ctx.font = "12px monospace";
-      this.ctx.textAlign = "center";
-      this.ctx.fillText(obj.label, x, y - (obj.radius || 10) - 10);
+    // Draw label if present and we're not rendering a valid sprite or if it's a specific meaningful label
+    if (obj.label && !isSpriteRendered) {
+      if (!/^Obj(ect)?\s*\d+$/i.test(obj.label) && obj.label.toLowerCase() !== "target") {
+        this.ctx.fillStyle = "#e2e8f0";
+        this.ctx.font = "12px monospace";
+        this.ctx.textAlign = "center";
+        this.ctx.fillText(obj.label, x, y - (obj.radius || 10) - 10);
+      }
     }
   }
 

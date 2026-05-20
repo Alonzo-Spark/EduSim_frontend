@@ -151,6 +151,10 @@ export function FuturisticWorkspaceContent({ initialTitle }: { initialTitle?: st
   const [promptText, setPromptText] = useState("Generate a car collision simulation showing conservation of momentum.");
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Simulation data state
+  const [simulationData, setSimulationData] = useState<any>(null);
+  const [simulationTitle, setSimulationTitle] = useState<string>("Car Collision Simulation");
+
   // Interaction parameters state matching the reference image values precisely
   const [params, setParams] = useState({
     car1Mass: 1500,
@@ -170,7 +174,7 @@ export function FuturisticWorkspaceContent({ initialTitle }: { initialTitle?: st
   const [showGridOption, setShowGridOption] = useState(true);
 
   // Runtime visual controls state
-  const [isPlaying, setIsPlaying] = useState(true); 
+  const [isPlaying, setIsPlaying] = useState(true);
   const [speedVal, setSpeedVal] = useState("1.0x");
   const [zoomPercent, setZoomPercent] = useState(100);
 
@@ -179,14 +183,46 @@ export function FuturisticWorkspaceContent({ initialTitle }: { initialTitle?: st
     toast.success(`Loaded descriptor for: ${chipLabel}`);
   };
 
-  const handleGenerateClick = () => {
+  const handleGenerateClick = async () => {
     if (!promptText.trim()) return;
     setIsGenerating(true);
-    toast.loading("Synthesizing premium futuristic matrix bindings...", { id: "sim-load" });
-    setTimeout(() => {
+    toast.loading("Generating simulation with AI...", { id: "sim-load" });
+
+    try {
+      // Call the actual simulation generator service
+      const result = await simulationGenerator.generateSimulation(promptText);
+
+      if (result.success && result.simulation) {
+        // Successfully generated simulation - update the state to show it
+        setIsGenerating(false);
+        setSimulationData(result.simulation);
+        setSimulationTitle(result.simulation.title || "Generated Simulation");
+        toast.success("Simulation generated successfully!", { id: "sim-load" });
+
+        // Reset interaction parameters to default for new simulation
+        setParams({
+          car1Mass: 1500,
+          car2Mass: 1500,
+          car1Vel: 10.00,
+          car2Vel: -10.00,
+          friction: 0.50,
+          restitution: 0.20,
+          gravity: 0.00,
+          airRes: 0.00
+        });
+
+        // Reset runtime controls
+        setIsPlaying(true);
+        setSpeedVal("1.0x");
+        setZoomPercent(100);
+      } else {
+        setIsGenerating(false);
+        toast.error(result.error || "Failed to generate simulation", { id: "sim-load" });
+      }
+    } catch (error) {
       setIsGenerating(false);
-      toast.success("Loaded simulation layout parameters successfully!", { id: "sim-load" });
-    }, 1200);
+      toast.error(`Generation failed: ${error.message}`, { id: "sim-load" });
+    }
   };
 
   const handleResetSliders = () => {

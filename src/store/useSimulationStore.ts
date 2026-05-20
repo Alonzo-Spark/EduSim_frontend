@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { RuntimeState } from "@/runtime/schema/runtimeSchema";
 
 interface Simulation {
   id: string;
@@ -28,12 +29,20 @@ interface SimulationStore {
   simulationGenerated: boolean;
   activeTopic: string | null;
   simulationData: any | null;
+  rendererType: "physics" | "graph" | "diagram" | "hybrid";
   aiExplanation: string;
   concepts: string[];
   formulas: any[];
+  graphs: any[];
   controls: any[];
   sceneConfig: any;
+  runtimeConfig: any;
   error: string | null;
+
+  // Unified Runtime Pipeline State
+  runtimeState: RuntimeState;
+  generationPhase: string;
+  generationProgress: number;
   
   // Library State
   savedSimulations: Simulation[];
@@ -54,13 +63,18 @@ interface SimulationStore {
   setActiveTopic: (topic: string | null) => void;
   setSimulationWorkspaceData: (data: {
     simulationData: any;
+    rendererType?: "physics" | "graph" | "diagram" | "hybrid";
     aiExplanation: string;
     concepts: string[];
     formulas: any[];
+    graphs?: any[];
     controls: any[];
     sceneConfig: any;
+    runtimeConfig?: any;
   }) => void;
   setError: (error: string | null) => void;
+  setRuntimeState: (state: RuntimeState, phase?: string) => void;
+  setGenerationProgress: (progress: number) => void;
   resetGenerationState: () => void;
   
   saveSimulation: (sim: Simulation) => void;
@@ -85,12 +99,19 @@ export const useSimulationStore = create<SimulationStore>()(
       simulationGenerated: false,
       activeTopic: null,
       simulationData: null,
+      rendererType: "physics",
       aiExplanation: "",
       concepts: [],
       formulas: [],
+      graphs: [],
       controls: [],
       sceneConfig: null,
+      runtimeConfig: null,
       error: null,
+
+      runtimeState: RuntimeState.IDLE,
+      generationPhase: "",
+      generationProgress: 0,
       
       savedSimulations: [],
       favorites: [],
@@ -108,25 +129,42 @@ export const useSimulationStore = create<SimulationStore>()(
       setActiveTopic: (topic) => set({ activeTopic: topic }),
       setSimulationWorkspaceData: (data) => set({
         simulationData: data.simulationData,
+        rendererType: data.rendererType || "physics",
         aiExplanation: data.aiExplanation,
         concepts: data.concepts,
         formulas: data.formulas,
+        graphs: data.graphs || [],
         controls: data.controls,
         sceneConfig: data.sceneConfig,
+        runtimeConfig: data.runtimeConfig || null,
         simulationGenerated: true,
+        runtimeState: RuntimeState.READY,
+        generationProgress: 1,
         error: null
       }),
-      setError: (err) => set({ error: err }),
+      setError: (err) => set({ error: err, runtimeState: err ? RuntimeState.ERROR : RuntimeState.IDLE }),
+      setRuntimeState: (state, phase) => set({ 
+        runtimeState: state, 
+        generationPhase: phase || "",
+        ...(state === RuntimeState.GENERATING ? { generatingSimulation: true } : {})
+      }),
+      setGenerationProgress: (progress) => set({ generationProgress: progress }),
       resetGenerationState: () => set({
         generatingSimulation: false,
         isGeneratingSimulation: false,
         simulationGenerated: false,
         simulationData: null,
+        rendererType: "physics",
         aiExplanation: "",
         concepts: [],
         formulas: [],
+        graphs: [],
         controls: [],
         sceneConfig: null,
+        runtimeConfig: null,
+        runtimeState: RuntimeState.IDLE,
+        generationPhase: "",
+        generationProgress: 0,
         error: null
       }),
       

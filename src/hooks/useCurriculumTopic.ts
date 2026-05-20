@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
+import { getApiUrl } from "@/config/api";
+import { joinUrl } from "@/utils/urlUtils";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = getApiUrl("");
 
 export interface TopicContent {
   class_name: string;
@@ -46,7 +48,7 @@ export function useCurriculumTopic(): UseCurriculumTopicReturn {
           ...(topic && { topic }),
         });
 
-        const response = await fetch(`${API_BASE}/api/tutor/topic?${params}`);
+        const response = await fetch(joinUrl(API_BASE, `/api/tutor/topic?${params}`));
         const json = await response.json();
 
         if (!response.ok || json.error) {

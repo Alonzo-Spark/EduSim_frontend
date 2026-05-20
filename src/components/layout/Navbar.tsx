@@ -3,10 +3,13 @@ import { GlobalSearch } from "./GlobalSearch";
 import { useTheme } from "@/hooks/useTheme";
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { motion } from "framer-motion";
+import { useRouterState } from "@tanstack/react-router";
 
 export function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const { setMobileOpen, isCollapsed } = useSidebarStore();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const hideSearch = pathname === "/tutor";
 
   return (
     <div className="fixed top-4 left-0 right-0 z-[50] pointer-events-none px-4 md:px-0">
@@ -28,7 +31,7 @@ export function Navbar() {
         {/* Centered Search Bar Section */}
         <div className="flex-1 flex justify-center min-w-0 px-4 pointer-events-auto">
           <div className="w-full max-w-3xl">
-             <GlobalSearch />
+            {!hideSearch && <GlobalSearch />}
           </div>
         </div>
         

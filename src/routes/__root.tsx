@@ -78,7 +78,8 @@ function RootComponent() {
         <Navbar />
         
         {/* Main Content Scroll Container */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden pt-28 pb-12 px-4 md:px-10 custom-scrollbar scroll-smooth">
+        { /* When on tutor route we must avoid page scrolling and let the Tutor page manage its own fixed layout */ }
+        <div className={`flex-1 ${routerState.location.pathname.startsWith('/tutor') ? 'overflow-hidden' : 'overflow-y-auto'} overflow-x-hidden pt-28 pb-12 px-4 md:px-10 custom-scrollbar scroll-smooth`}>
           <div className="mx-auto max-w-[1500px] w-full">
             {/* 
               Directly rendering Outlet here fixes the "manual refresh" bug. 

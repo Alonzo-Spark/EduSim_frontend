@@ -6,9 +6,36 @@
 
 import { useMemo } from 'react';
 import * as objectDataModule from '../data/objectData';
+import { resolveBestAsset, normalizeAssetName } from '../utils/assetCatalogResolver';
 
 const objectData = (objectDataModule as any).default ?? objectDataModule;
 import categoriesData from '../data/categories.json';
+
+function buildResolvedAsset(name: string) {
+  const exact = objectData[name as keyof typeof objectData];
+  if (exact) {
+    return exact;
+  }
+
+  const resolved = resolveBestAsset(name);
+  if (!resolved) {
+    return null;
+  }
+
+  return {
+    key: resolved.id,
+    category: resolved.category,
+    file: resolved.default || resolved.path,
+    image: resolved.default || resolved.path,
+    aliases: resolved.aliases || [],
+    variants: resolved.variants || [],
+    width: 1,
+    height: 1,
+    mass: 1,
+    friction: 0.1,
+    bounce: 0.1,
+  };
+}
 
 /**
  * Get a single asset by name
@@ -17,10 +44,10 @@ import categoriesData from '../data/categories.json';
  */
 export function useAsset(name: string) {
   return useMemo(() => {
-    if (!name || !objectData[name as keyof typeof objectData]) {
+    if (!name) {
       return null;
     }
-    return objectData[name as keyof typeof objectData];
+    return buildResolvedAsset(name);
   }, [name]);
 }
 
@@ -37,7 +64,7 @@ export function useCategory(categoryName: string) {
 
     const assetNames = categoriesData[categoryName as keyof typeof categoriesData];
     return assetNames
-      .map((name) => objectData[name as keyof typeof objectData])
+      .map((name) => buildResolvedAsset(name))
       .filter((asset) => asset !== undefined);
   }, [categoryName]);
 }
@@ -49,7 +76,7 @@ export function useCategory(categoryName: string) {
  */
 export function usePhysics(assetName: string) {
   return useMemo(() => {
-    const asset = assetName ? objectData[assetName as keyof typeof objectData] : null;
+    const asset = assetName ? buildResolvedAsset(assetName) : null;
 
     if (!asset) {
       return null;
@@ -83,12 +110,12 @@ export function useAssetSearch(query: string) {
       return [];
     }
 
-    const lowerQuery = query.toLowerCase();
+    const lowerQuery = normalizeAssetName(query);
     return Object.entries(objectData)
       .filter(([name, asset]) => {
         return (
-          name.toLowerCase().includes(lowerQuery) ||
-          (asset as any).category.toLowerCase().includes(lowerQuery)
+          normalizeAssetName(name).includes(lowerQuery) ||
+          normalizeAssetName((asset as any).category).includes(lowerQuery)
         );
       })
       .map(([, asset]) => asset as any);
@@ -119,7 +146,7 @@ export function useMultipleCategories(categoryNames: string[]) {
  */
 export function useAssetDimensions(assetName: string) {
   return useMemo(() => {
-    const asset = assetName ? objectData[assetName as keyof typeof objectData] : null;
+    const asset = assetName ? buildResolvedAsset(assetName) : null;
 
     if (!asset) {
       return null;

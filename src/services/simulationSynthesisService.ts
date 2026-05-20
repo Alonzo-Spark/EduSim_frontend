@@ -1,4 +1,8 @@
 import type { SimulationDSL } from "@/runtime/dsl";
+import { buildEnhancedPrompt, analyzeSimulationPrompt } from "@/services/simulationPromptIntelligence";
+import { getApiUrl } from "@/config/api";
+import { fetchJsonWithRetry, logApiEvent } from "@/services/apiClient";
+import { joinUrl } from "@/utils/urlUtils";
 
 export interface SimulationSourceRef {
   source: string;
@@ -40,8 +44,12 @@ interface GetResponse extends SynthesizedSimulation {
 }
 
 export interface StreamProgress {
-  stage: string;
+  stage?: string;
+  phase?: string;
+  state?: string;
+  progress?: number;
   id?: string;
+  content?: string;
   error?: string;
   type?: string;
 }
@@ -53,52 +61,58 @@ class SimulationSynthesisService {
   private apiBaseUrl: string;
 
   constructor() {
-    this.apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+    this.apiBaseUrl = getApiUrl("");
   }
 
   async generate(prompt: string, topic?: string): Promise<SynthesizedSimulation> {
-    const response = await fetch(`${this.apiBaseUrl}/api/simulations/synthesis/generate`, {
+    const enriched = buildEnhancedPrompt(prompt, topic);
+    const data = await fetchJsonWithRetry<GenerateResponse | { detail?: string }>(joinUrl(this.apiBaseUrl, "/api/simulations/synthesis/generate"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt, topic }),
+      body: JSON.stringify({
+        prompt: enriched.enhancedPrompt,
+        topic: topic || enriched.analysis.title,
+        intent: enriched.analysis,
+      }),
+      timeoutMs: 45000,
+      retries: 2,
+      retryDelayMs: 600,
+      scope: "simulationSynthesisService",
     });
-
-    const data = (await response.json()) as GenerateResponse | { detail?: string };
-    if (!response.ok) {
-      throw new Error((data as { detail?: string }).detail || "Simulation generation failed");
-    }
 
     return data as SynthesizedSimulation;
   }
 
   async list(limit = 30): Promise<SynthesizedSimulation[]> {
-    const response = await fetch(
-      `${this.apiBaseUrl}/api/simulations/synthesis/list?limit=${limit}`,
+    const data = await fetchJsonWithRetry<ListResponse | { detail?: string }>(
+      joinUrl(this.apiBaseUrl, `/api/simulations/synthesis/list?limit=${limit}`),
+      {
+        timeoutMs: 15000,
+        retries: 1,
+        scope: "simulationSynthesisService",
+      },
     );
-    const data = (await response.json()) as ListResponse | { detail?: string };
-
-    if (!response.ok) {
-      throw new Error((data as { detail?: string }).detail || "Failed to load simulations");
-    }
 
     return (data as ListResponse).items;
   }
 
   async getById(id: string): Promise<SynthesizedSimulation> {
-    const response = await fetch(`${this.apiBaseUrl}/api/simulations/synthesis/${id}`);
-    const data = (await response.json()) as GetResponse | { detail?: string };
-
-    if (!response.ok) {
-      throw new Error((data as { detail?: string }).detail || "Failed to load simulation");
-    }
+    const data = await fetchJsonWithRetry<GetResponse | { detail?: string }>(
+      joinUrl(this.apiBaseUrl, `/api/simulations/synthesis/${id}`),
+      {
+        timeoutMs: 15000,
+        retries: 1,
+        scope: "simulationSynthesisService",
+      },
+    );
 
     return data as SynthesizedSimulation;
   }
 
   getExportUrl(id: string): string {
-    return `${this.apiBaseUrl}/api/simulations/synthesis/${id}/export`;
+    return joinUrl(this.apiBaseUrl, `/api/simulations/synthesis/${id}/export`);
   }
 
   async generateStream(
@@ -107,12 +121,18 @@ class SimulationSynthesisService {
     onComplete: StreamCompleteCallback,
     topic?: string,
   ): Promise<void> {
-    const response = await fetch(`${this.apiBaseUrl}/api/simulations/synthesis/generate-stream`, {
+    const enriched = buildEnhancedPrompt(prompt, topic);
+    const response = await fetch(joinUrl(this.apiBaseUrl, "/api/simulations/synthesis/generate-stream"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt, topic }),
+      body: JSON.stringify({
+        prompt: enriched.enhancedPrompt,
+        topic: topic || enriched.analysis.title,
+        intent: enriched.analysis,
+      }),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined,
     });
 
     if (!response.ok || !response.body) {
@@ -144,7 +164,7 @@ class SimulationSynthesisService {
               try {
                 const data = JSON.parse(dataStr);
 
-                if (eventType === "progress" || eventType === "started") {
+                if (eventType === "progress" || eventType === "started" || eventType === "runtime_state_changed" || eventType === "generation_delta") {
                   onProgress(data as StreamProgress);
                 } else if (eventType === "complete") {
                   onComplete(data as SynthesizedSimulation);
@@ -152,7 +172,7 @@ class SimulationSynthesisService {
                   onProgress(data as StreamProgress);
                 }
               } catch (e) {
-                console.error("Failed to parse SSE data:", dataStr);
+                console.error("[simulationSynthesisService] Failed to parse SSE data:", dataStr);
               }
             }
           }
@@ -165,3 +185,5 @@ class SimulationSynthesisService {
 }
 
 export const simulationSynthesisService = new SimulationSynthesisService();
+
+export { analyzeSimulationPrompt, buildEnhancedPrompt };
