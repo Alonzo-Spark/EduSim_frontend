@@ -8,7 +8,8 @@ import FormulaGraph from "./FormulaGraph";
 import { motion, AnimatePresence } from "framer-motion";
 import QASection from "../tutor/QASection";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, CheckCircle2, Sparkles } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 interface Props {
   topic: string;
@@ -191,6 +192,12 @@ const FormulaLabPage: React.FC<Props> = ({
             >
               <ChevronLeft className="w-4 h-4" /> Previous
             </button>
+            <Link
+              to="/sandbox/default"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] hover:brightness-110 active:scale-95 text-sm font-bold text-white shadow-lg shadow-purple-500/20 transition-all cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" /> Create Simulation
+            </Link>
             <button
               onClick={() => setCurrentStep(prev => Math.min(steps.length - 1, prev + 1))}
               disabled={currentStep === steps.length - 1}
