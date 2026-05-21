@@ -59,11 +59,6 @@ const FormulaLabPage: React.FC<Props> = ({ topic, classId, subject, chapter, rag
           <div className="mt-2 text-sm text-muted-foreground">
             {topic} • {subject || ""} {classId ? `• Class ${classId}` : ""}
           </div>
-          {selectedFormula && (
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-              {selectedFormula.description || "No description available."}
-            </p>
-          )}
         </div>
         <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-foreground/90">
           Detected Formulas: {detectedCount}
