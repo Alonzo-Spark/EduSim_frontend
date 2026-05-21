@@ -1,10 +1,11 @@
 import React from "react";
-import { ParsedFormula } from "@/utils/FormulaExtractor";
+import { DynamicParsedFormula } from "@/utils/DynamicFormulaExtractor";
 
-const RelationshipVisualizer: React.FC<{ formula: ParsedFormula | null; formulas?: ParsedFormula[] }> = ({ formula }) => {
+const RelationshipVisualizer: React.FC<{ formula: DynamicParsedFormula | null; formulas?: DynamicParsedFormula[] }> = ({ formula }) => {
   if (!formula) return <div className="p-4 glass-card">No formula selected.</div>;
 
-  const vars = Object.keys(formula.variables || {});
+  const anatomy = Array.isArray(formula.anatomy) ? formula.anatomy : [];
+  const vars = anatomy.map(a => a.symbol);
   const expr = formula.expression || '';
 
   function detectRelation(variable: string) {
@@ -26,6 +27,7 @@ const RelationshipVisualizer: React.FC<{ formula: ParsedFormula | null; formulas
       <div className="mt-3 flex flex-col gap-3">
         {vars.map((v) => {
           const rel = detectRelation(v);
+          const an = anatomy.find(a => a.symbol === v);
           return (
             <div key={v} className="flex items-center gap-3">
               <div className="w-24 text-sm font-medium">{v}</div>
@@ -33,7 +35,7 @@ const RelationshipVisualizer: React.FC<{ formula: ParsedFormula | null; formulas
                 <div className="flex-1 h-3 bg-white/5 rounded" />
                 <div className="text-xs font-semibold px-2 py-1 rounded bg-white/6">{rel}</div>
               </div>
-              <div className="w-20 text-right text-sm">{formula.unitMap?.[v] ?? ''}</div>
+              <div className="w-20 text-right text-sm">{an?.unit || ''}</div>
             </div>
           );
         })}

@@ -1,14 +1,16 @@
 import React from "react";
-import { ParsedFormula } from "@/utils/FormulaExtractor";
+import { DynamicParsedFormula } from "@/utils/DynamicFormulaExtractor";
 import { BlockMath } from "react-katex";
-import { getFormulaLabProfile } from "@/data/formulaLabProfiles";
 
-const FormulaAnatomy: React.FC<{ formula: ParsedFormula | null }> = ({ formula }) => {
-  const profile = formula ? getFormulaLabProfile(formula.profileId || formula.id) : undefined;
-
-  if (!formula || !profile) {
+const FormulaAnatomy: React.FC<{ formula: DynamicParsedFormula | null }> = ({ formula }) => {
+  if (!formula) {
     return <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 text-sm text-muted-foreground">Select a formula to see anatomy.</div>;
   }
+
+  const title = formula.title || formula.formula || formula.raw || "Unnamed Formula";
+  const latex = formula.latex || formula.formula || "";
+  const description = formula.description || "No description available.";
+  const anatomy = Array.isArray(formula.anatomy) ? formula.anatomy : [];
 
   return (
     <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl space-y-5">
@@ -16,16 +18,16 @@ const FormulaAnatomy: React.FC<{ formula: ParsedFormula | null }> = ({ formula }
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground">Selected Formula</p>
-            <h3 className="mt-2 text-2xl font-extrabold tracking-tight">{profile.title}</h3>
+            <h3 className="mt-2 text-2xl font-extrabold tracking-tight">{title}</h3>
           </div>
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-muted-foreground">
-            {profile.category}
+            Dynamic
           </span>
         </div>
         <div className="rounded-3xl border border-white/10 bg-black/10 px-4 py-5 text-center">
-          <BlockMath math={profile.latex} />
+          {latex ? <BlockMath math={latex} /> : <p className="text-sm text-muted-foreground">No formula preview available.</p>}
         </div>
-        <p className="text-sm leading-6 text-muted-foreground">{profile.description}</p>
+        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
 
       <div>
@@ -40,7 +42,7 @@ const FormulaAnatomy: React.FC<{ formula: ParsedFormula | null }> = ({ formula }
               </tr>
             </thead>
             <tbody>
-              {profile.anatomy.map((row, index) => (
+              {anatomy.map((row, index) => (
                 <tr key={row.symbol} className={index % 2 === 0 ? "bg-white/3" : "bg-transparent"}>
                   <td className="px-4 py-3 font-mono font-semibold">{row.symbol}</td>
                   <td className="px-4 py-3 text-muted-foreground">{row.meaning}</td>

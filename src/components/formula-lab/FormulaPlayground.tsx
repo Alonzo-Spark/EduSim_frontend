@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ParsedFormula } from "@/utils/FormulaExtractor";
-import { getFormulaLabProfile, solveFormulaLab } from "@/data/formulaLabProfiles";
+import { DynamicParsedFormula } from "@/utils/DynamicFormulaExtractor";
+import { evaluate as mathEvaluate } from "mathjs";
 
 const SliderRow: React.FC<{
   label: string;
@@ -23,15 +23,14 @@ const SliderRow: React.FC<{
   </div>
 );
 
-const FormulaPlayground: React.FC<{ formula: ParsedFormula | null }> = ({ formula }) => {
-  const profile = formula ? getFormulaLabProfile(formula.profileId || formula.id) : undefined;
+const FormulaPlayground: React.FC<{ formula: DynamicParsedFormula | null }> = ({ formula }) => {
   const initialValues = useMemo(() => {
-    if (!profile) return {} as Record<string, number>;
-    return profile.controls.reduce<Record<string, number>>((acc, control) => {
+    if (!formula) return {} as Record<string, number>;
+    return (Array.isArray(formula.controls) ? formula.controls : []).reduce<Record<string, number>>((acc, control) => {
       acc[control.symbol] = control.defaultValue;
       return acc;
     }, {});
-  }, [profile]);
+  }, [formula]);
 
   const [values, setValues] = useState<Record<string, number>>(initialValues);
 
@@ -40,37 +39,56 @@ const FormulaPlayground: React.FC<{ formula: ParsedFormula | null }> = ({ formul
   }, [initialValues]);
 
   const result = useMemo(() => {
-    if (!profile) return null;
-    return solveFormulaLab(profile.id, values);
-  }, [profile, values]);
+    if (!formula) return null;
+    try {
+      const scope = { ...values };
+      const val = mathEvaluate(formula.expression, scope);
+      if (typeof val === 'number' && Number.isFinite(val)) {
+         return { status: "ok", value: val };
+      }
+      return { status: "invalid", message: "Cannot evaluate" };
+    } catch(e) {
+      return { status: "invalid", message: "Invalid evaluation" };
+    }
+  }, [formula, values]);
 
-  if (!formula || !profile) return <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 text-sm text-muted-foreground">Select a formula to interact.</div>;
+  if (!formula) return <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 text-sm text-muted-foreground">Select a formula to interact.</div>;
 
-  const resultUnit = profile.anatomy.find((row) => row.symbol === profile.resultSymbol)?.unit || "";
+  const anatomy = Array.isArray(formula.anatomy) ? formula.anatomy : [];
+  const controls = Array.isArray(formula.controls) ? formula.controls : [];
+  const resultSymbol = formula.resultSymbol || "result";
+  const resultUnit = anatomy.find((row) => row.symbol === resultSymbol)?.unit || "";
+  const title = formula.title || formula.formula || formula.raw || "Unnamed Formula";
 
   return (
     <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground">Interactive Playground</p>
-          <h3 className="mt-2 text-2xl font-extrabold tracking-tight">Try {profile.title}</h3>
+          <h3 className="mt-2 text-2xl font-extrabold tracking-tight">Try {title}</h3>
         </div>
         <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground">Live calculation</div>
       </div>
 
       <div className="grid gap-3">
-        {profile.controls.map((control) => (
-          <SliderRow
-            key={control.symbol}
-            label={control.label}
-            unit={control.unit}
-            value={values[control.symbol] ?? control.defaultValue}
-            onChange={(nextValue) => setValues((current) => ({ ...current, [control.symbol]: nextValue }))}
-            min={control.min}
-            max={control.max}
-            step={control.step}
-          />
-        ))}
+        {controls.length > 0 ? (
+          controls.map((control) => (
+            <SliderRow
+              key={control.symbol}
+              label={control.label}
+              unit={control.unit}
+              value={values[control.symbol] ?? control.defaultValue}
+              onChange={(nextValue) => setValues((current) => ({ ...current, [control.symbol]: nextValue }))}
+              min={control.min}
+              max={control.max}
+              step={control.step}
+            />
+          ))
+        ) : (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
+            Unable to generate interactive controls.
+          </div>
+        )}
       </div>
 
       <div className="rounded-[1.5rem] border border-white/10 bg-gradient-to-br from-violet-500/10 via-white/5 to-cyan-500/10 p-5 shadow-inner">
@@ -79,7 +97,7 @@ const FormulaPlayground: React.FC<{ formula: ParsedFormula | null }> = ({ formul
           {result?.status === "ok" ? `${Number(result.value).toFixed(2)} ${resultUnit}` : result?.message || "Missing variable"}
         </div>
         <div className="mt-1 text-sm text-muted-foreground">
-          {result?.status === "ok" ? `${profile.resultSymbol} = ${profile.anatomy.find((row) => row.symbol === profile.resultSymbol)?.meaning || profile.title}` : "Adjust the controls to calculate the formula."}
+          {result?.status === "ok" ? `${resultSymbol} = ${anatomy.find((row) => row.symbol === resultSymbol)?.meaning || title}` : "Adjust the controls to calculate the formula."}
         </div>
       </div>
     </div>

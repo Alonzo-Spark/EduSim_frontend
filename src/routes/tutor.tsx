@@ -6,8 +6,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import ChatWorkspace from "@/components/tutor/ChatWorkspace";
-import TextbookResourcesPanel from "@/components/tutor/TextbookResourcesPanel";
-import VerticalResourcesToggle from "@/components/tutor/VerticalResourcesToggle";
 import { TutorService, TutorAnalysisResponse } from "@/services/TutorService";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useCurriculumTopic } from "@/hooks/useCurriculumTopic";
@@ -29,7 +27,6 @@ function TutorPage() {
   const [tutorData, setTutorData] = useState<TutorAnalysisResponse["data"] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resourcesOpen, setResourcesOpen] = useState(false);
 
   const { 
     setTutorResponse, 
@@ -116,9 +113,7 @@ ${topicContent.related_concepts?.map((c) => `- ${c}`).join("\n") || "No related 
     : tutorData;
 
   return (
-    <div className="relative w-full h-[100dvh] overflow-hidden text-foreground" style={{ height: "100dvh" }}>
-      {/* Full-viewport smooth gradient background */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-white via-[#fbf7ff] to-violet-50" style={{ background: 'linear-gradient(120deg,#fff 0%, #f6f0ff 45%, #efe7ff 100%)' }} />
+    <div className="relative w-full h-full overflow-hidden text-foreground bg-background">
 
       <div className="relative mx-auto flex h-full w-full max-w-[100rem] items-stretch">
         <div className="flex w-full items-stretch flex-1 min-w-0">
@@ -126,21 +121,11 @@ ${topicContent.related_concepts?.map((c) => `- ${c}`).join("\n") || "No related 
             onSend={handleAnalyze}
             aiResponse={displayData?.ai_explanation || displayData?.explanation || null}
             loading={isLoading || topicLoading}
-            initialPrompt={
-              // prefer explicit ?prompt= param then fallback to topic -> "Explain <topic>"
-              searchParams.prompt || (searchParams.topic ? `Explain ${searchParams.topic}` : undefined)
-            }
+            initialPrompt={searchParams.prompt || (searchParams.topic ? `Explain ${searchParams.topic}` : undefined)}
             focusInput={Boolean(searchParams.prompt || searchParams.topic)}
+            topicTitle={searchParams.topic || searchParams.chapter}
           />
         </div>
-
-        <VerticalResourcesToggle onToggle={() => setResourcesOpen((s) => !s)} open={resourcesOpen} />
-        <TextbookResourcesPanel
-          open={resourcesOpen}
-          onClose={() => setResourcesOpen(false)}
-          subject={searchParams.subject}
-          topic={searchParams.topic}
-        />
       </div>
 
       {/* Embedded high-fidelity overlay satisfying explicit floating sandbox constraints */}

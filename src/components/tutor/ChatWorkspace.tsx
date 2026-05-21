@@ -2,8 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChatBubble, TypingAnimation } from "./ChatBubble";
 import ChatInput from "./ChatInput";
 import { TutorHeader } from "./TutorHeader";
-import { Sparkles, Lightbulb, ListChecks, HelpCircle } from "lucide-react";
-import { useTutorStore } from "@/store/tutorStore";
 
 interface Props {
   onSend: (text: string) => void;
@@ -11,6 +9,7 @@ interface Props {
   loading?: boolean;
   initialPrompt?: string | null;
   focusInput?: boolean;
+  topicTitle?: string;
 }
 
 type Message = {
@@ -24,17 +23,11 @@ function formatTime(date: Date) {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-export function ChatWorkspace({ onSend, aiResponse, loading }: Props) {
-  // props updated below; include initialPrompt and focusInput from parent
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const initialPrompt = (arguments[0] as any)?.initialPrompt as string | null | undefined;
-  const focusInput = (arguments[0] as any)?.focusInput as boolean | undefined;
+export function ChatWorkspace({ onSend, aiResponse, loading, initialPrompt, focusInput, topicTitle }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastAiResponseRef = useRef<string | null>(null);
-
-  const { activeFormulaId } = useTutorStore();
 
   const send = (text: string) => {
     setMessages((current) => [
@@ -50,10 +43,8 @@ export function ChatWorkspace({ onSend, aiResponse, loading }: Props) {
     onSend(text);
   };
 
-  // If a parent passes an initial prompt, auto-send it on mount
   useEffect(() => {
     if (initialPrompt && initialPrompt.trim()) {
-      // allow render to settle
       const t = setTimeout(() => {
         send(initialPrompt!.trim());
       }, 120);
@@ -95,68 +86,40 @@ export function ChatWorkspace({ onSend, aiResponse, loading }: Props) {
   }, [aiResponse, loading, messages.length, pendingPrompt]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
     if (messages.length > 0) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }, [messages, loading, aiResponse]);
 
-  const latestHint = useMemo(() => {
-    if (loading) return "Thinking...";
-    if (messages.length === 0) return "What would you like to learn today?";
-    return null;
-  }, [loading, messages.length]);
-
-  const suggestions = [
-    { label: "Explain a concept", icon: Lightbulb, prompt: "Explain a concept in simple terms." },
-    { label: "Summarize a chapter", icon: ListChecks, prompt: "Summarize this chapter in clear bullet points." },
-    { label: "Generate quiz questions", icon: HelpCircle, prompt: "Generate quiz questions on this topic." },
-    { label: "Solve a problem", icon: Sparkles, prompt: "Help me solve a problem step by step." },
-  ];
+  const topics = ["Physics", "Chemistry", "Biology", "Math", "History", "Coding"];
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 w-full max-w-none overflow-hidden relative">
-      <TutorHeader onNewChat={handleNewChat} />
+    <div className="flex-1 flex flex-col h-full min-h-0 w-full relative bg-transparent">
+      <TutorHeader onNewChat={handleNewChat} topicTitle={topicTitle} />
 
-      <main 
-        className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 custom-scrollbar pb-28 pt-2 space-y-8 flex"
-        style={{ minHeight: 0 }}
-      >
-        <div className={`mx-auto w-full max-w-[950px] h-full flex flex-col ${messages.length === 0 ? "items-center justify-center" : ""} space-y-6`}>
+      <main className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+        <div className={`mx-auto w-full max-w-[850px] min-h-full flex flex-col px-4 sm:px-6 pb-40 pt-6 ${messages.length === 0 ? "justify-center" : "justify-start"} space-y-6`}>
           {messages.length === 0 && !loading && (
-            <div className="flex items-center justify-center w-full">
-              <div className="w-full max-w-[48rem] rounded-[1.75rem] border border-white/10 bg-white/[0.035] px-6 py-6 sm:px-8 sm:py-8 shadow-[0_20px_80px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
-                <div className="flex flex-col items-center text-center gap-6">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[0_0_40px_rgba(139,92,246,0.35)]">
-                    <Sparkles className="h-8 w-8 text-white" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-2xl sm:text-[2rem] font-semibold tracking-tight text-foreground">{latestHint}</h3>
-                    <p className="mx-auto max-w-2xl text-sm sm:text-base text-muted-foreground">
-                      Ask anything about your chapter, concept, or problem. The conversation will feel like a premium AI workspace.
-                    </p>
-                  </div>
-
-                  <div className="grid w-full grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
-                    {suggestions.map(({ label, icon: Icon, prompt }) => (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => send(prompt)}
-                        className="group flex items-center gap-4 rounded-2xl border border-border/45 bg-black/10 px-4 py-4 text-left transition-all hover:border-violet-400/35 hover:bg-white/[0.06] hover:shadow-[0_0_30px_rgba(139,92,246,0.12)]"
-                      >
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300 transition-transform group-hover:scale-105">
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-foreground">{label}</div>
-                          <div className="text-xs text-muted-foreground">Start a guided conversation</div>
-                        </div>
-                        <div className="text-muted-foreground/70 transition-transform group-hover:translate-x-0.5">›</div>
-                      </button>
-                    ))}
-                  </div>
+            <div className="flex flex-col items-center justify-center w-full space-y-10 mt-[-5vh]">
+              <div className="text-center space-y-3">
+                <div className="inline-block rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 px-4 py-1.5 mb-2">
+                   <span className="text-xs font-bold uppercase tracking-[0.2em] text-violet-300">AI Tutor</span>
                 </div>
+                <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
+                  What would you like to learn today?
+                </h2>
+              </div>
+              
+              <div className="flex flex-wrap justify-center gap-3 max-w-2xl">
+                {topics.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => send(`Let's learn about ${t}`)}
+                    className="rounded-full border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-white/10 hover:border-white/20 hover:scale-105"
+                  >
+                    {t}
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -173,15 +136,20 @@ export function ChatWorkspace({ onSend, aiResponse, loading }: Props) {
           ))}
 
           {loading && (
-            <div className="flex items-center gap-3 pl-1 py-2">
-              <TypingAnimation />
-              <span className="text-xs text-muted-foreground">{latestHint}</span>
+            <div className="flex w-full items-start gap-4">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-[var(--neon-purple)] to-[var(--neon-blue)] glow-purple">
+                <span className="text-white text-xs font-bold">AI</span>
+              </div>
+              <div className="pt-2">
+                <TypingAnimation />
+              </div>
             </div>
           )}
 
-          <div ref={bottomRef} className="h-6 w-full" />
+          <div ref={bottomRef} className="h-10 w-full shrink-0" />
         </div>
       </main>
+
       <ChatInput onSend={send} disabled={loading} focus={Boolean(focusInput)} />
     </div>
   );
