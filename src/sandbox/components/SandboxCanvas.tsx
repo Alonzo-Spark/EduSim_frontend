@@ -14,8 +14,7 @@ import { RuntimeObserver } from '../../ai/runtimeObserver';
 import { useExplanationEngine } from '../../ai/explanationEngine';
 import { FloatingAssetPanel } from '../../components/AssetLibrary/FloatingAssetPanel';
 import { physicsEventBus } from '../../ai/physicsEventBus';
-import { TutorOverlay } from '../ui/TutorOverlay';
-import { inferActiveTopics, topicChanged, type TopicResult } from '../intelligence/topicInference';
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -139,6 +138,7 @@ export const SandboxCanvas: React.FC = () => {
   const [gravity, setGravity] = useState<GravityPreset>('earth');
   const [speed, setSpeed] = useState(1);
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
+  const [tutorEnabled, setTutorEnabled] = useState(true);
 
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -379,45 +379,7 @@ export const SandboxCanvas: React.FC = () => {
           setPropertyVersion((v) => v + 1);
         });
 
-        // ── Topic inference ─────────────────────────────────────────────────
-        // Track last fired topic so we don't repeat the same message on every
-        // small update (e.g. spawning rope segments one by one).
-        let lastTopicResult: TopicResult | null = null;
-        let inferDebounceId: ReturnType<typeof setTimeout> | null = null;
 
-        const runTopicInference = () => {
-          // Debounce by one tick so that multi-body spawns (rope chain)
-          // resolve before we inspect the store.
-          if (inferDebounceId) clearTimeout(inferDebounceId);
-          inferDebounceId = setTimeout(() => {
-            const result = inferActiveTopics(store);
-            if (topicChanged(lastTopicResult, result) && result) {
-              lastTopicResult = result;
-              // Fire tutor overlay message
-              window.showTutorMessage?.({ 
-                type: result.messageType,
-                title: result.tutorTitle,
-                message: result.tutorMessage,
-                formula: result.formula,
-                duration: 7500,
-              });
-              // Auto-register recommended observables on all current dynamic objects
-              const dynamicObjs = store.getAllObjects().filter((o) => !o.body.isStatic);
-              dynamicObjs.forEach((obj) => {
-                observableEngineRef.current?.registerObservable({
-                  objectId: obj.id,
-                  types: result.recommendedObservables,
-                  label: obj.metadata?.label || obj.id,
-                  color: 0xffffff,
-                });
-              });
-            }
-          }, 120);
-        };
-
-        store.subscribe('objectAdded', runTopicInference);
-        store.subscribe('constraintAdded', runTopicInference);
-        store.subscribe('constraintRemoved', runTopicInference);
 
         // 1. Init renderer
         await rt.init(el);
@@ -1284,6 +1246,66 @@ export const SandboxCanvas: React.FC = () => {
           <button style={{ ...S.btn, ...S.btnGhost }} onClick={handleReset} disabled={!ready} title="Reset">↺</button>
         </div>
 
+        {/* Tutor Explanation Toggle */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: 2,
+          marginBottom: 6,
+          padding: '7px 10px',
+          borderRadius: 10,
+          background: tutorEnabled
+            ? 'rgba(99, 102, 241, 0.10)'
+            : 'rgba(255,255,255,0.03)',
+          border: tutorEnabled
+            ? '1px solid rgba(99,102,241,0.30)'
+            : '1px solid rgba(255,255,255,0.07)',
+          transition: 'all 0.2s ease',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 14 }}>🤖</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: tutorEnabled ? '#a5b4fc' : '#64748b', transition: 'color 0.2s' }}>
+              AI Explanation
+            </span>
+          </div>
+          <button
+            id="tutor-toggle-btn"
+            onClick={() => setTutorEnabled((v) => !v)}
+            style={{
+              position: 'relative',
+              width: 38,
+              height: 20,
+              borderRadius: 10,
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              background: tutorEnabled
+                ? 'linear-gradient(135deg, #6366f1, #818cf8)'
+                : 'rgba(71,85,105,0.6)',
+              boxShadow: tutorEnabled
+                ? '0 0 8px rgba(99,102,241,0.5)'
+                : 'none',
+              transition: 'all 0.25s ease',
+              flexShrink: 0,
+            }}
+            title={tutorEnabled ? 'Disable AI explanations' : 'Enable AI explanations'}
+          >
+            <span style={{
+              position: 'absolute',
+              top: 3,
+              left: tutorEnabled ? 21 : 3,
+              width: 14,
+              height: 14,
+              borderRadius: '50%',
+              background: '#fff',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+              transition: 'left 0.25s ease',
+              display: 'block',
+            }} />
+          </button>
+        </div>
+
         <Sep label="Spawn Shapes — click or drag" />
         <div
           style={S.row}
@@ -1601,8 +1623,7 @@ export const SandboxCanvas: React.FC = () => {
           Drag shapes & constraints · Drop anywhere
         </div>
 
-        {/* AI Tutor Overlay — driven by live topic inference */}
-        <TutorOverlay />
+
 
         {/* Floating glassmorphic STEM Laboratory HUD Overlay */}
         {selected && (
@@ -1633,9 +1654,9 @@ export const SandboxCanvas: React.FC = () => {
           </div>
         )}
 
-        {/* Floating AI Response Panel */}
+        {/* Floating AI Response Panel — hidden when tutor is off */}
         <AnimatePresence>
-          {currentExplanation && (
+          {tutorEnabled && currentExplanation && (
             <motion.div
               key={currentExplanation.id}
               initial={{ opacity: 0, y: -20, x: '-50%' }}
