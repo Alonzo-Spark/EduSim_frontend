@@ -2,6 +2,19 @@ import React from "react";
 import { DynamicParsedFormula } from "@/utils/DynamicFormulaExtractor";
 import { BlockMath } from "react-katex";
 
+function cleanAndTruncate(text: string, maxWords: number): string {
+  if (!text) return "";
+  // Strip Markdown headings like "### " or "## "
+  let cleaned = text.replace(/#+\s*/g, "");
+  // Strip bold/italic symbols like "**" or "*"
+  cleaned = cleaned.replace(/\*\*|__/g, "");
+  cleaned = cleaned.replace(/\*|_/g, "");
+  // Split into words, limit, and join
+  const words = cleaned.trim().split(/\s+/);
+  if (words.length <= maxWords) return cleaned;
+  return words.slice(0, maxWords).join(" ") + "...";
+}
+
 const FormulaAnatomy: React.FC<{ formula: DynamicParsedFormula | null }> = ({ formula }) => {
   if (!formula) {
     return <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 text-sm text-muted-foreground">Select a formula to see anatomy.</div>;
@@ -9,7 +22,8 @@ const FormulaAnatomy: React.FC<{ formula: DynamicParsedFormula | null }> = ({ fo
 
   const title = formula.title || formula.formula || formula.raw || "Unnamed Formula";
   const latex = formula.latex || formula.formula || "";
-  const description = formula.description || "No description available.";
+  const rawDescription = formula.description || "No description available.";
+  const description = cleanAndTruncate(rawDescription, 30);
   const anatomy = Array.isArray(formula.anatomy) ? formula.anatomy : [];
 
   return (

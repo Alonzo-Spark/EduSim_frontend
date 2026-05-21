@@ -1,5 +1,6 @@
 import React from "react";
 import { DynamicParsedFormula } from "@/utils/DynamicFormulaExtractor";
+import { TutorMarkdownRenderer } from "@/components/tutor/TutorMarkdownRenderer";
 
 const AIInsightPanel: React.FC<{ formula: DynamicParsedFormula | null }> = ({ formula }) => {
   if (!formula) return <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 text-sm text-muted-foreground">AI insights will appear here once a formula is selected.</div>;
@@ -16,8 +17,8 @@ const AIInsightPanel: React.FC<{ formula: DynamicParsedFormula | null }> = ({ fo
       <div className="grid gap-3">
         {description && (
           <div className="rounded-2xl border border-white/10 bg-black/10 p-4 text-sm leading-6 text-foreground/90">
-             <span className="font-semibold text-violet-300 block mb-1">Context</span>
-             {description}
+             <span className="font-semibold text-violet-300 block mb-3">Context</span>
+             <TutorMarkdownRenderer content={description} density="compact" />
           </div>
         )}
         {relatedTopics.length > 0 && (
