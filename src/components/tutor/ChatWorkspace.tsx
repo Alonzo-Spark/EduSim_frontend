@@ -10,6 +10,11 @@ interface Props {
   initialPrompt?: string | null;
   focusInput?: boolean;
   topicTitle?: string;
+  topicContext?: {
+    subject?: string;
+    className?: string;
+    chapter?: string;
+  };
 }
 
 type Message = {
@@ -23,7 +28,15 @@ function formatTime(date: Date) {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-export function ChatWorkspace({ onSend, aiResponse, loading, initialPrompt, focusInput, topicTitle }: Props) {
+export function ChatWorkspace({
+  onSend,
+  aiResponse,
+  loading,
+  initialPrompt,
+  focusInput,
+  topicTitle,
+  topicContext,
+}: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -50,7 +63,7 @@ export function ChatWorkspace({ onSend, aiResponse, loading, initialPrompt, focu
       }, 120);
       return () => clearTimeout(t);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPrompt]);
 
   const handleRegenerate = () => {
@@ -68,7 +81,8 @@ export function ChatWorkspace({ onSend, aiResponse, loading, initialPrompt, focu
 
   useEffect(() => {
     if (!loading && aiResponse) {
-      const shouldAppend = pendingPrompt !== null || messages.length === 0 || lastAiResponseRef.current !== aiResponse;
+      const shouldAppend =
+        pendingPrompt !== null || messages.length === 0 || lastAiResponseRef.current !== aiResponse;
       if (shouldAppend) {
         setMessages((current) => [
           ...current,
@@ -95,27 +109,34 @@ export function ChatWorkspace({ onSend, aiResponse, loading, initialPrompt, focu
 
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 w-full relative bg-transparent">
-      <TutorHeader onNewChat={handleNewChat} topicTitle={topicTitle} />
+      <TutorHeader onNewChat={handleNewChat} topicTitle={topicTitle} topicContext={topicContext} />
 
       <main className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-        <div className={`mx-auto w-full max-w-[850px] min-h-full flex flex-col px-4 sm:px-6 pb-40 pt-6 ${messages.length === 0 ? "justify-center" : "justify-start"} space-y-6`}>
+        <div
+          className={`mx-auto w-full max-w-[850px] min-h-full flex flex-col px-4 sm:px-6 pb-40 pt-6 ${messages.length === 0 ? "justify-center" : "justify-start"} space-y-6`}
+        >
           {messages.length === 0 && !loading && (
             <div className="flex flex-col items-center justify-center w-full space-y-10 mt-[-5vh]">
               <div className="text-center space-y-3">
                 <div className="inline-block rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 px-4 py-1.5 mb-2">
-                   <span className="text-xs font-bold uppercase tracking-[0.2em] text-violet-300">AI Tutor</span>
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-violet-300">
+                    AI Tutor
+                  </span>
                 </div>
                 <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
                   What would you like to learn today?
                 </h2>
               </div>
-              
-              <div className="flex flex-wrap justify-center gap-3 max-w-2xl">
+
+              <div className="flex flex-wrap justify-center gap-3 max-w-2xl relative z-40">
                 {topics.map((t) => (
                   <button
                     key={t}
-                    onClick={() => send(`Let's learn about ${t}`)}
-                    className="rounded-full border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-white/10 hover:border-white/20 hover:scale-105"
+                    type="button"
+                    onClick={() => {
+                      send(`Explain ${t}`);
+                    }}
+                    className="pointer-events-auto relative z-50 rounded-full border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-white/10 hover:border-white/20 hover:scale-105 active:scale-95 cursor-pointer"
                   >
                     {t}
                   </button>
@@ -130,6 +151,7 @@ export function ChatWorkspace({ onSend, aiResponse, loading, initialPrompt, focu
               role={m.role}
               content={m.content}
               timestamp={m.timestamp}
+              topicTitle={topicTitle}
               onCopy={m.role === "ai" ? () => navigator.clipboard?.writeText(m.content) : undefined}
               onRegenerate={m.role === "ai" ? handleRegenerate : undefined}
             />

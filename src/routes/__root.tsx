@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
-import { FloatingButton } from "@/components/layout/FloatingButton";
+
 import { useSidebarStore } from "@/store/useSidebarStore";
 import "katex/dist/katex.min.css";
 
@@ -109,8 +109,6 @@ function RootComponent() {
           </div>
         </div>
       </motion.main>
-      
-      <FloatingButton />
     </div>
   );
 }

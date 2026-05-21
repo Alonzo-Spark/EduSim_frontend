@@ -3,11 +3,17 @@ import { GlobalSearch } from "./layout/GlobalSearch";
 import { useTheme } from "@/hooks/useTheme";
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 export function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const { toggleSidebar, setMobileOpen, isCollapsed } = useSidebarStore();
+  const [mounted, setMounted] = useState(false);
   const isTutor = typeof window !== "undefined" && window.location?.pathname?.startsWith("/tutor");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <header className="sticky top-0 z-[60] w-full px-4 pt-4 pb-2 md:px-6">
@@ -52,7 +58,13 @@ export function Navbar() {
             className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-secondary/50 border border-border hover:bg-secondary transition-all hover:scale-105 active:scale-95"
             title="Toggle Theme"
           >
-            {theme === "light" ? <Moon className="w-5 h-5 text-primary" /> : <Sun className="w-5 h-5 text-amber-400" />}
+            {!mounted ? (
+              <div className="w-5 h-5" />
+            ) : theme === "light" ? (
+              <Moon className="w-5 h-5 text-primary" />
+            ) : (
+              <Sun className="w-5 h-5 text-amber-400" />
+            )}
           </button>
 
           <button className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-secondary/50 border border-border hover:bg-secondary transition-all relative hover:scale-105 active:scale-95">

@@ -1,4 +1,5 @@
-import { parse as mathParse } from "mathjs";
+import { formatLatexForDisplay } from "@/utils/latexDisplay";
+import { getApiUrl } from "@/config/api";
 
 export interface FormulaAnatomyRow {
   symbol: string;
@@ -34,9 +35,11 @@ export interface FormulaControl {
 export interface DynamicParsedFormula {
   id: string;
   raw: string;
+  rawFormula?: string;
   expression: string;
   latex?: string;
   formula?: string;
+  displayFormula?: string;
   title?: string;
   description?: string;
   category?: string;
@@ -51,252 +54,221 @@ export interface DynamicParsedFormula {
   resultSymbol?: string;
 }
 
-const DISALLOWED_SYMBOLS = new Set(["sin", "cos", "tan", "log", "ln", "exp", "pi", "e"]);
-
-function extractSymbols(expr: string): string[] {
-  const symbols: string[] = [];
-
-  try {
-    const node = mathParse(expr) as unknown as {
-      filter: (
-        predicate: (child: unknown) => boolean,
-      ) => Array<{ name?: string; isSymbolNode?: boolean }>;
-    };
-
-    node
-      .filter((child) =>
-        Boolean(
-          child && typeof child === "object" && (child as { isSymbolNode?: boolean }).isSymbolNode,
-        ),
-      )
-      .forEach((symbolNode) => {
-        const name = symbolNode.name;
-        if (name && !symbols.includes(name) && !DISALLOWED_SYMBOLS.has(name)) {
-          symbols.push(name);
-        }
-      });
-  } catch {
-    const fallbackMatches = expr.match(/[a-zA-Z_]+/g) || [];
-    fallbackMatches.forEach((symbol) => {
-      if (!symbols.includes(symbol) && !DISALLOWED_SYMBOLS.has(symbol)) {
-        symbols.push(symbol);
-      }
-    });
+const OFFLINE_FORMULA_BACKUP: Record<string, {
+  title: string;
+  description: string;
+  anatomy: FormulaAnatomyRow[];
+  controls: FormulaControl[];
+  resultSymbol: string;
+}> = {
+  "F=MA": {
+    title: "Newton's Second Law",
+    description: "The rate of change of momentum of a body over time is directly proportional to the force applied, and occurs in the same direction as the applied force.",
+    anatomy: [
+      { symbol: "F", meaning: "Force applied", unit: "N" },
+      { symbol: "m", meaning: "Mass of the object", unit: "kg" },
+      { symbol: "a", meaning: "Acceleration", unit: "m/s²" }
+    ],
+    controls: [
+      { symbol: "m", label: "Mass (m)", unit: "kg", min: 1, max: 100, step: 1, defaultValue: 10 },
+      { symbol: "a", label: "Acceleration (a)", unit: "m/s²", min: 1, max: 20, step: 0.5, defaultValue: 9.8 }
+    ],
+    resultSymbol: "F"
+  },
+  "V=IR": {
+    title: "Ohm's Law",
+    description: "The current through a conductor between two points is directly proportional to the voltage across the two points.",
+    anatomy: [
+      { symbol: "V", meaning: "Voltage / Potential Difference", unit: "V" },
+      { symbol: "I", meaning: "Electric Current", unit: "A" },
+      { symbol: "R", meaning: "Electrical Resistance", unit: "Ω" }
+    ],
+    controls: [
+      { symbol: "I", label: "Current (I)", unit: "A", min: 0.1, max: 10, step: 0.1, defaultValue: 2 },
+      { symbol: "R", label: "Resistance (R)", unit: "Ω", min: 1, max: 100, step: 1, defaultValue: 10 }
+    ],
+    resultSymbol: "V"
+  },
+  "KE=1/2MV^2": {
+    title: "Kinetic Energy",
+    description: "The kinetic energy of an object is the energy that it possesses due to its motion.",
+    anatomy: [
+      { symbol: "KE", meaning: "Kinetic Energy", unit: "J" },
+      { symbol: "m", meaning: "Mass of the object", unit: "kg" },
+      { symbol: "v", meaning: "Velocity of the object", unit: "m/s" }
+    ],
+    controls: [
+      { symbol: "m", label: "Mass (m)", unit: "kg", min: 1, max: 100, step: 1, defaultValue: 10 },
+      { symbol: "v", label: "Velocity (v)", unit: "m/s", min: 1, max: 50, step: 1, defaultValue: 5 }
+    ],
+    resultSymbol: "KE"
   }
+};
 
-  return symbols;
-}
-
-function normalizeMathExpression(expr: string): string {
-  let res = expr;
-  res = res.replace(/½/g, "0.5").replace(/1\/2/g, "0.5");
-  res = res.replace(/²/g, "^2").replace(/³/g, "^3");
-  res = res.replace(/([\d.]+)([a-zA-Z])/g, "$1*$2");
-
-  res = res.replace(/\b([a-zA-Z])([a-zA-Z])([a-zA-Z])\b/g, (match, p1, p2, p3) => {
-    const funcs = ["sin", "cos", "tan", "log", "exp", "cot", "sec", "csc", "max", "min"];
-    if (funcs.includes(match.toLowerCase())) return match;
-    return `${p1}*${p2}*${p3}`;
-  });
-
-  res = res.replace(/\b([a-zA-Z])([a-zA-Z])\b/g, (match, p1, p2) => {
-    const exceptions = ["pi", "ln", "dr", "dt", "dx", "dy", "KE", "PE"];
-    if (exceptions.includes(match)) return match;
-    return `${p1}*${p2}`;
-  });
-
-  return res;
+function parseGenericFormula(rawFormula: string): {
+  title: string;
+  description: string;
+  anatomy: FormulaAnatomyRow[];
+  controls: FormulaControl[];
+  resultSymbol: string;
+} {
+  const clean = rawFormula.replace(/[\$\s]/g, "");
+  const parts = clean.split("=");
+  const resultSymbol = parts[0] || "y";
+  const equation = parts[1] || parts[0] || "";
+  
+  // Extract all single letter variables from the equation
+  const matches = Array.from(new Set(equation.match(/[a-zA-Z]/g) || []));
+  const controls: FormulaControl[] = matches.map(symbol => ({
+    symbol,
+    label: `Variable ${symbol}`,
+    unit: "",
+    min: 1,
+    max: 100,
+    step: 1,
+    defaultValue: 10
+  }));
+  
+  const anatomy: FormulaAnatomyRow[] = [
+    { symbol: resultSymbol, meaning: "Calculated Result", unit: "" },
+    ...matches.map(symbol => ({
+      symbol,
+      meaning: `Input parameter ${symbol}`,
+      unit: ""
+    }))
+  ];
+  
+  return {
+    title: `Formula ${rawFormula}`,
+    description: `Mathematical relationship defining ${resultSymbol}.`,
+    anatomy,
+    controls,
+    resultSymbol
+  };
 }
 
 export const DynamicFormulaExtractor = {
-  parseTutorResponse(
+  async parseTutorResponse(
     content: string,
     topic: string,
     subject?: string,
     classId?: string,
-  ): DynamicParsedFormula[] {
-    console.log("FULL_RESPONSE", content);
-    const formulas: DynamicParsedFormula[] = [];
-    if (!content) return formulas;
+  ): Promise<DynamicParsedFormula[]> {
+    console.log("[DynamicFormulaExtractor] Extracting via backend API...");
 
-    const displayRegex = /\$\$(.*?)\$\$/g;
-    const inlineRegex = /\$([^$\n]+?)\$/g;
+    try {
+      // 1. Extract formulas from text
+      const extractRes = await fetch(getApiUrl("/api/formula/extract"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: content })
+      });
+      
+      if (!extractRes.ok) throw new Error("Extraction failed");
+      const extractData = await extractRes.json();
+      const formulasList = extractData.formulas || [];
+      
+      const parsedFormulas: DynamicParsedFormula[] = [];
+      
+      // 2. Fetch metadata for each formula
+      for (const f of formulasList) {
+        try {
+          let labData: any = null;
+          
+          try {
+            const labRes = await fetch(getApiUrl("/api/formula/lab"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ formula: f.formula })
+            });
+            
+            if (labRes.ok) {
+              labData = await labRes.json();
+            }
+          } catch (fetchErr) {
+            console.warn("Could not reach formula lab endpoint, using offline fallback.", fetchErr);
+          }
+          
+          // Deduplicate controls based on symbol (so we don't have n1, n2, n_1 all duplicated)
+          let uniqueControls: FormulaControl[] = [];
+          const seenVars = new Set<string>();
+          for (const v of (labData?.variables || [])) {
+            if (!seenVars.has(v.symbol)) {
+              seenVars.add(v.symbol);
+              uniqueControls.push({
+                symbol: v.symbol,
+                label: v.label || v.symbol,
+                unit: v.unit || "",
+                min: v.min !== undefined ? v.min : 1,
+                max: v.max !== undefined ? v.max : 100,
+                step: v.step !== undefined ? v.step : 1,
+                defaultValue: v.defaultValue !== undefined ? v.defaultValue : 10
+              });
+            }
+          }
+          
+          let anatomy: FormulaAnatomyRow[] = labData?.anatomy || [];
+          let title = labData?.title || "Formula";
+          let description = labData?.description || content;
+          let resultSymbol = labData?.resultSymbol || "y";
+          
+          // If backend returned empty variable data, use premium local fallbacks
+          if (anatomy.length === 0) {
+            const cleanFormula = f.formula.replace(/[\$\s]/g, ""); // Strip $ and spaces
+            const matchedKey = Object.keys(OFFLINE_FORMULA_BACKUP).find(key => 
+              cleanFormula.toUpperCase().includes(key) || 
+              key.includes(cleanFormula.toUpperCase())
+            );
+            
+            if (matchedKey) {
+              const backup = OFFLINE_FORMULA_BACKUP[matchedKey];
+              title = backup.title;
+              description = backup.description;
+              anatomy = backup.anatomy;
+              uniqueControls = backup.controls;
+              resultSymbol = backup.resultSymbol;
+            } else {
+              const parsedGeneric = parseGenericFormula(f.formula);
+              title = parsedGeneric.title;
+              description = parsedGeneric.description;
+              anatomy = parsedGeneric.anatomy;
+              uniqueControls = parsedGeneric.controls;
+              resultSymbol = parsedGeneric.resultSymbol;
+            }
+          }
+          
+          let formulaId = labData?.id || f.id;
+          if (formulaId === "dynamic-formula" || formulaId === "fallback") {
+            formulaId = f.id || `formula-${Math.random().toString(36).substring(2, 9)}`;
+          }
 
-    const matches = new Set<string>();
-    let match: RegExpExecArray | null;
-
-    while ((match = displayRegex.exec(content)) !== null) {
-      if (match[1].includes("=")) {
-        matches.add(match[1].trim());
-      }
-    }
-
-    while ((match = inlineRegex.exec(content)) !== null) {
-      if (match[1].includes("=") && /[a-zA-Z]/.test(match[1])) {
-        matches.add(match[1].trim());
-      }
-    }
-
-    if (matches.size === 0) return [];
-
-    const anatomyTableRegex = /\|.*?Symbol.*?\|.*?Meaning.*?\|[\s\S]*?(?=\n\n|\n##|$)/i;
-    const anatomyMatch = content.match(anatomyTableRegex);
-    const anatomy: FormulaAnatomyRow[] = [];
-
-    if (anatomyMatch) {
-      const rows = anatomyMatch[0].split("\n").filter((row) => row.trim().startsWith("|"));
-
-      for (let i = 2; i < rows.length; i += 1) {
-        const cols = rows[i]
-          .split("|")
-          .map((cell) => cell.trim())
-          .filter(Boolean);
-
-        if (cols.length >= 2) {
-          anatomy.push({
-            symbol: cols[0].replace(/\*/g, ""),
-            meaning: cols[1].replace(/\*/g, ""),
-            unit: cols[2] ? cols[2].replace(/\*/g, "") : "",
+          parsedFormulas.push({
+            id: formulaId,
+            raw: f.formula,
+            rawFormula: f.formula,
+            expression: f.formula,
+            latex: f.formula,
+            formula: f.formula,
+            displayFormula: formatLatexForDisplay(f.formula),
+            title,
+            category: subject,
+            topic,
+            description,
+            variables: uniqueControls,
+            controls: uniqueControls,
+            anatomy,
+            examples: labData?.examples || [],
+            resultSymbol
           });
+        } catch (e) {
+          console.warn("Failed to load lab data for formula", f.formula, e);
         }
       }
+      
+      return parsedFormulas;
+    } catch (e) {
+      console.error("[DynamicFormulaExtractor] Error:", e);
+      return [];
     }
-
-    const examplesRegex = /##\s*(?:Worked\s*)?Examples?([\s\S]*?)(?=\n##|$)/i;
-    const examplesMatch = content.match(examplesRegex);
-    const examples: FormulaExample[] = [];
-
-    if (examplesMatch) {
-      const exampleText = examplesMatch[1].trim();
-      const subExamples = exampleText.split(/\n(?=\*\*Example|\d+\.)/i).filter(Boolean);
-
-      subExamples.forEach((example, idx) => {
-        examples.push({ title: `Example ${idx + 1}`, content: example.trim() });
-      });
-
-      if (examples.length === 0 && exampleText) {
-        examples.push({ title: "Example", content: exampleText });
-      }
-    }
-
-    const pqRegex = /##\s*(?:Suggested\s*|Practice\s*)Questions?([\s\S]*?)(?=\n##|$)/i;
-    const pqMatch = content.match(pqRegex);
-    const practiceQuestions: FormulaPracticeQuestion[] = [];
-
-    if (pqMatch) {
-      const pqText = pqMatch[1].trim();
-      const qLines = pqText.split("\n").filter((line) => line.trim().match(/^[0-9]+\.|^-/));
-
-      qLines.forEach((questionLine) => {
-        practiceQuestions.push({ question: questionLine.replace(/^[0-9]+\.|-/, "").trim() });
-      });
-    }
-
-    const rtRegex = /##\s*Related\s*Topics?([\s\S]*?)(?=\n##|$)/i;
-    const rtMatch = content.match(rtRegex);
-    const relatedTopics: string[] = [];
-
-    if (rtMatch) {
-      const rtLines = rtMatch[1]
-        .trim()
-        .split("\n")
-        .filter((line) => line.trim().match(/^-\s*/));
-
-      rtLines.forEach((topicLine) => {
-        relatedTopics.push(topicLine.replace(/^-/, "").trim());
-      });
-    }
-
-    const revisionCards: FormulaRevisionCard[] = anatomy.map((row) => ({
-      front: `What does ${row.symbol} represent?`,
-      back: row.meaning,
-    }));
-
-    let idCounter = 1;
-    for (const latex of matches) {
-      let expr = latex
-        .replace(/\\frac{([^}]+)}{([^}]+)}/g, "($1)/($2)")
-        .replace(/\\cdot/g, "*")
-        .replace(/\\times/g, "*")
-        .replace(/\\left/g, "")
-        .replace(/\\right/g, "")
-        .replace(/\\sin/g, "sin")
-        .replace(/\\cos/g, "cos")
-        .replace(/\\tan/g, "tan")
-        .replace(/[{}]/g, "")
-        .replace(/\\/g, "");
-
-      let resultSymbol = "y";
-      if (expr.includes("=")) {
-        const parts = expr.split("=");
-        resultSymbol = parts[0].trim();
-        expr = parts[1].trim();
-      }
-
-      expr = normalizeMathExpression(expr);
-
-      const formulaAnatomy = [...anatomy];
-      const symbols = extractSymbols(expr);
-
-      symbols.forEach((symbol) => {
-        if (!formulaAnatomy.find((row) => row.symbol === symbol) && symbol !== resultSymbol) {
-          formulaAnatomy.push({ symbol, meaning: symbol, unit: "" });
-        }
-      });
-
-      const controls: FormulaControl[] = symbols
-        .filter((symbol) => symbol !== resultSymbol)
-        .map((symbol) => {
-          const an = formulaAnatomy.find((row) => row.symbol === symbol);
-          let def = 10, min = 1, max = 100, step = 1;
-          const l = symbol.toLowerCase();
-          if (l === 'm') { def = 10; max = 100; }
-          else if (l === 'a') { def = 5; max = 20; }
-          else if (l === 'v') { def = 12; max = 240; }
-          else if (l === 'r') { def = 4; max = 100; }
-          else if (l === 'i') { def = 2; max = 20; }
-          else if (l === 't') { def = 10; max = 100; }
-          else if (l === 'f') { def = 50; max = 500; }
-          else if (l === 'h') { def = 5; max = 50; }
-          else if (l === 'c') { def = 300; max = 500; }
-          else if (l === 'n') { def = 1.5; max = 3; step = 0.1; }
-
-          return {
-            symbol,
-            label: an?.meaning || symbol,
-            unit: an?.unit || "",
-            min, max, step, defaultValue: def,
-          };
-        });
-
-      const escapedLatex = latex.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const explanationRegex = new RegExp(`([^\\n]+)\\n+.*${escapedLatex}.*\\n+([^\\n]+)`, "i");
-      const explMatch = content.match(explanationRegex);
-
-      let description = content;
-      formulas.push({
-        id: `f-${idCounter++}`,
-        raw: latex,
-        expression: expr,
-        latex,
-        formula: latex,
-        title: resultSymbol ? `Formula for ${resultSymbol}` : "Formula",
-        category: subject,
-        topic,
-        description,
-        anatomy: formulaAnatomy.filter(
-          (row) => symbols.includes(row.symbol) || row.symbol === resultSymbol,
-        ),
-        examples,
-        practiceQuestions,
-        revisionCards,
-        relatedTopics,
-        controls,
-        variables: controls,
-        resultSymbol,
-      });
-    }
-
-    return formulas;
   },
 };

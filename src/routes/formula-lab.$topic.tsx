@@ -1,12 +1,17 @@
-import React from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import FormulaLabPage from "@/components/formula-lab/FormulaLabPage";
-import { useParams } from "@tanstack/react-router";
 
-export default function FormulaLabRoute() {
-  const params = useParams() as any;
-  const topic = params.topic || 'Topic';
-  const classId = params.classId;
-  const subject = params.subject;
+export const Route = createFileRoute("/formula-lab/$topic")({
+  component: FormulaLabRoute,
+});
 
-  return <FormulaLabPage topic={topic} classId={classId} subject={subject} />;
+function FormulaLabRoute() {
+  const { topic } = Route.useParams();
+  
+  // Retrieve optional query params safely using TanStack Router search constraints if needed
+  const search = Route.useSearch() as any;
+  const classId = search.classId;
+  const subject = search.subject;
+
+  return <FormulaLabPage topic={topic || "Topic"} classId={classId} subject={subject} />;
 }

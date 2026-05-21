@@ -3,16 +3,16 @@ import { useMemo, useState } from "react";
 import { PageWrapper } from "@/components/Card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Search, 
-  PlayCircle, 
-  Link2, 
-  Download, 
-  Star, 
-  Clock, 
-  Filter, 
-  Atom, 
-  FlaskConical, 
+import {
+  Search,
+  PlayCircle,
+  Link2,
+  Download,
+  Star,
+  Clock,
+  Filter,
+  Atom,
+  FlaskConical,
   Calculator,
   ChevronRight,
   Trash2,
@@ -34,18 +34,15 @@ function MySimulationsPage() {
 
   const filteredSimulations = useMemo(() => {
     return simulations.filter((sim) => {
-      const simTitle = sim.title || "";
-      const simSubject = sim.subject || "";
-      
-      const matchesSearch = simTitle.toLowerCase().includes(search.toLowerCase()) || 
-                            simSubject.toLowerCase().includes(search.toLowerCase());
-      
-      const matchesFilter = 
-        filter === "all" || 
+      const matchesSearch = sim.title.toLowerCase().includes(search.toLowerCase()) ||
+        sim.subject.toLowerCase().includes(search.toLowerCase());
+
+      const matchesFilter =
+        filter === "all" ||
         (filter === "favorites" && sim.favorite) ||
-        (filter === "physics" && simSubject.toLowerCase() === "physics") ||
-        (filter === "chemistry" && simSubject.toLowerCase() === "chemistry") ||
-        (filter === "math" && simSubject.toLowerCase() === "math");
+        (filter === "physics" && (sim.subject || "").toLowerCase() === "physics") ||
+        (filter === "chemistry" && (sim.subject || "").toLowerCase() === "chemistry") ||
+        (filter === "math" && (sim.subject || "").toLowerCase() === "math");
 
       return matchesSearch && matchesFilter;
     });
@@ -77,7 +74,7 @@ function MySimulationsPage() {
   };
 
   const getSubjectIcon = (subject: string) => {
-    switch (subject.toLowerCase()) {
+    switch ((subject || "").toLowerCase()) {
       case "physics": return <Atom className="w-4 h-4" />;
       case "chemistry": return <FlaskConical className="w-4 h-4" />;
       case "math": return <Calculator className="w-4 h-4" />;
@@ -119,11 +116,10 @@ function MySimulationsPage() {
                 <button
                   key={f.id}
                   onClick={() => setFilter(f.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors ${
-                    filter === f.id
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors ${filter === f.id
                       ? "bg-primary text-primary-foreground font-semibold"
                       : "bg-secondary/50 text-muted-foreground border border-border hover:border-primary/30"
-                  }`}
+                    }`}
                 >
                   {f.icon}
                   {f.label}
@@ -137,11 +133,10 @@ function MySimulationsPage() {
                   <div
                     key={sim.id}
                     onClick={() => setActive(sim)}
-                    className={`group relative w-full text-left p-3 rounded-2xl border transition-all cursor-pointer ${
-                    active?.id === sim.id
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-secondary/20 hover:border-primary/30 hover:bg-secondary/50"
-                  }`}
+                    className={`group relative w-full text-left p-3 rounded-2xl border transition-all cursor-pointer ${active?.id === sim.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-secondary/20 hover:border-primary/30 hover:bg-secondary/50"
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -164,9 +159,8 @@ function MySimulationsPage() {
                             e.stopPropagation();
                             toggleFavorite(sim.id);
                           }}
-                          className={`p-1.5 rounded-lg border border-border ${
-                            sim.favorite ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground hover:text-foreground"
-                          }`}
+                          className={`p-1.5 rounded-lg border border-border ${sim.favorite ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground hover:text-foreground"
+                            }`}
                         >
                           <Star className="w-3.5 h-3.5" fill={sim.favorite ? "currentColor" : "none"} />
                         </button>
@@ -220,16 +214,15 @@ function MySimulationsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => toggleFavorite(active.id)}
-                      className={`p-2 rounded-xl border transition-all ${
-                        active.favorite
+                      className={`p-2 rounded-xl border transition-all ${active.favorite
                           ? "bg-amber-500/10 border-amber-500/50 text-amber-500"
                           : "bg-secondary border-border text-muted-foreground hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       <Star className="w-4 h-4" fill={active.favorite ? "currentColor" : "none"} />
                     </button>
-                    <Link 
-                      to="/sandbox/$simulationId" 
+                    <Link
+                      to="/sandbox/$simulationId"
                       params={{ simulationId: active.id }}
                     >
                       <Button size="sm" className="rounded-xl bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white font-bold hover:scale-105 transition-transform shadow-lg shadow-[var(--neon-purple)]/20 gap-2 cursor-pointer">
@@ -260,7 +253,7 @@ function MySimulationsPage() {
                 </div>
                 <h2 className="text-2xl font-bold text-foreground mb-3">No simulation selected</h2>
                 <p className="text-muted-foreground max-w-sm mb-8">
-                  {simulations.length > 0 
+                  {simulations.length > 0
                     ? "Select a simulation from your library to interact with it."
                     : "You haven't generated any simulations yet. Start by creating one with the AI Agent."}
                 </p>
