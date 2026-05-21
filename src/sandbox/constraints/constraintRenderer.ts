@@ -8,7 +8,7 @@ import type { SandboxRuntime }    from '../engine/runtime';
 const STYLE: Record<string, { color: number; alpha: number; width: number; dash: boolean }> = {
   pivot:  { color: 0x818cf8, alpha: 0.7, width: 2,   dash: false },
   spring: { color: 0x34d399, alpha: 0.8, width: 1.5, dash: true  },
-  rope:   { color: 0xfbbf24, alpha: 0.75, width: 2,  dash: false },
+  rope:   { color: 0xfbbf24, alpha: 0.95, width: 3,  dash: false },
 };
 
 // ─── ConstraintRenderer ───────────────────────────────────────────────────────
@@ -31,11 +31,13 @@ export class ConstraintRenderer {
   private readonly hookId = 'constraint-renderer';
 
   private active    = false;
+  private rafId:    number | null = null;
   private sourcesFn: (() => RuntimeConstraint[]) | null = null;
 
   constructor(runtime: SandboxRuntime) {
     this.runtime  = runtime;
     this.graphics = new PIXI.Graphics();
+    (this.graphics as any)._isConstraintOverlay = true; // prevent removal by buildScene
     this.graphics.zIndex = 100; // draw on top
   }
 
@@ -54,15 +56,21 @@ export class ConstraintRenderer {
     vp.addChild(this.graphics);
     vp.sortChildren();
 
-    this.runtime.addHook({
-      id:        this.hookId,
-      afterStep: () => this.draw(),
-    });
+    // Use own RAF loop so lines are visible even when physics is paused
+    const loop = () => {
+      if (!this.active) return;
+      this.draw();
+      this.rafId = requestAnimationFrame(loop);
+    };
+    this.rafId = requestAnimationFrame(loop);
   }
 
   disable(): void {
     if (!this.active) return;
-    this.runtime.removeHook(this.hookId);
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
     this.graphics.parent?.removeChild(this.graphics);
     this.graphics.clear();
     this.active = false;
@@ -125,8 +133,8 @@ export class ConstraintRenderer {
    * A constraint endpoint is either a body (+ optional local offset) or a raw world point.
    */
   private resolveEndpoint(
-    body:  Matter.Body | null | undefined,
-    point: Matter.Vector | undefined,
+    body:  Matter.Body | null | null | undefined,
+    point: Matter.Vector | null | undefined,
   ): { x: number; y: number } | null {
     if (body) {
       const offset = point ?? { x: 0, y: 0 };
