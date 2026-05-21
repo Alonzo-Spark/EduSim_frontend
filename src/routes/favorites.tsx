@@ -46,8 +46,8 @@ function FavoritesPage() {
                 
                 <div className="flex items-center justify-between gap-2 mt-auto">
                   <span className="text-[10px] text-muted-foreground">{new Date(sim.createdAt).toLocaleDateString()}</span>
-                  <Link to="/my-simulations">
-                    <Button size="sm" variant="ghost" className="text-accent hover:bg-accent/10 gap-2">
+                  <Link to="/sandbox/$simulationId" params={{ simulationId: sim.id }}>
+                    <Button size="sm" variant="ghost" className="text-accent hover:bg-accent/10 gap-2 cursor-pointer">
                       Launch <ArrowRight className="w-3.5 h-3.5" />
                     </Button>
                   </Link>

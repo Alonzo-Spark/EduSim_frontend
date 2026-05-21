@@ -34,15 +34,18 @@ function MySimulationsPage() {
 
   const filteredSimulations = useMemo(() => {
     return simulations.filter((sim) => {
-      const matchesSearch = sim.title.toLowerCase().includes(search.toLowerCase()) || 
-                            sim.subject.toLowerCase().includes(search.toLowerCase());
+      const simTitle = sim.title || "";
+      const simSubject = sim.subject || "";
+      
+      const matchesSearch = simTitle.toLowerCase().includes(search.toLowerCase()) || 
+                            simSubject.toLowerCase().includes(search.toLowerCase());
       
       const matchesFilter = 
         filter === "all" || 
         (filter === "favorites" && sim.favorite) ||
-        (filter === "physics" && sim.subject.toLowerCase() === "physics") ||
-        (filter === "chemistry" && sim.subject.toLowerCase() === "chemistry") ||
-        (filter === "math" && sim.subject.toLowerCase() === "math");
+        (filter === "physics" && simSubject.toLowerCase() === "physics") ||
+        (filter === "chemistry" && simSubject.toLowerCase() === "chemistry") ||
+        (filter === "math" && simSubject.toLowerCase() === "math");
 
       return matchesSearch && matchesFilter;
     });
@@ -225,6 +228,14 @@ function MySimulationsPage() {
                     >
                       <Star className="w-4 h-4" fill={active.favorite ? "currentColor" : "none"} />
                     </button>
+                    <Link 
+                      to="/sandbox/$simulationId" 
+                      params={{ simulationId: active.id }}
+                    >
+                      <Button size="sm" className="rounded-xl bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white font-bold hover:scale-105 transition-transform shadow-lg shadow-[var(--neon-purple)]/20 gap-2 cursor-pointer">
+                        <Sparkles className="w-4 h-4" /> Launch Sandbox
+                      </Button>
+                    </Link>
                     <Button size="sm" variant="outline" onClick={handleShare}>
                       <Link2 className="w-4 h-4 mr-1" /> Share
                     </Button>

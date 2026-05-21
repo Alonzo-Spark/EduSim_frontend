@@ -21,6 +21,7 @@ import { Route as AiAgentRouteImport } from './routes/ai-agent'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubjectsClassIdRouteImport } from './routes/subjects.$classId'
 import { Route as SimulationTopicRouteImport } from './routes/simulation.$topic'
+import { Route as SandboxSimulationIdRouteImport } from './routes/sandbox.$simulationId'
 import { Route as ChaptersClassIdSubjectRouteImport } from './routes/chapters.$classId.$subject'
 import { Route as TopicsClassIdSubjectChapterRouteImport } from './routes/topics.$classId.$subject.$chapter'
 import { Route as SimulationClass9PhysicsLawsOfMotionRouteImport } from './routes/simulation.class9.physics.laws-of-motion'
@@ -86,6 +87,11 @@ const SimulationTopicRoute = SimulationTopicRouteImport.update({
   path: '/simulation/$topic',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SandboxSimulationIdRoute = SandboxSimulationIdRouteImport.update({
+  id: '/sandbox/$simulationId',
+  path: '/sandbox/$simulationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChaptersClassIdSubjectRoute = ChaptersClassIdSubjectRouteImport.update({
   id: '/chapters/$classId/$subject',
   path: '/chapters/$classId/$subject',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/simulation-generator': typeof SimulationGeneratorRoute
   '/tutor': typeof TutorRoute
+  '/sandbox/$simulationId': typeof SandboxSimulationIdRoute
   '/simulation/$topic': typeof SimulationTopicRoute
   '/subjects/$classId': typeof SubjectsClassIdRoute
   '/chapters/$classId/$subject': typeof ChaptersClassIdSubjectRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/simulation-generator': typeof SimulationGeneratorRoute
   '/tutor': typeof TutorRoute
+  '/sandbox/$simulationId': typeof SandboxSimulationIdRoute
   '/simulation/$topic': typeof SimulationTopicRoute
   '/subjects/$classId': typeof SubjectsClassIdRoute
   '/chapters/$classId/$subject': typeof ChaptersClassIdSubjectRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/simulation-generator': typeof SimulationGeneratorRoute
   '/tutor': typeof TutorRoute
+  '/sandbox/$simulationId': typeof SandboxSimulationIdRoute
   '/simulation/$topic': typeof SimulationTopicRoute
   '/subjects/$classId': typeof SubjectsClassIdRoute
   '/chapters/$classId/$subject': typeof ChaptersClassIdSubjectRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/simulation-generator'
     | '/tutor'
+    | '/sandbox/$simulationId'
     | '/simulation/$topic'
     | '/subjects/$classId'
     | '/chapters/$classId/$subject'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/simulation-generator'
     | '/tutor'
+    | '/sandbox/$simulationId'
     | '/simulation/$topic'
     | '/subjects/$classId'
     | '/chapters/$classId/$subject'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/simulation-generator'
     | '/tutor'
+    | '/sandbox/$simulationId'
     | '/simulation/$topic'
     | '/subjects/$classId'
     | '/chapters/$classId/$subject'
@@ -233,6 +245,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SimulationGeneratorRoute: typeof SimulationGeneratorRoute
   TutorRoute: typeof TutorRoute
+  SandboxSimulationIdRoute: typeof SandboxSimulationIdRoute
   SimulationTopicRoute: typeof SimulationTopicRoute
   SubjectsClassIdRoute: typeof SubjectsClassIdRoute
   ChaptersClassIdSubjectRoute: typeof ChaptersClassIdSubjectRoute
@@ -326,6 +339,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SimulationTopicRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sandbox/$simulationId': {
+      id: '/sandbox/$simulationId'
+      path: '/sandbox/$simulationId'
+      fullPath: '/sandbox/$simulationId'
+      preLoaderRoute: typeof SandboxSimulationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/chapters/$classId/$subject': {
       id: '/chapters/$classId/$subject'
       path: '/chapters/$classId/$subject'
@@ -383,6 +403,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SimulationGeneratorRoute: SimulationGeneratorRoute,
   TutorRoute: TutorRoute,
+  SandboxSimulationIdRoute: SandboxSimulationIdRoute,
   SimulationTopicRoute: SimulationTopicRoute,
   SubjectsClassIdRoute: SubjectsClassIdRoute,
   ChaptersClassIdSubjectRoute: ChaptersClassIdSubjectRoute,

@@ -87,8 +87,8 @@ function RootComponent() {
         
         {/* Main Content Scroll Container */}
         { /* When on tutor route we must avoid page scrolling and let the Tutor page manage its own fixed layout */ }
-        <div className={`flex-1 overflow-x-hidden ${routerState.location.pathname.startsWith('/tutor') ? 'overflow-hidden p-0' : 'overflow-y-auto pt-28 pb-12 px-4 md:px-10 custom-scrollbar scroll-smooth'}`}>
-          <div className={`mx-auto w-full h-full ${routerState.location.pathname.startsWith('/tutor') ? 'max-w-none' : 'max-w-[1500px]'}`}>
+        <div className={`flex-1 overflow-x-hidden ${routerState.location.pathname.startsWith('/tutor') || routerState.location.pathname.startsWith('/sandbox') ? 'overflow-hidden p-0' : 'overflow-y-auto pt-28 pb-12 px-4 md:px-10 custom-scrollbar scroll-smooth'}`}>
+          <div className={`mx-auto w-full h-full ${routerState.location.pathname.startsWith('/tutor') || routerState.location.pathname.startsWith('/sandbox') ? 'max-w-none' : 'max-w-[1500px]'}`}>
             {/* 
               Directly rendering Outlet here fixes the "manual refresh" bug. 
               PageTransition was causing component unmounting/remounting issues 
