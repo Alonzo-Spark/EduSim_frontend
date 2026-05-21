@@ -1,9 +1,11 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
 import { FloatingButton } from "@/components/layout/FloatingButton";
 import { useSidebarStore } from "@/store/useSidebarStore";
+import "katex/dist/katex.min.css";
 
 import appCss from "../styles.css?url";
 
@@ -60,6 +62,14 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const routerState = useRouterState();
   const { isCollapsed } = useSidebarStore();
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const updateDesktop = () => setIsDesktop(window.innerWidth >= 768);
+    updateDesktop();
+    window.addEventListener("resize", updateDesktop);
+    return () => window.removeEventListener("resize", updateDesktop);
+  }, []);
   
   return (
     <div className="flex min-h-screen w-full relative bg-background text-foreground overflow-hidden">
@@ -68,9 +78,7 @@ function RootComponent() {
       <motion.main 
         initial={false}
         animate={{ 
-          paddingLeft: typeof window !== "undefined" && window.innerWidth >= 768 
-            ? (isCollapsed ? 72 : 240) 
-            : 0 
+          paddingLeft: isDesktop ? (isCollapsed ? 72 : 240) : 0
         }}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
         className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden relative w-full"

@@ -1,4 +1,4 @@
-import { Bell, Moon, Sun, User, Menu, PanelLeft } from "lucide-react";
+import { Bell, Moon, Sun, User, Menu, PanelLeft, Sparkles } from "lucide-react";
 import { GlobalSearch } from "./layout/GlobalSearch";
 import { useTheme } from "@/hooks/useTheme";
 import { useSidebarStore } from "@/store/useSidebarStore";
@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 export function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const { toggleSidebar, setMobileOpen, isCollapsed } = useSidebarStore();
+  const isTutor = typeof window !== "undefined" && window.location?.pathname?.startsWith("/tutor");
 
   return (
     <header className="sticky top-0 z-[60] w-full px-4 pt-4 pb-2 md:px-6">
@@ -35,6 +36,15 @@ export function Navbar() {
         <div className="flex-1 max-w-3xl mx-auto">
           <GlobalSearch />
         </div>
+        {/* Show AI Tutor title when on tutor route */}
+        {isTutor && (
+          <div className="hidden md:flex items-center gap-3 ml-3 mr-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[0_6px_22px_rgba(139,92,246,0.18)]">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <div className="text-sm font-semibold tracking-tight text-foreground">AI Tutor</div>
+          </div>
+        )}
         
         <div className="flex items-center gap-2 md:gap-3 shrink-0">
           <button 

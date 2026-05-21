@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChatBubble, TypingAnimation } from "./ChatBubble";
 import ChatInput from "./ChatInput";
-import { ThemeToggle } from "./ThemeToggle";
+import { TutorHeader } from "./TutorHeader";
 import { Sparkles, Lightbulb, ListChecks, HelpCircle } from "lucide-react";
+import { useTutorStore } from "@/store/tutorStore";
 
 interface Props {
   onSend: (text: string) => void;
   aiResponse?: string | null;
   loading?: boolean;
+  initialPrompt?: string | null;
+  focusInput?: boolean;
 }
 
 type Message = {
@@ -22,10 +25,16 @@ function formatTime(date: Date) {
 }
 
 export function ChatWorkspace({ onSend, aiResponse, loading }: Props) {
+  // props updated below; include initialPrompt and focusInput from parent
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const initialPrompt = (arguments[0] as any)?.initialPrompt as string | null | undefined;
+  const focusInput = (arguments[0] as any)?.focusInput as boolean | undefined;
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastAiResponseRef = useRef<string | null>(null);
+
+  const { activeFormulaId } = useTutorStore();
 
   const send = (text: string) => {
     setMessages((current) => [
@@ -41,8 +50,19 @@ export function ChatWorkspace({ onSend, aiResponse, loading }: Props) {
     onSend(text);
   };
 
+  // If a parent passes an initial prompt, auto-send it on mount
+  useEffect(() => {
+    if (initialPrompt && initialPrompt.trim()) {
+      // allow render to settle
+      const t = setTimeout(() => {
+        send(initialPrompt!.trim());
+      }, 120);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt]);
+
   const handleRegenerate = () => {
-    // Find last user message
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     if (lastUser) {
       send(lastUser.content);
@@ -75,7 +95,10 @@ export function ChatWorkspace({ onSend, aiResponse, loading }: Props) {
   }, [aiResponse, loading, messages.length, pendingPrompt]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // Scroll to bottom when messages change
+    if (messages.length > 0) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
   }, [messages, loading, aiResponse]);
 
   const latestHint = useMemo(() => {
@@ -92,29 +115,16 @@ export function ChatWorkspace({ onSend, aiResponse, loading }: Props) {
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 w-full max-w-none overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/20">
-      <header className="mx-auto flex w-full max-w-[92rem] items-center justify-between px-4 sm:px-6 lg:px-8 h-20 shrink-0 bg-transparent">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[0_0_40px_rgba(139,92,246,0.28)]">
-            <Sparkles className="h-7 w-7 text-white" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-[1.6rem] sm:text-[1.8rem] font-bold tracking-tight">AI Tutor</h2>
-            <p className="text-xs sm:text-sm text-muted-foreground">Your personal learning assistant</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={handleNewChat} className="h-11 rounded-full border border-violet-400/30 bg-white/[0.03] px-5 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.06]">
-            + New Chat
-          </button>
-          <ThemeToggle />
-        </div>
-      </header>
+    <div className="flex-1 flex flex-col h-full min-h-0 w-full max-w-none overflow-hidden relative">
+      <TutorHeader onNewChat={handleNewChat} />
 
-      <main className="flex-1 min-h-0 overflow-hidden px-4 sm:px-6 lg:px-8 pb-28 pt-2 space-y-8">
-        <div className={`mx-auto w-full ${messages.length === 0 ? "max-w-[64rem]" : "max-w-[92rem]"} h-full flex flex-col ${messages.length === 0 ? "items-center justify-center" : ""} space-y-8`}>
+      <main 
+        className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 custom-scrollbar pb-28 pt-2 space-y-8 flex"
+        style={{ minHeight: 0 }}
+      >
+        <div className={`mx-auto w-full max-w-[950px] h-full flex flex-col ${messages.length === 0 ? "items-center justify-center" : ""} space-y-6`}>
           {messages.length === 0 && !loading && (
-            <div className="flex items-center justify-center h-full w-full">
+            <div className="flex items-center justify-center w-full">
               <div className="w-full max-w-[48rem] rounded-[1.75rem] border border-white/10 bg-white/[0.035] px-6 py-6 sm:px-8 sm:py-8 shadow-[0_20px_80px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
                 <div className="flex flex-col items-center text-center gap-6">
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[0_0_40px_rgba(139,92,246,0.35)]">
@@ -169,11 +179,10 @@ export function ChatWorkspace({ onSend, aiResponse, loading }: Props) {
             </div>
           )}
 
-          <div ref={bottomRef} />
+          <div ref={bottomRef} className="h-6 w-full" />
         </div>
       </main>
-
-      <ChatInput onSend={send} disabled={loading} />
+      <ChatInput onSend={send} disabled={loading} focus={Boolean(focusInput)} />
     </div>
   );
 }

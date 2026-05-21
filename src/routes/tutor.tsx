@@ -116,18 +116,31 @@ ${topicContent.related_concepts?.map((c) => `- ${c}`).join("\n") || "No related 
     : tutorData;
 
   return (
-    <div className="relative w-full h-screen overflow-hidden text-foreground">
-      <div className="relative mx-auto flex h-full w-full max-w-[96rem] items-stretch px-4 sm:px-6 lg:px-8">
-        <div className="flex w-full items-stretch">
+    <div className="relative w-full h-[100dvh] overflow-hidden text-foreground" style={{ height: "100dvh" }}>
+      {/* Full-viewport smooth gradient background */}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-white via-[#fbf7ff] to-violet-50" style={{ background: 'linear-gradient(120deg,#fff 0%, #f6f0ff 45%, #efe7ff 100%)' }} />
+
+      <div className="relative mx-auto flex h-full w-full max-w-[100rem] items-stretch">
+        <div className="flex w-full items-stretch flex-1 min-w-0">
           <ChatWorkspace
             onSend={handleAnalyze}
             aiResponse={displayData?.ai_explanation || displayData?.explanation || null}
             loading={isLoading || topicLoading}
+            initialPrompt={
+              // prefer explicit ?prompt= param then fallback to topic -> "Explain <topic>"
+              searchParams.prompt || (searchParams.topic ? `Explain ${searchParams.topic}` : undefined)
+            }
+            focusInput={Boolean(searchParams.prompt || searchParams.topic)}
           />
         </div>
 
         <VerticalResourcesToggle onToggle={() => setResourcesOpen((s) => !s)} open={resourcesOpen} />
-        <TextbookResourcesPanel open={resourcesOpen} onClose={() => setResourcesOpen(false)} subject={searchParams.subject} />
+        <TextbookResourcesPanel
+          open={resourcesOpen}
+          onClose={() => setResourcesOpen(false)}
+          subject={searchParams.subject}
+          topic={searchParams.topic}
+        />
       </div>
 
       {/* Embedded high-fidelity overlay satisfying explicit floating sandbox constraints */}

@@ -137,6 +137,12 @@ export function GlobalSearch() {
             handleSelect(suggestions[activeIndex]);
           } else if (suggestions.length > 0) {
             handleSelect(suggestions[0]);
+          } else if (query.trim()) {
+            // No suggestions: navigate to tutor with a smart prompt and topic param
+            setIsOpen(false);
+            const topic = query.trim();
+            setQuery("");
+            router.navigate({ to: "/tutor", search: { topic }, state: { prompt: `Explain ${topic}` } });
           }
           break;
         case "Escape":
@@ -203,7 +209,9 @@ export function GlobalSearch() {
     if (item.chapter) params.chapter = item.chapter;
     if (item.topic) params.topic = item.topic;
 
-    router.navigate({ to: "/tutor", search: params });
+    // Also include a helpful prompt when possible
+    const prompt = item.topic ? `Explain ${item.topic}` : undefined;
+    router.navigate({ to: "/tutor", search: params, state: prompt ? { prompt } : undefined });
   };
 
   const groupedSuggestions = TYPE_ORDER.map((type) => ({

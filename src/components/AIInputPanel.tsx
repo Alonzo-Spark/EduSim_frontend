@@ -11,10 +11,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { AlertCircle, Sparkles, History, X } from "lucide-react";
 import { useSimulationGenerator } from "@/hooks/useSimulationGenerator";
 import { cn } from "@/lib/utils";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
+import { TutorMarkdownRenderer } from "./tutor/TutorMarkdownRenderer";
 
 interface AIInputPanelProps {
   onSimulationGenerated?: (config: any) => void;
@@ -166,13 +163,7 @@ export function AIInputPanel({ onSimulationGenerated, className }: AIInputPanelP
           {reasoning && (
             <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-blue-300">
               <p className="font-medium mb-1">AI Reasoning:</p>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeKatex]}
-                className="text-xs leading-relaxed prose prose-invert prose-sm max-w-none"
-              >
-                {reasoning}
-              </ReactMarkdown>
+              <TutorMarkdownRenderer content={reasoning} density="compact" className="text-xs leading-relaxed" />
             </div>
           )}
 
