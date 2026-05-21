@@ -928,7 +928,6 @@ export const SandboxCanvas: React.FC = () => {
       bodyB: sensor,
       length: ARM_LEN,
       stiffness: 1,
-      damping: 0,
     }));
 
     // ── 4. Visible drop-zone ring that tracks the sensor via SyncRegistry ───
