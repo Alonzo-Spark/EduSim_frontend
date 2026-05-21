@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, X } from 'lucide-react';
 import type { SandboxRuntime } from '../engine/runtime';
 import type { RuntimeObject } from '../types/RuntimeObject';
 import type { Body } from 'matter-js';
@@ -8,6 +10,10 @@ import { ObservableEngine } from '../observables/observableEngine';
 import { RuntimeStore } from '../state/runtimeStore';
 import { PropertyController } from '../properties/propertyController';
 import { PropertyPanel } from '../ui/PropertyPanel';
+import { RuntimeObserver } from '../../ai/runtimeObserver';
+import { useExplanationEngine } from '../../ai/explanationEngine';
+import { FloatingAssetPanel } from '../../components/AssetLibrary/FloatingAssetPanel';
+import { physicsEventBus } from '../../ai/physicsEventBus';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -132,9 +138,86 @@ export const SandboxCanvas: React.FC = () => {
   const [speed, setSpeed] = useState(1);
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
 
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+
+  const { currentExplanation, queueCount, handleDismiss, setIsHovered, pushExplanation } = useExplanationEngine();
+
+  const handleAiQuery = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiLoading(true);
+    try {
+      const resp = await fetch('/api/tutor/sandbox-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: aiPrompt })
+      });
+
+      if (!resp.ok) {
+        throw new Error(`Backend error: ${resp.status} ${resp.statusText}`);
+      }
+
+      const json = await resp.json();
+
+      if (json.success && json.data) {
+        const d = json.data;
+        // sandbox-query returns exact shape: title, explanation, formula, effects[], suggestions[]
+        pushExplanation({
+          title: d.title || 'AI Answer',
+          explanation: d.explanation || '',
+          effects: d.effects || [],
+          formula: d.formula || '',
+          suggestions: d.suggestions || []
+        });
+      } else {
+        throw new Error(json.detail || 'Unknown error from backend');
+      }
+    } catch (e) {
+      pushExplanation({
+        title: 'Connection Error',
+        explanation: (e as Error).message,
+        effects: ['Ensure the EduSim API is running on port 8000'],
+        formula: '',
+        suggestions: []
+      });
+    } finally {
+      setAiLoading(false);
+      setAiPrompt('');
+    }
+  };
+
+
+  const handleAiKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAiQuery();
+    }
+  };
+
   const propertyControllerRef = useRef<PropertyController | null>(null);
+  const observerRef = useRef<RuntimeObserver | null>(null);
   const [propertyVersion, setPropertyVersion] = useState(0);
   const [telemetryTick, setTelemetryTick] = useState(0);
+
+  // Initialize runtime observer once ready
+  useEffect(() => {
+    if (ready && storeRef.current && propertyControllerRef.current && runtimeRef.current && !observerRef.current) {
+      observerRef.current = new RuntimeObserver(
+        storeRef.current,
+        propertyControllerRef.current,
+        runtimeRef.current
+      );
+      observerRef.current.start();
+    }
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.stop();
+        observerRef.current = null;
+      }
+    };
+  }, [ready]);
 
   // Newton Second Law HUD DOM refs
   const hudForceRef = useRef<HTMLSpanElement>(null);
@@ -519,7 +602,19 @@ export const SandboxCanvas: React.FC = () => {
     store.addObject(obj);
     dynRef.current.push(obj.body);
     setBodyCount(dynRef.current.length);
-  }, [ready]);
+
+    // Emit spawn event so explanation card shows free-fall context
+    physicsEventBus.emit({
+      type: 'OBJECT_SPAWNED',
+      objectId: obj.id,
+      metadata: {
+        shape:   type,
+        name:    type === 'circle' ? 'Circle' : 'Rectangle',
+        mass:    obj.body.mass,
+        gravity: GRAVITY_VALUES[gravity],
+      },
+    });
+  }, [ready, gravity]);
 
   const blast = useCallback(async () => {
     if (!ready) return;
@@ -786,6 +881,128 @@ export const SandboxCanvas: React.FC = () => {
     setBodyCount(dynRef.current.length);
     checkConstraintSnapping(obj.body);
   }, [ready, checkConstraintSnapping]);
+
+  // ── Asset Library drop handler ─────────────────────────────────────────────
+  // Called by FloatingAssetPanel when user drops an asset onto the simulation canvas.
+  // Translates AssetDefinition → RuntimeObject using existing objectFactory, keeping
+  // all physics engine logic 100% unchanged.
+  const handleAssetDrop = useCallback(async (
+    asset: import('../../config/assetsRegistry').AssetDefinition,
+    canvasX: number,
+    canvasY: number,
+  ) => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const store = storeRef.current;
+    if (!rt || !ia || !store || !ready) return;
+
+    const { createObject } = await import('../objects/objectFactory');
+    const { spawnType, spawnConfig } = asset;
+
+    const base = {
+      x: canvasX,
+      y: canvasY,
+      restitution: spawnConfig.restitution ?? 0.5,
+      friction: spawnConfig.friction ?? 0.3,
+      density: spawnConfig.density ?? 0.002,
+      fillColor: spawnConfig.fillColor,
+      strokeColor: spawnConfig.strokeColor,
+      strokeWidth: 2,
+      isStatic: spawnConfig.isStatic ?? false,
+    };
+
+    let obj;
+    if (spawnType === 'circle') {
+      obj = createObject({
+        id: uid(`asset-${asset.id}`),
+        type: 'circle',
+        radius: spawnConfig.radius ?? 20,
+        ...base,
+      });
+    } else {
+      obj = createObject({
+        id: uid(`asset-${asset.id}`),
+        type: 'rectangle',
+        width: spawnConfig.width ?? 40,
+        height: spawnConfig.height ?? 40,
+        cornerRadius: spawnConfig.cornerRadius ?? 6,
+        ...base,
+      });
+    }
+
+    rt.renderer.getViewport().addChild(obj.display);
+    rt.physics.addBodies(obj.body);
+    rt.sync.register(obj.id, obj.body, obj.display);
+
+    if (!spawnConfig.isStatic) {
+      ia.selection.register(obj);
+      store.addObject(obj);
+      dynRef.current.push(obj.body);
+      setBodyCount(dynRef.current.length);
+      checkConstraintSnapping(obj.body);
+
+      // Emit spawn event so explanation card shows free-fall context
+      physicsEventBus.emit({
+        type: 'OBJECT_SPAWNED',
+        objectId: obj.id,
+        metadata: {
+          shape:   spawnType,
+          name:    asset.name,
+          mass:    obj.body.mass,
+          gravity: GRAVITY_VALUES[gravity],
+        },
+      });
+    }
+  }, [ready, checkConstraintSnapping, gravity]);
+
+  // ── Canvas HTML5 drag-and-drop bridge (for FloatingAssetPanel) ────────────
+  // Uses native window-level listeners to bypass react-rnd / framer-motion event capture.
+  const [assetDragOver, setAssetDragOver] = useState(false);
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes('application/edusim-asset')) return;
+      const wrap = canvasWrapRef.current;
+      if (!wrap) return;
+      const r = wrap.getBoundingClientRect();
+      const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      if (inside) {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        setAssetDragOver(true);
+      } else {
+        setAssetDragOver(false);
+      }
+    };
+
+    const handleDragEnd = () => setAssetDragOver(false);
+
+    const handleDrop = (e: DragEvent) => {
+      const wrap = canvasWrapRef.current;
+      if (!wrap) return;
+      const r = wrap.getBoundingClientRect();
+      const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      if (!inside) return;
+      const raw = e.dataTransfer?.getData('application/edusim-asset');
+      if (!raw) return;
+      e.preventDefault();
+      setAssetDragOver(false);
+      const asset = JSON.parse(raw) as import('../../config/assetsRegistry').AssetDefinition;
+      const canvasX = e.clientX - r.left;
+      const canvasY = e.clientY - r.top;
+      handleAssetDrop(asset, canvasX, canvasY);
+    };
+
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('dragend', handleDragEnd);
+    window.addEventListener('drop', handleDrop);
+    return () => {
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('dragend', handleDragEnd);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, [handleAssetDrop]);
 
   const onPanelPointerDown = (type: PanelDragType) =>
     (e: React.PointerEvent) => {
@@ -1073,10 +1290,67 @@ export const SandboxCanvas: React.FC = () => {
         <p style={S.hint}>
           <strong style={{ color: '#6366f1' }}>Drag</strong> objects · <strong style={{ color: '#6366f1' }}>Click</strong> to select · Use controls to shape the simulation.
         </p>
+
+        {/* AI Query Input Section */}
+        <div style={{ marginTop: 'auto', paddingTop: 20 }}>
+          <div style={{ 
+            background: 'rgba(255, 255, 255, 0.03)', 
+            border: '1px solid rgba(168, 85, 247, 0.2)', 
+            borderRadius: 12, 
+            padding: 12,
+            boxShadow: '0 0 15px rgba(168, 85, 247, 0.1) inset' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <Sparkles size={14} color="#c084fc" />
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#e9d5ff', letterSpacing: '0.05em' }}>AI QUERY</span>
+            </div>
+            <textarea
+              value={aiPrompt}
+              onChange={e => setAiPrompt(e.target.value)}
+              onKeyDown={handleAiKeyDown}
+              disabled={aiLoading}
+              placeholder="Ask about physics..."
+              style={{
+                width: '100%',
+                background: 'rgba(0, 0, 0, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: 8,
+                padding: '8px 10px',
+                color: '#f8fafc',
+                fontSize: 12,
+                resize: 'none',
+                minHeight: 50,
+                outline: 'none',
+                opacity: aiLoading ? 0.5 : 1
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+              <span style={{ fontSize: 9, color: '#64748b' }}>Press Enter to send</span>
+              <button
+                onClick={handleAiQuery}
+                disabled={aiLoading || !aiPrompt.trim()}
+                style={{
+                  background: aiLoading ? '#475569' : 'linear-gradient(135deg, #a855f7, #6366f1)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '4px 12px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: (aiLoading || !aiPrompt.trim()) ? 'default' : 'pointer',
+                  opacity: (aiLoading || !aiPrompt.trim()) ? 0.6 : 1
+                }}
+              >
+                {aiLoading ? '...' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
       </aside>
 
       {/* ── Canvas ─────────────────────────────────────────── */}
       <div
+        ref={canvasWrapRef}
         style={{
           ...S.canvasWrap,
           outline: isOverCanvas ? '2px dashed rgba(99,102,241,0.6)' : 'none',
@@ -1088,6 +1362,40 @@ export const SandboxCanvas: React.FC = () => {
       >
         <div style={S.dotGrid} />
         <div ref={mountRef} style={S.mount} />
+
+        {/* Asset drag-over visual highlight — pointer events always off, window listener handles the drop */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 210,
+            pointerEvents: 'none',
+            background: assetDragOver ? 'rgba(120,140,255,0.07)' : 'transparent',
+            border: assetDragOver ? '2px dashed rgba(120,140,255,0.55)' : 'none',
+            borderRadius: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background 0.15s, border 0.15s',
+          }}
+        >
+          {assetDragOver && (
+            <span style={{
+              fontSize: 14, fontWeight: 700, color: '#a5b4fc',
+              background: 'rgba(10,15,35,0.7)',
+              padding: '8px 20px', borderRadius: 10,
+              boxShadow: '0 4px 16px rgba(90,120,255,0.3)',
+              fontFamily: "'Inter', sans-serif",
+              pointerEvents: 'none',
+            }}>Drop to spawn ✦</span>
+          )}
+        </div>
+
+        {/* Floating Asset Library Panel */}
+        <FloatingAssetPanel
+          onAssetDrop={handleAssetDrop}
+          canvasRef={mountRef}
+        />
 
         {/* Drop hint overlay */}
         {isOverCanvas && (
@@ -1133,6 +1441,108 @@ export const SandboxCanvas: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Floating AI Response Panel */}
+        <AnimatePresence>
+          {currentExplanation && (
+            <motion.div
+              key={currentExplanation.id}
+              initial={{ opacity: 0, y: -20, x: '-50%' }}
+              animate={{ opacity: 1, y: 0, x: '-50%' }}
+              exit={{ opacity: 0, y: -20, x: '-50%' }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+              style={{
+                position: 'absolute',
+                top: 24,
+                left: '50%',
+                zIndex: 100,
+                width: 420,
+                background: 'rgba(15, 23, 42, 0.9)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(168, 85, 247, 0.5)',
+                borderRadius: 16,
+                padding: 20,
+                boxShadow: '0 10px 40px -10px rgba(168, 85, 247, 0.4), 0 0 20px rgba(168, 85, 247, 0.15) inset',
+                color: '#f8fafc',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Sparkles size={18} color="#c084fc" />
+                  <span style={{ fontSize: 14, fontWeight: 800, color: '#e9d5ff', letterSpacing: '0.02em' }}>✨ AI Explanation</span>
+                  {queueCount > 0 && (
+                    <span style={{ background: '#a855f7', color: 'white', fontSize: 10, padding: '2px 6px', borderRadius: 10, fontWeight: 800 }}>
+                      +{queueCount}
+                    </span>
+                  )}
+                </div>
+                <button 
+                  onClick={handleDismiss}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              
+              <div>
+                <h4 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 8 }}>{currentExplanation.insight.title}</h4>
+                <p style={{ fontSize: 13, lineHeight: 1.5, color: '#cbd5e1' }}>{currentExplanation.insight.explanation}</p>
+              </div>
+
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Effects:</span>
+                <ul style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {currentExplanation.insight.effects.map((effect, idx) => (
+                    <li key={idx} style={{ fontSize: 12, color: '#e2e8f0', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                      <span style={{ color: '#c084fc', marginTop: -1 }}>•</span> {effect}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Formula:</span>
+                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: 6, marginTop: 4, fontFamily: 'monospace', color: '#fde047', fontSize: 13, fontWeight: 600, border: '1px solid rgba(255,255,255,0.05)' }}>
+                  {currentExplanation.insight.formula}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                {currentExplanation.insight.suggestions.map((action, i) => (
+                  <button 
+                    key={i} 
+                    style={{
+                      background: 'rgba(168,85,247,0.15)',
+                      border: '1px solid rgba(168,85,247,0.3)',
+                      borderRadius: 6,
+                      padding: '6px 12px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#e9d5ff',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(168,85,247,0.25)';
+                      e.currentTarget.style.borderColor = 'rgba(168,85,247,0.5)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(168,85,247,0.15)';
+                      e.currentTarget.style.borderColor = 'rgba(168,85,247,0.3)';
+                    }}
+                  >
+                    {action}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── Right panel ─────────────────────────────────────── */}
@@ -1167,8 +1577,8 @@ export const SandboxCanvas: React.FC = () => {
                     ? 'rgba(16,185,129,0.55)'
                     : 'rgba(251,191,36,0.55)',
             border: `2px solid ${panelDragRef.current === 'circle' || panelDragRef.current === 'spring' ? '#6ee7b7' :
-                panelDragRef.current === 'rectangle' ? '#a5b4fc' :
-                  panelDragRef.current === 'pivot' ? '#c084fc' : '#fde047'
+              panelDragRef.current === 'rectangle' ? '#a5b4fc' :
+                panelDragRef.current === 'pivot' ? '#c084fc' : '#fde047'
               }`,
             display: 'flex',
             alignItems: 'center',
