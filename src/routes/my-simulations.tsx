@@ -34,15 +34,15 @@ function MySimulationsPage() {
 
   const filteredSimulations = useMemo(() => {
     return simulations.filter((sim) => {
-      const matchesSearch = sim.title.toLowerCase().includes(search.toLowerCase()) || 
-                            sim.subject.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = (sim.title || "").toLowerCase().includes((search || "").toLowerCase()) || 
+                            (sim.subject || "").toLowerCase().includes((search || "").toLowerCase());
       
       const matchesFilter = 
         filter === "all" || 
         (filter === "favorites" && sim.favorite) ||
-        (filter === "physics" && sim.subject.toLowerCase() === "physics") ||
-        (filter === "chemistry" && sim.subject.toLowerCase() === "chemistry") ||
-        (filter === "math" && sim.subject.toLowerCase() === "math");
+        (filter === "physics" && (sim.subject || "").toLowerCase() === "physics") ||
+        (filter === "chemistry" && (sim.subject || "").toLowerCase() === "chemistry") ||
+        (filter === "math" && (sim.subject || "").toLowerCase() === "math");
 
       return matchesSearch && matchesFilter;
     });
@@ -74,7 +74,7 @@ function MySimulationsPage() {
   };
 
   const getSubjectIcon = (subject: string) => {
-    switch (subject.toLowerCase()) {
+    switch ((subject || "").toLowerCase()) {
       case "physics": return <Atom className="w-4 h-4" />;
       case "chemistry": return <FlaskConical className="w-4 h-4" />;
       case "math": return <Calculator className="w-4 h-4" />;

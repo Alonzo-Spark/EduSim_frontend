@@ -7,6 +7,8 @@ const AIInsightPanel: React.FC<{ formula: DynamicParsedFormula | null }> = ({ fo
   const relatedTopics = Array.isArray(formula.relatedTopics) ? formula.relatedTopics : [];
   const description = formula.description || "";
 
+  if (!description && relatedTopics.length === 0) return null;
+
   return (
     <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl space-y-4">
       <div>

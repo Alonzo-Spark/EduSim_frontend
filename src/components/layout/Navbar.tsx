@@ -4,12 +4,18 @@ import { useTheme } from "@/hooks/useTheme";
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { motion } from "framer-motion";
 import { useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 
 export function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const { setMobileOpen, isCollapsed } = useSidebarStore();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const [mounted, setMounted] = useState(false);
   const hideSearch = pathname === "/tutor";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div className="fixed top-4 left-0 right-0 z-[50] pointer-events-none px-4 md:px-0">
@@ -41,7 +47,13 @@ export function Navbar() {
             className="w-12 h-12 rounded-full flex items-center justify-center bg-background/80 backdrop-blur-xl border border-border/40 shadow-lg hover:bg-secondary transition-all hover:scale-105 active:scale-95 group"
             title="Toggle Theme"
           >
-            {theme === "light" ? <Moon className="w-5 h-5 text-primary" /> : <Sun className="w-5 h-5 text-amber-400" />}
+            {!mounted ? (
+              <div className="w-5 h-5" />
+            ) : theme === "light" ? (
+              <Moon className="w-5 h-5 text-primary" />
+            ) : (
+              <Sun className="w-5 h-5 text-amber-400" />
+            )}
           </button>
 
           <button className="hidden sm:flex w-12 h-12 rounded-full items-center justify-center bg-background/80 backdrop-blur-xl border border-border/40 shadow-lg hover:bg-secondary transition-all relative hover:scale-105 active:scale-95 group">

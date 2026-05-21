@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { physicsSimulationApi } from "@/services/physicsSimulationApi";
 import { DynamicFormulaExtractor, DynamicParsedFormula } from "@/utils/DynamicFormulaExtractor";
 
@@ -17,10 +17,6 @@ export function useFormulaLab() {
   const loadForTopic = useCallback(
     async (params: LoadParams) => {
       const cacheKey = `formula-lab-v4:${params.topic}-${params.classId || ""}-${params.subject || ""}-${params.chapter || ""}`;
-      const selectedId =
-        formulas && formulas[selectedIndex]
-          ? formulas[selectedIndex].id || formulas[selectedIndex].raw
-          : null;
 
       const cached = typeof window !== "undefined" ? window.localStorage.getItem(cacheKey) : null;
       if (cached) {
@@ -28,14 +24,7 @@ export function useFormulaLab() {
           const parsed: DynamicParsedFormula[] = JSON.parse(cached);
           setFormulas(parsed);
 
-          if (selectedId) {
-            const idx = parsed.findIndex(
-              (formula) => formula.id === selectedId || formula.raw === selectedId,
-            );
-            setSelectedIndex(idx >= 0 ? idx : 0);
-          } else {
-            setSelectedIndex(0);
-          }
+          setSelectedIndex(0);
 
           return;
         } catch {
@@ -51,22 +40,32 @@ export function useFormulaLab() {
         rag = response.success && response.data ? response.data.answer : "";
       }
 
-      const parsed = DynamicFormulaExtractor.parseTutorResponse(
+      const parsed = await DynamicFormulaExtractor.parseTutorResponse(
         rag || "",
         params.topic,
         params.subject,
         params.classId,
       );
+      console.log("[FormulaLab] formulas received:", parsed);
+      console.log(
+        "[useFormulaLab] Detected formulas:",
+        parsed.map((p) => ({ id: p.id, raw: p.raw, display: p.displayFormula })),
+      );
+      console.log(
+        "[useFormulaLab] Parsed variables:",
+        parsed.map((p) => p.variables),
+      );
+      console.log(
+        "[FormulaLab] formulas received:",
+        parsed.map((p) => ({
+          id: p.id,
+          displayFormula: p.displayFormula || p.formula || p.latex || p.raw,
+        })),
+      );
+      console.log("[FormulaLab] count:", parsed.length);
       setFormulas(parsed);
 
-      if (selectedId) {
-        const idx = parsed.findIndex(
-          (formula) => formula.id === selectedId || formula.raw === selectedId,
-        );
-        setSelectedIndex(idx >= 0 ? idx : 0);
-      } else {
-        setSelectedIndex(0);
-      }
+      setSelectedIndex(0);
 
       try {
         if (typeof window !== "undefined") {
@@ -76,7 +75,7 @@ export function useFormulaLab() {
         // ignore storage failures
       }
     },
-    [formulas, selectedIndex],
+    [],
   );
 
   const selectFormula = useCallback(
@@ -89,6 +88,17 @@ export function useFormulaLab() {
   );
 
   const selectedFormula = formulas && formulas.length > 0 ? formulas[selectedIndex] : null;
+
+  // Reset selection when formulas change to avoid stale selectedIndex
+  useEffect(() => {
+    if (!formulas || formulas.length === 0) {
+      setSelectedIndex(0);
+      return;
+    }
+    if (selectedIndex < 0 || selectedIndex >= formulas.length) {
+      setSelectedIndex(0);
+    }
+  }, [formulas, selectedIndex]);
 
   return {
     formulas,
