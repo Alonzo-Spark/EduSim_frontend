@@ -3,9 +3,7 @@ import { motion } from "framer-motion";
 import { getClass } from "@/data/curriculum";
 import { PageWrapper } from "@/components/Card";
 import { Crumbs } from "@/components/Crumbs";
-import { Play, Sparkles } from "lucide-react";
-import { useState } from "react";
-import { FloatingSimulationWorkspaceOverlay } from "@/components/simulation/FloatingSimulationWorkspaceOverlay";
+import { Play } from "lucide-react";
 
 export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
   beforeLoad: ({ params }) => {
@@ -39,20 +37,6 @@ export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
 function TopicsPage() {
   const { c, s, chapter, classId, subjectId } = Route.useLoaderData();
   const navigate = useNavigate();
-  
-  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-  const [selectedTopic, setSelectedTopic] = useState<any>(null);
-
-  const handleGenerateSimulation = (topic: any) => {
-    setSelectedTopic({
-      ...topic,
-      classId,
-      subject: subjectId,
-      chapter: chapter.name,
-      title: topic.name
-    });
-    setIsOverlayOpen(true);
-  };
 
   return (
     <PageWrapper>
@@ -108,30 +92,15 @@ function TopicsPage() {
                       to: topic.simulationRoute,
                     })
                   }
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 text-white text-sm font-medium border border-white/5 hover:bg-slate-700 transition-shadow"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white text-sm font-medium hover:glow-purple transition-shadow shadow-lg shadow-indigo-500/20"
                 >
                   <Play className="w-4 h-4" /> Lab
                 </motion.button>
               ) : null}
-
-              <motion.button
-                whileHover={{ scale: 1.06 }}
-                whileTap={{ scale: 0.96 }}
-                onClick={() => handleGenerateSimulation(topic)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white text-sm font-medium hover:glow-purple transition-shadow shadow-lg shadow-indigo-500/20"
-              >
-                <Sparkles className="w-4 h-4" /> Generate Simulation
-              </motion.button>
             </div>
           </motion.div>
         ))}
       </div>
-
-      <FloatingSimulationWorkspaceOverlay 
-        isOpen={isOverlayOpen} 
-        onClose={() => setIsOverlayOpen(false)}
-        simulation={selectedTopic}
-      />
     </PageWrapper>
   );
 }

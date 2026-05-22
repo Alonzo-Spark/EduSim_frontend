@@ -1,4 +1,4 @@
-import { SimulationDSL } from "@/runtime/dsl";
+import { SimulationDSL } from "@/types/simulation";
 import { getApiUrl } from "@/config/api";
 import { joinUrl } from "@/utils/urlUtils";
 

@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { useSavedSimulations } from "@/hooks/useSavedSimulations";
 import type { SavedSimulation } from "@/types/saved-simulation";
-import { DynamicSimulationRenderer } from "@/components/simulation-runtime/DynamicSimulationRenderer";
 
 export const Route = createFileRoute("/my-simulations")({
   component: MySimulationsPage,
@@ -117,8 +116,8 @@ function MySimulationsPage() {
                   key={f.id}
                   onClick={() => setFilter(f.id)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors ${filter === f.id
-                      ? "bg-primary text-primary-foreground font-semibold"
-                      : "bg-secondary/50 text-muted-foreground border border-border hover:border-primary/30"
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "bg-secondary/50 text-muted-foreground border border-border hover:border-primary/30"
                     }`}
                 >
                   {f.icon}
@@ -134,8 +133,8 @@ function MySimulationsPage() {
                     key={sim.id}
                     onClick={() => setActive(sim)}
                     className={`group relative w-full text-left p-3 rounded-2xl border transition-all cursor-pointer ${active?.id === sim.id
-                        ? "border-primary bg-primary/10"
-                        : "border-border bg-secondary/20 hover:border-primary/30 hover:bg-secondary/50"
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-secondary/20 hover:border-primary/30 hover:bg-secondary/50"
                       }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -191,6 +190,13 @@ function MySimulationsPage() {
 
             <Link
               to="/tutor"
+              search={{
+                subject: undefined,
+                class_name: undefined,
+                chapter: undefined,
+                topic: undefined,
+                prompt: undefined
+              }}
               className="mt-2 flex items-center justify-center gap-2 p-3 rounded-2xl bg-gradient-to-r from-[var(--neon-purple)]/20 to-[var(--neon-blue)]/20 border border-[var(--neon-purple)]/30 text-[var(--neon-cyan)] font-bold text-sm hover:scale-[1.02] transition-transform"
             >
               <Sparkles className="w-4 h-4" />
@@ -215,8 +221,8 @@ function MySimulationsPage() {
                     <button
                       onClick={() => toggleFavorite(active.id)}
                       className={`p-2 rounded-xl border transition-all ${active.favorite
-                          ? "bg-amber-500/10 border-amber-500/50 text-amber-500"
-                          : "bg-secondary border-border text-muted-foreground hover:text-foreground"
+                        ? "bg-amber-500/10 border-amber-500/50 text-amber-500"
+                        : "bg-secondary border-border text-muted-foreground hover:text-foreground"
                         }`}
                     >
                       <Star className="w-4 h-4" fill={active.favorite ? "currentColor" : "none"} />
@@ -238,13 +244,87 @@ function MySimulationsPage() {
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-[520px]">
-                  <DynamicSimulationRenderer
-                    dsl={active.type === "dsl" ? active.simulation : undefined}
-                    html={active.type === "html" ? active.simulation : undefined}
-                    title={active.title}
-                  />
+                <div className="flex-1 min-h-[520px] flex flex-col justify-between rounded-3xl border border-white/10 bg-black/40 p-6 relative overflow-hidden">
+                  <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_50%_30%,var(--neon-purple),transparent_70%)]" />
+
+                  <div className="relative space-y-6">
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-2">Pedagogical Insights</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        This AI-compiled simulation is engineered to demonstrate the fundamental laws of {active.subject}.
+                        Launch the high-fidelity interactive sandbox below to manipulate objects, adjust forces, and visualize equations in real-time.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="glass p-4 rounded-2xl border border-white/5 space-y-1">
+                        <span className="text-xs text-muted-foreground">Gravity</span>
+                        <p className="text-lg font-bold font-mono text-white">
+                          {typeof active.simulation === 'object' && (active.simulation as any)?.environment?.gravity
+                            ? `${(active.simulation as any).environment.gravity.y || (active.simulation as any).environment.gravity} m/s²`
+                            : "9.8 m/s²"}
+                        </p>
+                      </div>
+                      <div className="glass p-4 rounded-2xl border border-white/5 space-y-1">
+                        <span className="text-xs text-muted-foreground">Friction</span>
+                        <p className="text-lg font-bold font-mono text-white">
+                          {typeof active.simulation === 'object' && (active.simulation as any)?.environment?.friction !== undefined
+                            ? (active.simulation as any).environment.friction
+                            : "0.1"}
+                        </p>
+                      </div>
+                      <div className="glass p-4 rounded-2xl border border-white/5 space-y-1">
+                        <span className="text-xs text-muted-foreground">Entities</span>
+                        <p className="text-lg font-bold font-mono text-white">
+                          {typeof active.simulation === 'object' && Array.isArray((active.simulation as any)?.objects)
+                            ? (active.simulation as any).objects.length
+                            : "Dynamic"}
+                        </p>
+                      </div>
+                      <div className="glass p-4 rounded-2xl border border-white/5 space-y-1">
+                        <span className="text-xs text-muted-foreground">Difficulty</span>
+                        <p className="text-lg font-bold font-mono text-[var(--neon-cyan)] capitalize">
+                          {typeof active.simulation === 'object' && (active.simulation as any)?.meta?.difficulty
+                            ? (active.simulation as any).meta.difficulty
+                            : "Intermediate"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {typeof active.simulation === 'object' && Array.isArray((active.simulation as any)?.equations) && (active.simulation as any).equations.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Governing Equations</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {(active.simulation as any).equations.map((eq: string, i: number) => (
+                            <code key={i} className="px-3 py-1.5 rounded-xl bg-[var(--neon-purple)]/10 border border-[var(--neon-purple)]/20 text-xs font-mono text-[var(--neon-purple)]">
+                              {eq}
+                            </code>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="relative mt-8 p-6 rounded-2xl border border-[var(--neon-cyan)]/20 bg-[var(--neon-cyan)]/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-[var(--neon-cyan)]" /> Ready for Experimentation
+                      </h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Interactive physical parameters are fully mapped to the sandbox canvas workspace.
+                      </p>
+                    </div>
+                    <Link
+                      to="/sandbox/$simulationId"
+                      params={{ simulationId: active.id }}
+                    >
+                      <Button className="rounded-xl bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white font-bold hover:scale-105 transition-transform shadow-lg shadow-[var(--neon-purple)]/20 gap-2 cursor-pointer whitespace-nowrap">
+                        <PlayCircle className="w-4 h-4" /> Launch Interactive Sandbox
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
+
               </>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
@@ -260,6 +340,13 @@ function MySimulationsPage() {
                 {simulations.length === 0 && (
                   <Link
                     to="/tutor"
+                    search={{
+                      subject: undefined,
+                      class_name: undefined,
+                      chapter: undefined,
+                      topic: undefined,
+                      prompt: undefined
+                    }}
                     className="flex items-center gap-2 px-8 py-3 rounded-2xl bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white font-bold shadow-lg glow-purple hover:scale-105 transition-transform"
                   >
                     <Sparkles className="w-5 h-5" />
