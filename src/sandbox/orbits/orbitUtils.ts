@@ -1,3 +1,5 @@
+import * as Matter from 'matter-js';
+
 /**
  * OrbitUtils
  * Reusable orbital mechanics math utilities.
@@ -120,5 +122,75 @@ export class OrbitUtils {
   public static calculateAngularVelocity(r: number, vTangential: number): number {
     if (r <= 0) return 0;
     return vTangential / r;
+  }
+
+  /**
+   * Computes circular orbit velocity.
+   */
+  public static computeStableOrbitVelocity(G: number, M: number, r: number): number {
+    return this.calculateCircularOrbitVelocity(G, M, r);
+  }
+
+  /**
+   * Computes unit tangential direction vector.
+   */
+  public static computeTangentialDirection(
+    centerPos: { x: number; y: number },
+    bodyPos: { x: number; y: number },
+    clockwise: boolean
+  ): { x: number; y: number } {
+    const dx = bodyPos.x - centerPos.x;
+    const dy = bodyPos.y - centerPos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist <= 0.0001) return { x: 0, y: clockwise ? 1 : -1 };
+    const norm = { x: dx / dist, y: dy / dist };
+    return clockwise ? { x: -norm.y, y: norm.x } : { x: norm.y, y: -norm.x };
+  }
+
+  /**
+   * Eliminates the radial component of velocity, leaving only tangential motion.
+   */
+  public static removeRadialVelocityComponent(
+    centerPos: { x: number; y: number },
+    bodyPos: { x: number; y: number },
+    velocity: { x: number; y: number }
+  ): { x: number; y: number } {
+    const dx = bodyPos.x - centerPos.x;
+    const dy = bodyPos.y - centerPos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist <= 0.0001) return velocity;
+
+    const rx = dx / dist;
+    const ry = dy / dist;
+
+    // Radial component (v dot r_hat)
+    const vRadial = velocity.x * rx + velocity.y * ry;
+
+    return {
+      x: velocity.x - vRadial * rx,
+      y: velocity.y - vRadial * ry,
+    };
+  }
+
+  /**
+   * Snaps a body's velocity to ideal circular orbit velocity.
+   */
+  public static applyCircularOrbitVelocity(
+    centerBody: Matter.Body,
+    orbitingBody: Matter.Body,
+    G: number,
+    clockwise: boolean
+  ): void {
+    const M = (centerBody as any).customData?.mass ?? centerBody.mass ?? 800;
+    const r = this.calculateDistance(centerBody.position, orbitingBody.position);
+    const speed = this.computeStableOrbitVelocity(G, M, r) * 16.67;
+    const velVec = this.calculateTangentialVelocityVector(
+      centerBody.position,
+      orbitingBody.position,
+      speed,
+      clockwise
+    );
+
+    Matter.Body.setVelocity(orbitingBody, velVec);
   }
 }

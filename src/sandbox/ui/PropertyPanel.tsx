@@ -6,6 +6,12 @@ import type { ObservableEngine } from '../observables/observableEngine';
 import type { RuntimeObject } from '../types/RuntimeObject';
 import type { RuntimeConstraint } from '../constraints/constraintFactory';
 
+import { OrbitalInspector } from './orbital/orbitalInspector';
+import { OrbitControls } from './orbital/orbitControls';
+import { GravityControls } from './orbital/gravityControls';
+import { OrbitDebugPanel } from './orbital/orbitDebugPanel';
+import { OrbitVectorsOverlay } from './orbital/OrbitVectorsOverlay';
+
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
 interface PropertyPanelProps {
@@ -112,6 +118,15 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
   const [propertyVersion, setPropertyVersion] = useState(0);
   const [activeConstraints, setActiveConstraints] = useState<RuntimeConstraint[]>([]);
+  const [activeTab, setActiveTab] = useState<'general' | 'orbital'>('general');
+  const [vectorConfig, setVectorConfig] = useState({
+    showOrbitPath: true,
+    showGravityVectors: true,
+    showInfluenceRadius: true,
+    showVelocityVectors: true,
+    showForceVectors: true,
+    showOrbitalTrail: true,
+  });
 
   // Collapsible sections state
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
@@ -146,6 +161,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     const updateSelection = () => {
       const obj = store.getSelectedObject();
       setSelected(obj);
+      setActiveTab('general');
 
       // Re-scan constraints connected to the newly selected object
       if (obj) {
@@ -302,7 +318,67 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         </button>
       </div>
 
-      {/* ── SECTION: Newton's Second Law Lab ─────────────────────────────────── */}
+      {/* ── Tab Navigation ─────────────────────────────────────────────────── */}
+      {isCircle && (
+        <div style={S.tabsContainer}>
+          <button
+            onClick={() => setActiveTab('general')}
+            style={{
+              ...S.tabBtn,
+              borderBottom: activeTab === 'general' ? '2px solid #818cf8' : '2px solid transparent',
+              color: activeTab === 'general' ? '#e2e8f0' : '#64748b',
+              fontWeight: activeTab === 'general' ? 700 : 500,
+            }}
+          >
+            🔬 General Lab
+          </button>
+          <button
+            onClick={() => setActiveTab('orbital')}
+            style={{
+              ...S.tabBtn,
+              borderBottom: activeTab === 'orbital' ? '2px solid #a78bfa' : '2px solid transparent',
+              color: activeTab === 'orbital' ? '#e2e8f0' : '#64748b',
+              fontWeight: activeTab === 'orbital' ? 700 : 500,
+            }}
+          >
+            🪐 Orbital Mechanics
+          </button>
+        </div>
+      )}
+
+      {/* ── Tab Content ────────────────────────────────────────────────────── */}
+      {activeTab === 'orbital' && isCircle ? (
+        <div style={S.orbitalContent}>
+          {/* Background Vector Overlay */}
+          <OrbitVectorsOverlay
+            selectedObject={selected}
+            propertyController={propertyController}
+            vectorConfig={vectorConfig}
+          />
+          <OrbitalInspector
+            selectedObject={selected}
+            propertyController={propertyController}
+          />
+          <OrbitControls
+            selectedObject={selected}
+            propertyController={propertyController}
+            onRefresh={() => setPropertyVersion((v) => v + 1)}
+          />
+          <GravityControls
+            selectedObject={selected}
+            propertyController={propertyController}
+            onRefresh={() => setPropertyVersion((v) => v + 1)}
+          />
+          <OrbitDebugPanel
+            selectedObject={selected}
+            propertyController={propertyController}
+            vectorConfig={vectorConfig}
+            setVectorConfig={setVectorConfig}
+          />
+        </div>
+      ) : (
+        <>
+          {/* ── SECTION: Newton's Second Law Lab ─────────────────────────────────── */}
       <div style={S.section}>
         <div style={S.sectionHeader} onClick={() => toggleSection('newton')}>
           <span style={{ ...S.sectionTitle, color: '#fde047' }}>🔬 F = ma Laboratory</span>
@@ -990,7 +1066,9 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </>
+  )}
+</div>
   );
 };
 
@@ -1006,6 +1084,36 @@ const S: Record<string, React.CSSProperties> = {
     fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif',
     color: '#cbd5e1',
     userSelect: 'none',
+  },
+  tabsContainer: {
+    display: 'flex',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+    marginBottom: 4,
+    background: 'rgba(0, 0, 0, 0.15)',
+    borderRadius: '0 0 6px 6px',
+    overflow: 'hidden',
+  },
+  tabBtn: {
+    flex: 1,
+    padding: '10px 4px',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 9,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    transition: 'all 0.15s ease',
+    outline: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  orbitalContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
   },
   emptyState: {
     display: 'flex',
