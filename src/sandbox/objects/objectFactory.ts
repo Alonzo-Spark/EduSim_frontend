@@ -51,6 +51,10 @@ export function createObject(config: ObjectConfig): RuntimeObject {
       isStatic:    config.isStatic,
       restitution: config.restitution,
       friction:    config.friction,
+<<<<<<< HEAD
+=======
+      frictionAir: config.frictionAir,
+>>>>>>> origin/orbital-sys
       density:     config.density,
       angle:       config.angle,
       label:       config.label ?? config.id,
@@ -63,6 +67,10 @@ export function createObject(config: ObjectConfig): RuntimeObject {
   })();
 
   const body = createBody(bodyConfig);
+<<<<<<< HEAD
+=======
+  (body as any).objectId = config.id;
+>>>>>>> origin/orbital-sys
 
   // ── 2. Rendering ───────────────────────────────────────────────────────────
   const spriteConfig: SpriteConfig = (() => {

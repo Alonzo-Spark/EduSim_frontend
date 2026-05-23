@@ -6,6 +6,15 @@ import type { ObservableEngine } from '../observables/observableEngine';
 import type { RuntimeObject } from '../types/RuntimeObject';
 import type { RuntimeConstraint } from '../constraints/constraintFactory';
 
+<<<<<<< HEAD
+=======
+import { OrbitalInspector } from './orbital/orbitalInspector';
+import { OrbitControls } from './orbital/orbitControls';
+import { GravityControls } from './orbital/gravityControls';
+import { OrbitDebugPanel } from './orbital/orbitDebugPanel';
+import { OrbitVectorsOverlay } from './orbital/OrbitVectorsOverlay';
+
+>>>>>>> origin/orbital-sys
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
 interface PropertyPanelProps {
@@ -112,14 +121,34 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
   const [propertyVersion, setPropertyVersion] = useState(0);
   const [activeConstraints, setActiveConstraints] = useState<RuntimeConstraint[]>([]);
+<<<<<<< HEAD
+=======
+  const [activeTab, setActiveTab] = useState<'general' | 'orbital'>('general');
+  const [vectorConfig, setVectorConfig] = useState({
+    showOrbitPath: true,
+    showGravityVectors: true,
+    showInfluenceRadius: true,
+    showVelocityVectors: true,
+    showForceVectors: true,
+    showOrbitalTrail: true,
+  });
+>>>>>>> origin/orbital-sys
 
   // Collapsible sections state
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
     newton: false, // Default expanded for STEM lab focus!
+<<<<<<< HEAD
     physics: false,
     motion: false,
     visuals: false,
     constraints: false,
+=======
+    celestial: false, // Celestial & Gravity controls!
+    physics: true,
+    motion: true,
+    visuals: true,
+    constraints: true,
+>>>>>>> origin/orbital-sys
     observables: false,
   });
 
@@ -145,6 +174,10 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     const updateSelection = () => {
       const obj = store.getSelectedObject();
       setSelected(obj);
+<<<<<<< HEAD
+=======
+      setActiveTab('general');
+>>>>>>> origin/orbital-sys
 
       // Re-scan constraints connected to the newly selected object
       if (obj) {
@@ -256,6 +289,23 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const { body, display } = selected;
   const isLocked = store.isObjectLocked(selected.id);
 
+<<<<<<< HEAD
+=======
+  // Dynamic Gravity/Celestial telemetry and properties
+  const radialGravity = (propertyController as any).runtime?.gravitySystem?.getRadialGravity();
+  const gravitySource = radialGravity?.getSources()?.find((s: any) => s.id === selected.id);
+  const isSource = !!gravitySource;
+  const influenceRadius = gravitySource?.influenceRadius ?? 0;
+
+  const gravityBody = radialGravity?.getBodies()?.find((b: any) => b.id === selected.id);
+  const isAffected = gravityBody ? gravityBody.affectedByGravity : true;
+
+  const customData = (selected.metadata?.customData || {}) as any;
+  const radius = selected.metadata?.shapeInfo?.radius ?? (body as any).circleRadius ?? 25;
+  const orbitalCategory = customData.orbitalCategory ?? (selected.id === 'orbit-star' ? 'star' : 'planet');
+  const gravityStrength = customData.gravityStrength ?? (gravitySource ? 1.0 : 0.0);
+
+>>>>>>> origin/orbital-sys
   return (
     <div style={S.panel}>
       {/* ── Header Card ──────────────────────────────────────────────────────── */}
@@ -287,7 +337,71 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         </button>
       </div>
 
+<<<<<<< HEAD
       {/* ── SECTION: Newton's Second Law Lab ─────────────────────────────────── */}
+=======
+      {/* ── Tab Navigation ─────────────────────────────────────────────────── */}
+      {isCircle && (
+        <div style={S.tabsContainer}>
+          <button
+            onClick={() => setActiveTab('general')}
+            style={{
+              ...S.tabBtn,
+              borderBottom: activeTab === 'general' ? '2px solid #818cf8' : '2px solid transparent',
+              color: activeTab === 'general' ? '#e2e8f0' : '#64748b',
+              fontWeight: activeTab === 'general' ? 700 : 500,
+            }}
+          >
+            🔬 General Lab
+          </button>
+          <button
+            onClick={() => setActiveTab('orbital')}
+            style={{
+              ...S.tabBtn,
+              borderBottom: activeTab === 'orbital' ? '2px solid #a78bfa' : '2px solid transparent',
+              color: activeTab === 'orbital' ? '#e2e8f0' : '#64748b',
+              fontWeight: activeTab === 'orbital' ? 700 : 500,
+            }}
+          >
+            🪐 Orbital Mechanics
+          </button>
+        </div>
+      )}
+
+      {/* ── Tab Content ────────────────────────────────────────────────────── */}
+      {activeTab === 'orbital' && isCircle ? (
+        <div style={S.orbitalContent}>
+          {/* Background Vector Overlay */}
+          <OrbitVectorsOverlay
+            selectedObject={selected}
+            propertyController={propertyController}
+            vectorConfig={vectorConfig}
+          />
+          <OrbitalInspector
+            selectedObject={selected}
+            propertyController={propertyController}
+          />
+          <OrbitControls
+            selectedObject={selected}
+            propertyController={propertyController}
+            onRefresh={() => setPropertyVersion((v) => v + 1)}
+          />
+          <GravityControls
+            selectedObject={selected}
+            propertyController={propertyController}
+            onRefresh={() => setPropertyVersion((v) => v + 1)}
+          />
+          <OrbitDebugPanel
+            selectedObject={selected}
+            propertyController={propertyController}
+            vectorConfig={vectorConfig}
+            setVectorConfig={setVectorConfig}
+          />
+        </div>
+      ) : (
+        <>
+          {/* ── SECTION: Newton's Second Law Lab ─────────────────────────────────── */}
+>>>>>>> origin/orbital-sys
       <div style={S.section}>
         <div style={S.sectionHeader} onClick={() => toggleSection('newton')}>
           <span style={{ ...S.sectionTitle, color: '#fde047' }}>🔬 F = ma Laboratory</span>
@@ -420,6 +534,148 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         )}
       </div>
 
+<<<<<<< HEAD
+=======
+      {/* ── SECTION: Celestial & Gravity Properties ────────────────────────── */}
+      <div style={S.section}>
+        <div style={S.sectionHeader} onClick={() => toggleSection('celestial')}>
+          <span style={{ ...S.sectionTitle, color: '#a78bfa' }}>🪐 Celestial & Gravity</span>
+          <span style={S.chevron}>{collapsed.celestial ? '▼' : '▲'}</span>
+        </div>
+
+        {!collapsed.celestial && (
+          <div style={S.sectionBody}>
+            {/* Orbital Category Dropdown */}
+            <div style={S.controlRow}>
+              <span style={S.controlLabel}>Classification</span>
+              <select
+                value={orbitalCategory}
+                onChange={(e) => {
+                  propertyController.updateProperty(selected.id, 'orbitalCategory', e.target.value);
+                  setPropertyVersion(v => v + 1);
+                }}
+                style={S.selectInput}
+              >
+                <option value="star">🌟 Sun/Star</option>
+                <option value="planet">🌍 Terrestrial Planet</option>
+                <option value="gas_giant">🪐 Gas Giant</option>
+                <option value="moon">🌒 Moon/Satellite</option>
+                <option value="dwarf_planet">☄️ Dwarf Planet</option>
+                <option value="black_hole">🕳️ Black Hole</option>
+              </select>
+            </div>
+
+            {/* Gravity Source Toggle */}
+            <div style={S.toggleRow}>
+              <span style={S.controlLabel}>Gravitational Puller</span>
+              <button
+                onClick={() => {
+                  propertyController.updateProperty(selected.id, 'isGravitySource', !isSource);
+                  setPropertyVersion(v => v + 1);
+                }}
+                style={{
+                  ...S.toggleBtn,
+                  backgroundColor: isSource ? 'rgba(167, 139, 250, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                  borderColor: isSource ? 'rgba(167, 139, 250, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+                  color: isSource ? '#c084fc' : '#94a3b8',
+                }}
+              >
+                {isSource ? '🌌 Gravity Source (Active)' : '⚪ No Gravity Field'}
+              </button>
+            </div>
+
+            {/* Affected By Gravity Toggle */}
+            <div style={S.toggleRow}>
+              <span style={S.controlLabel}>Affected by Gravity</span>
+              <button
+                onClick={() => {
+                  propertyController.updateProperty(selected.id, 'affectedByGravity', !isAffected);
+                  setPropertyVersion(v => v + 1);
+                }}
+                style={{
+                  ...S.toggleBtn,
+                  backgroundColor: isAffected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                  borderColor: isAffected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                  color: isAffected ? '#60a5fa' : '#f87171',
+                }}
+              >
+                {isAffected ? '🌌 Attracted by Stars' : '🚀 Gravity Ignored'}
+              </button>
+            </div>
+
+            {/* Radius Slider */}
+            {isCircle && (
+              <SliderRow
+                label="Physical Radius"
+                min={5}
+                max={150}
+                step={1}
+                value={radius}
+                unit="px"
+                precision={0}
+                onChange={(v) => {
+                  propertyController.updateProperty(selected.id, 'radius', v);
+                  setPropertyVersion(v2 => v2 + 1);
+                }}
+                tooltip="The radius of the celestial body. Modifying this scales both collision bounds and visual rendering."
+              />
+            )}
+
+            {/* Virtual Mass Slider */}
+            <SliderRow
+              label="Celestial Mass"
+              min={1}
+              max={selected.id === 'orbit-star' || orbitalCategory === 'star' || orbitalCategory === 'black_hole' ? 1000000 : 10000}
+              step={selected.id === 'orbit-star' || orbitalCategory === 'star' || orbitalCategory === 'black_hole' ? 1000 : 10}
+              value={body.isStatic && customData.mass ? customData.mass : body.mass}
+              unit="M_e"
+              precision={0}
+              onChange={(v) => {
+                propertyController.updateProperty(selected.id, 'mass', v);
+                setPropertyVersion(v2 => v2 + 1);
+              }}
+              tooltip="The gravitational mass of the body. Influences gravity pull, orbital velocity, and escape velocity calculations."
+            />
+
+            {/* Gravity Strength Modifier */}
+            {isSource && (
+              <SliderRow
+                label="Gravity Strength"
+                min={0}
+                max={50}
+                step={0.5}
+                value={gravityStrength}
+                precision={1}
+                onChange={(v) => {
+                  propertyController.updateProperty(selected.id, 'gravityStrength', v);
+                  setPropertyVersion(v2 => v2 + 1);
+                }}
+                tooltip="Scales the gravitational attraction force multiplier of this celestial body."
+              />
+            )}
+
+            {/* Influence Radius Slider */}
+            {isSource && (
+              <SliderRow
+                label="Influence Field Range"
+                min={50}
+                max={3000}
+                step={50}
+                value={influenceRadius || 1500}
+                unit="px"
+                precision={0}
+                onChange={(v) => {
+                  propertyController.updateProperty(selected.id, 'influenceRadius', v);
+                  setPropertyVersion(v2 => v2 + 1);
+                }}
+                tooltip="The boundary size of this object's gravity field. Objects outside this range will not feel its pull."
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+>>>>>>> origin/orbital-sys
       {/* ── SECTION: Physics Parameters ───────────────────────────────────────── */}
       <div style={S.section}>
         <div style={S.sectionHeader} onClick={() => toggleSection('physics')}>
@@ -836,7 +1092,13 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           </div>
         )}
       </div>
+<<<<<<< HEAD
     </div>
+=======
+    </>
+  )}
+</div>
+>>>>>>> origin/orbital-sys
   );
 };
 
@@ -853,6 +1115,39 @@ const S: Record<string, React.CSSProperties> = {
     color: '#cbd5e1',
     userSelect: 'none',
   },
+<<<<<<< HEAD
+=======
+  tabsContainer: {
+    display: 'flex',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+    marginBottom: 4,
+    background: 'rgba(0, 0, 0, 0.15)',
+    borderRadius: '0 0 6px 6px',
+    overflow: 'hidden',
+  },
+  tabBtn: {
+    flex: 1,
+    padding: '10px 4px',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 9,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    transition: 'all 0.15s ease',
+    outline: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  orbitalContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+>>>>>>> origin/orbital-sys
   emptyState: {
     display: 'flex',
     flexDirection: 'column',
@@ -1175,6 +1470,20 @@ const S: Record<string, React.CSSProperties> = {
     marginBottom: 4,
     textAlign: 'center',
   },
+<<<<<<< HEAD
+=======
+  selectInput: {
+    background: 'rgba(0, 0, 0, 0.35)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: 6,
+    color: '#e2e8f0',
+    padding: '4px 8px',
+    fontSize: 10,
+    fontWeight: 600,
+    outline: 'none',
+    cursor: 'pointer',
+  },
+>>>>>>> origin/orbital-sys
 };
 
 export default PropertyPanel;

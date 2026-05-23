@@ -112,11 +112,40 @@ export class PropertyController {
       case 'density':
       case 'scale':
       case 'length':
+<<<<<<< HEAD
+=======
+      case 'radius':
+>>>>>>> origin/orbital-sys
         if (typeof value !== 'number' || value <= 0 || !isFinite(value)) {
           return { valid: false, error: `${property} must be a positive finite number.` };
         }
         break;
 
+<<<<<<< HEAD
+=======
+      case 'influenceRadius':
+      case 'gravityStrength':
+        if (typeof value !== 'number' || value < 0 || !isFinite(value)) {
+          return { valid: false, error: `${property} must be a non-negative finite number.` };
+        }
+        break;
+
+      case 'isGravitySource':
+      case 'affectedByGravity':
+        if (typeof value !== 'boolean') {
+          return { valid: false, error: `${property} must be a boolean.` };
+        }
+        break;
+
+      case 'orbitalCategory': {
+        const validCategories = ['planet', 'moon', 'star', 'gas_giant', 'dwarf_planet', 'black_hole'];
+        if (typeof value !== 'string' || !validCategories.includes(value)) {
+          return { valid: false, error: `orbitalCategory must be one of: ${validCategories.join(', ')}` };
+        }
+        break;
+      }
+
+>>>>>>> origin/orbital-sys
       case 'x':
       case 'y':
       case 'vx':
@@ -270,6 +299,19 @@ export class PropertyController {
     switch (property) {
       // ── Physics Properties ─────────────────────────────────────────────────
       case 'mass': {
+<<<<<<< HEAD
+=======
+        if (body.isStatic) {
+          if (!(body as any).customData) (body as any).customData = {};
+          (body as any).customData.mass = value;
+          
+          // Also sync with RadialGravity source if it exists
+          const radialGravity = this.runtime.gravitySystem.getRadialGravity();
+          radialGravity.updateGravitySource(objectId, { mass: value });
+          break;
+        }
+
+>>>>>>> origin/orbital-sys
         const currentMass = body.mass;
         if (currentMass > 0 && value > 0) {
           const k = Math.sqrt(value / currentMass);
@@ -277,10 +319,96 @@ export class PropertyController {
           Matter.Body.scale(body, k, k);
           // Scale PixiJS display container
           display.scale.set(display.scale.x * k, display.scale.y * k);
+<<<<<<< HEAD
+=======
+          
+          if (!(body as any).customData) (body as any).customData = {};
+          (body as any).customData.mass = value;
+          
+          // Also sync with RadialGravity source if it exists
+          const radialGravity = this.runtime.gravitySystem.getRadialGravity();
+          radialGravity.updateGravitySource(objectId, { mass: value });
+>>>>>>> origin/orbital-sys
         }
         break;
       }
 
+<<<<<<< HEAD
+=======
+      case 'radius': {
+        const metadata = obj.metadata;
+        if (metadata && metadata.shapeInfo) {
+          const shapeInfo = metadata.shapeInfo;
+          if (shapeInfo.type === 'circle') {
+            const currentRadius = shapeInfo.radius ?? 20;
+            if (currentRadius > 0 && value > 0) {
+              const k = value / currentRadius;
+              // Scale physical body and visual sprite
+              Matter.Body.scale(body, k, k);
+              display.scale.set(display.scale.x * k, display.scale.y * k);
+              shapeInfo.radius = value;
+              
+              // Scale gravity source influence radius proportionally if active
+              const radialGravity = this.runtime.gravitySystem.getRadialGravity();
+              const source = radialGravity.getSources().find(s => s.id === objectId);
+              if (source && source.influenceRadius !== undefined) {
+                source.influenceRadius *= k;
+                this.emit('propertyChanged', { objectId, property: 'influenceRadius', value: source.influenceRadius });
+              }
+            }
+          }
+        }
+        break;
+      }
+
+      case 'influenceRadius': {
+        const radialGravity = this.runtime.gravitySystem.getRadialGravity();
+        radialGravity.updateGravitySource(objectId, { influenceRadius: value });
+        break;
+      }
+
+      case 'gravityStrength': {
+        if (!(body as any).customData) (body as any).customData = {};
+        (body as any).customData.gravityStrength = value;
+        const radialGravity = this.runtime.gravitySystem.getRadialGravity();
+        radialGravity.updateGravitySource(objectId, {
+          metadata: { ...radialGravity.getSources().find(s => s.id === objectId)?.metadata, gravityStrength: value }
+        });
+        break;
+      }
+
+      case 'isGravitySource': {
+        const radialGravity = this.runtime.gravitySystem.getRadialGravity();
+        if (value) {
+          radialGravity.addGravitySource({
+            id: objectId,
+            mass: body.isStatic && (body as any).customData?.mass ? (body as any).customData.mass : body.mass,
+            position: { x: body.position.x, y: body.position.y },
+            enabled: true,
+            influenceRadius: (body as any).circleRadius ? (body as any).circleRadius * 15 : 1000,
+          });
+        } else {
+          radialGravity.removeGravitySource(objectId);
+        }
+        break;
+      }
+
+      case 'affectedByGravity': {
+        const radialGravity = this.runtime.gravitySystem.getRadialGravity();
+        const existing = radialGravity.getBodies().find(b => b.id === objectId);
+        if (existing) {
+          existing.affectedByGravity = value;
+        }
+        break;
+      }
+
+      case 'orbitalCategory': {
+        if (!(body as any).customData) (body as any).customData = {};
+        (body as any).customData.orbitalCategory = value;
+        break;
+      }
+
+>>>>>>> origin/orbital-sys
       case 'x':
         Matter.Body.setPosition(body, { x: value, y: body.position.y });
         this.runtime.sync.flush(); // immediately sync visuals
@@ -388,7 +516,11 @@ export class PropertyController {
     }
 
     // Sync centralized store metadata
+<<<<<<< HEAD
     if (['mass', 'friction', 'restitution', 'static'].includes(property)) {
+=======
+    if (['mass', 'friction', 'restitution', 'static', 'radius', 'influenceRadius', 'gravityStrength', 'isGravitySource', 'affectedByGravity', 'orbitalCategory'].includes(property)) {
+>>>>>>> origin/orbital-sys
       this.store.updateMetadata(objectId, {
         customData: {
           ...this.store.getMetadata(objectId).customData,
