@@ -1,12 +1,7 @@
 // ─── useAssetRegistry ─────────────────────────────────────────────────────────
 // Hook that exposes the asset registry with optional search/filter helpers.
-
 import { useMemo } from 'react';
-<<<<<<< HEAD
-import { assetsRegistry, type AssetDefinition } from '../config/assetsRegistry';
-=======
 import { assetsRegistry, type AssetDefinition } from '../../config/assetsRegistry';
->>>>>>> origin/orbital-sys
 
 interface UseAssetRegistryReturn {
   registry: Record<string, AssetDefinition[]>;

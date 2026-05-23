@@ -112,17 +112,12 @@ export class PropertyController {
       case 'density':
       case 'scale':
       case 'length':
-<<<<<<< HEAD
-=======
       case 'radius':
->>>>>>> origin/orbital-sys
         if (typeof value !== 'number' || value <= 0 || !isFinite(value)) {
           return { valid: false, error: `${property} must be a positive finite number.` };
         }
         break;
 
-<<<<<<< HEAD
-=======
       case 'influenceRadius':
       case 'gravityStrength':
         if (typeof value !== 'number' || value < 0 || !isFinite(value)) {
@@ -145,7 +140,6 @@ export class PropertyController {
         break;
       }
 
->>>>>>> origin/orbital-sys
       case 'x':
       case 'y':
       case 'vx':
@@ -299,8 +293,6 @@ export class PropertyController {
     switch (property) {
       // ── Physics Properties ─────────────────────────────────────────────────
       case 'mass': {
-<<<<<<< HEAD
-=======
         if (body.isStatic) {
           if (!(body as any).customData) (body as any).customData = {};
           (body as any).customData.mass = value;
@@ -311,7 +303,6 @@ export class PropertyController {
           break;
         }
 
->>>>>>> origin/orbital-sys
         const currentMass = body.mass;
         if (currentMass > 0 && value > 0) {
           const k = Math.sqrt(value / currentMass);
@@ -319,8 +310,6 @@ export class PropertyController {
           Matter.Body.scale(body, k, k);
           // Scale PixiJS display container
           display.scale.set(display.scale.x * k, display.scale.y * k);
-<<<<<<< HEAD
-=======
           
           if (!(body as any).customData) (body as any).customData = {};
           (body as any).customData.mass = value;
@@ -328,13 +317,10 @@ export class PropertyController {
           // Also sync with RadialGravity source if it exists
           const radialGravity = this.runtime.gravitySystem.getRadialGravity();
           radialGravity.updateGravitySource(objectId, { mass: value });
->>>>>>> origin/orbital-sys
         }
         break;
       }
 
-<<<<<<< HEAD
-=======
       case 'radius': {
         const metadata = obj.metadata;
         if (metadata && metadata.shapeInfo) {
@@ -408,7 +394,6 @@ export class PropertyController {
         break;
       }
 
->>>>>>> origin/orbital-sys
       case 'x':
         Matter.Body.setPosition(body, { x: value, y: body.position.y });
         this.runtime.sync.flush(); // immediately sync visuals
@@ -516,11 +501,7 @@ export class PropertyController {
     }
 
     // Sync centralized store metadata
-<<<<<<< HEAD
-    if (['mass', 'friction', 'restitution', 'static'].includes(property)) {
-=======
     if (['mass', 'friction', 'restitution', 'static', 'radius', 'influenceRadius', 'gravityStrength', 'isGravitySource', 'affectedByGravity', 'orbitalCategory'].includes(property)) {
->>>>>>> origin/orbital-sys
       this.store.updateMetadata(objectId, {
         customData: {
           ...this.store.getMetadata(objectId).customData,

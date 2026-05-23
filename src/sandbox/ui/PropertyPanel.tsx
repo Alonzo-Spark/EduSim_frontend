@@ -6,15 +6,11 @@ import type { ObservableEngine } from '../observables/observableEngine';
 import type { RuntimeObject } from '../types/RuntimeObject';
 import type { RuntimeConstraint } from '../constraints/constraintFactory';
 
-<<<<<<< HEAD
-=======
 import { OrbitalInspector } from './orbital/orbitalInspector';
 import { OrbitControls } from './orbital/orbitControls';
 import { GravityControls } from './orbital/gravityControls';
 import { OrbitDebugPanel } from './orbital/orbitDebugPanel';
 import { OrbitVectorsOverlay } from './orbital/OrbitVectorsOverlay';
-
->>>>>>> origin/orbital-sys
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
 interface PropertyPanelProps {
@@ -121,8 +117,6 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
   const [propertyVersion, setPropertyVersion] = useState(0);
   const [activeConstraints, setActiveConstraints] = useState<RuntimeConstraint[]>([]);
-<<<<<<< HEAD
-=======
   const [activeTab, setActiveTab] = useState<'general' | 'orbital'>('general');
   const [vectorConfig, setVectorConfig] = useState({
     showOrbitPath: true,
@@ -132,23 +126,15 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     showForceVectors: true,
     showOrbitalTrail: true,
   });
->>>>>>> origin/orbital-sys
 
   // Collapsible sections state
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
     newton: false, // Default expanded for STEM lab focus!
-<<<<<<< HEAD
-    physics: false,
-    motion: false,
-    visuals: false,
-    constraints: false,
-=======
     celestial: false, // Celestial & Gravity controls!
     physics: true,
     motion: true,
     visuals: true,
     constraints: true,
->>>>>>> origin/orbital-sys
     observables: false,
   });
 
@@ -174,10 +160,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     const updateSelection = () => {
       const obj = store.getSelectedObject();
       setSelected(obj);
-<<<<<<< HEAD
-=======
       setActiveTab('general');
->>>>>>> origin/orbital-sys
 
       // Re-scan constraints connected to the newly selected object
       if (obj) {
@@ -289,8 +272,6 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const { body, display } = selected;
   const isLocked = store.isObjectLocked(selected.id);
 
-<<<<<<< HEAD
-=======
   // Dynamic Gravity/Celestial telemetry and properties
   const radialGravity = (propertyController as any).runtime?.gravitySystem?.getRadialGravity();
   const gravitySource = radialGravity?.getSources()?.find((s: any) => s.id === selected.id);
@@ -304,8 +285,6 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const radius = selected.metadata?.shapeInfo?.radius ?? (body as any).circleRadius ?? 25;
   const orbitalCategory = customData.orbitalCategory ?? (selected.id === 'orbit-star' ? 'star' : 'planet');
   const gravityStrength = customData.gravityStrength ?? (gravitySource ? 1.0 : 0.0);
-
->>>>>>> origin/orbital-sys
   return (
     <div style={S.panel}>
       {/* ── Header Card ──────────────────────────────────────────────────────── */}
@@ -337,9 +316,6 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         </button>
       </div>
 
-<<<<<<< HEAD
-      {/* ── SECTION: Newton's Second Law Lab ─────────────────────────────────── */}
-=======
       {/* ── Tab Navigation ─────────────────────────────────────────────────── */}
       {isCircle && (
         <div style={S.tabsContainer}>
@@ -401,7 +377,6 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
       ) : (
         <>
           {/* ── SECTION: Newton's Second Law Lab ─────────────────────────────────── */}
->>>>>>> origin/orbital-sys
       <div style={S.section}>
         <div style={S.sectionHeader} onClick={() => toggleSection('newton')}>
           <span style={{ ...S.sectionTitle, color: '#fde047' }}>🔬 F = ma Laboratory</span>
@@ -534,8 +509,6 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         )}
       </div>
 
-<<<<<<< HEAD
-=======
       {/* ── SECTION: Celestial & Gravity Properties ────────────────────────── */}
       <div style={S.section}>
         <div style={S.sectionHeader} onClick={() => toggleSection('celestial')}>
@@ -674,8 +647,6 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           </div>
         )}
       </div>
-
->>>>>>> origin/orbital-sys
       {/* ── SECTION: Physics Parameters ───────────────────────────────────────── */}
       <div style={S.section}>
         <div style={S.sectionHeader} onClick={() => toggleSection('physics')}>
@@ -1092,13 +1063,9 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           </div>
         )}
       </div>
-<<<<<<< HEAD
-    </div>
-=======
     </>
   )}
 </div>
->>>>>>> origin/orbital-sys
   );
 };
 
@@ -1115,8 +1082,6 @@ const S: Record<string, React.CSSProperties> = {
     color: '#cbd5e1',
     userSelect: 'none',
   },
-<<<<<<< HEAD
-=======
   tabsContainer: {
     display: 'flex',
     borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
@@ -1147,7 +1112,6 @@ const S: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 12,
   },
->>>>>>> origin/orbital-sys
   emptyState: {
     display: 'flex',
     flexDirection: 'column',
@@ -1470,8 +1434,6 @@ const S: Record<string, React.CSSProperties> = {
     marginBottom: 4,
     textAlign: 'center',
   },
-<<<<<<< HEAD
-=======
   selectInput: {
     background: 'rgba(0, 0, 0, 0.35)',
     border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -1483,7 +1445,6 @@ const S: Record<string, React.CSSProperties> = {
     outline: 'none',
     cursor: 'pointer',
   },
->>>>>>> origin/orbital-sys
 };
 
 export default PropertyPanel;

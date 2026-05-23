@@ -6,10 +6,7 @@ import type { RuntimeObject } from '../types/RuntimeObject';
 import type { Body } from 'matter-js';
 import { ConstraintRegistry } from '../constraints/constraintRegistry';
 import type { ConstraintRenderer } from '../constraints/constraintRenderer';
-<<<<<<< HEAD
-=======
 import type { GravityRenderer } from '../gravity/gravityRenderer';
->>>>>>> origin/orbital-sys
 import { ObservableEngine } from '../observables/observableEngine';
 import { RuntimeStore } from '../state/runtimeStore';
 import { PropertyController } from '../properties/propertyController';
@@ -74,13 +71,8 @@ async function buildScene(
   // Remove non-graphics children, while preserving constraint and observable overlays.
   for (let i = vp.children.length - 1; i >= 0; i--) {
     const child = vp.children[i];
-<<<<<<< HEAD
-    const meta = child as { _isConstraintOverlay?: boolean; _isObservableOverlay?: boolean };
-    if (meta._isConstraintOverlay || meta._isObservableOverlay) continue;
-=======
     const meta = child as { _isConstraintOverlay?: boolean; _isObservableOverlay?: boolean; _isGravityOverlay?: boolean };
     if (meta._isConstraintOverlay || meta._isObservableOverlay || meta._isGravityOverlay) continue;
->>>>>>> origin/orbital-sys
     vp.removeChildAt(i);
   }
 
@@ -138,10 +130,7 @@ export const SandboxCanvas: React.FC = () => {
   const interactionRef = useRef<InteractionRefs | null>(null);
   const constraintRegRef = useRef<ConstraintRegistry | null>(null);
   const constraintRenRef = useRef<ConstraintRenderer | null>(null);
-<<<<<<< HEAD
-=======
   const gravityRenRef = useRef<GravityRenderer | null>(null);
->>>>>>> origin/orbital-sys
   const observableEngineRef = useRef<ObservableEngine | null>(null);
   const dynRef = useRef<Body[]>([]);
 
@@ -153,14 +142,10 @@ export const SandboxCanvas: React.FC = () => {
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
   const [tutorEnabled, setTutorEnabled] = useState(true);
 
-<<<<<<< HEAD
-=======
   // Modular Switchable Gravity System states
   const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
   const [gConstant, setGConstant] = useState(0.0012);
   const [radialDebug, setRadialDebug] = useState(true);
-
->>>>>>> origin/orbital-sys
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
@@ -372,10 +357,7 @@ export const SandboxCanvas: React.FC = () => {
           { RuntimeControls },
           { ConstraintRegistry },
           { ConstraintRenderer },
-<<<<<<< HEAD
-=======
           { GravityRenderer },
->>>>>>> origin/orbital-sys
         ] = await Promise.all([
           import('../engine/runtime'),
           import('../interactions/drag'),
@@ -383,10 +365,7 @@ export const SandboxCanvas: React.FC = () => {
           import('../interactions/controls'),
           import('../constraints/constraintRegistry'),
           import('../constraints/constraintRenderer'),
-<<<<<<< HEAD
-=======
           import('../gravity/gravityRenderer'),
->>>>>>> origin/orbital-sys
         ]);
 
         const rt = new SandboxRuntime();
@@ -511,14 +490,10 @@ export const SandboxCanvas: React.FC = () => {
         constraintRenRef.current = constraintRen;
         constraintRen.enable(() => constraintReg.getAll());
 
-<<<<<<< HEAD
-=======
         // Gravity diagnostics rendering overlay
         const gravityRen = new GravityRenderer(rt);
         gravityRenRef.current = gravityRen;
         gravityRen.enable();
-
->>>>>>> origin/orbital-sys
         const observableEngine = new ObservableEngine(rt, rt.sync, propertyController);
         observableEngine.enable();
         observableEngineRef.current = observableEngine;
@@ -577,10 +552,7 @@ export const SandboxCanvas: React.FC = () => {
       interactionRef.current?.selection.clear();
       constraintRegRef.current?.clear();
       constraintRenRef.current?.destroy();
-<<<<<<< HEAD
-=======
       gravityRenRef.current?.destroy();
->>>>>>> origin/orbital-sys
       observableEngineRef.current?.destroy();
       runtimeRef.current?.destroy();
       runtimeRef.current = null;
@@ -588,10 +560,7 @@ export const SandboxCanvas: React.FC = () => {
       interactionRef.current = null;
       constraintRegRef.current = null;
       constraintRenRef.current = null;
-<<<<<<< HEAD
-=======
       gravityRenRef.current = null;
->>>>>>> origin/orbital-sys
       observableEngineRef.current = null;
       setReady(false);
       setRunning(false);
@@ -607,8 +576,6 @@ export const SandboxCanvas: React.FC = () => {
     else { ctrl.resume(); setRunning(true); }
   };
 
-<<<<<<< HEAD
-=======
   const spawnStar = useCallback(async () => {
     const rt = runtimeRef.current;
     const ia = interactionRef.current;
@@ -767,8 +734,6 @@ export const SandboxCanvas: React.FC = () => {
       }
     }
   };
-
->>>>>>> origin/orbital-sys
   const handleReset = useCallback(async () => {
     const rt = runtimeRef.current;
     const ia = interactionRef.current;
@@ -780,22 +745,16 @@ export const SandboxCanvas: React.FC = () => {
     const wasRunning = running;
     rt.pause();
     store.reset();
-<<<<<<< HEAD
-=======
 
     // Clear old gravity sources during system reset
     if (rt.gravitySystem) {
       rt.gravitySystem.getRadialGravity().clear();
     }
 
->>>>>>> origin/orbital-sys
     const dyn = await buildScene(rt, el, ia, creg, store);
     dynRef.current = dyn;
     setBodyCount(dyn.length);
     setSelected(null);
-<<<<<<< HEAD
-    ia.controls.setGravity(GRAVITY_VALUES[gravity]);
-=======
 
     // Restore correct gravity behaviors based on active mode
     if (gravityMode === 'linear') {
@@ -805,17 +764,12 @@ export const SandboxCanvas: React.FC = () => {
       setTimeout(() => spawnStar(), 40);
     }
 
->>>>>>> origin/orbital-sys
     ia.controls.setSimulationSpeed(speed);
     if (wasRunning) {
       rt.start();
       store.setRuntimeState('running');
     }
-<<<<<<< HEAD
-  }, [ready, running, gravity, speed]);
-=======
   }, [ready, running, gravity, speed, gravityMode, spawnStar]);
->>>>>>> origin/orbital-sys
 
   const spawnShape = useCallback(async (type: 'circle' | 'rectangle') => {
     const rt = runtimeRef.current;
@@ -857,9 +811,9 @@ export const SandboxCanvas: React.FC = () => {
       type: 'OBJECT_SPAWNED',
       objectId: obj.id,
       metadata: {
-        shape:   type,
-        name:    type === 'circle' ? 'Circle' : 'Rectangle',
-        mass:    obj.body.mass,
+        shape: type,
+        name: type === 'circle' ? 'Circle' : 'Rectangle',
+        mass: obj.body.mass,
         gravity: GRAVITY_VALUES[gravity],
       },
     });
@@ -891,11 +845,7 @@ export const SandboxCanvas: React.FC = () => {
     interactionRef.current?.controls.setSimulationSpeed(val);
   };
 
-<<<<<<< HEAD
-=======
 
-
->>>>>>> origin/orbital-sys
   // ── Panel drag-and-drop ────────────────────────────────────────────────────
 
   // Connect constraint to existing body, or spawn new complete system
@@ -1141,7 +1091,7 @@ export const SandboxCanvas: React.FC = () => {
     rt.sync.register(pin.id, pin.body, pin.display);
 
     // ── 2. Terminal receptor sensor with visible drop-zone display ──────────
-    const terminalId   = uid('rope-terminal');
+    const terminalId = uid('rope-terminal');
     const sensorDispId = uid('rope-sensor-disp');
 
     const sensor = Matter.Bodies.circle(
@@ -1300,9 +1250,9 @@ export const SandboxCanvas: React.FC = () => {
         type: 'OBJECT_SPAWNED',
         objectId: obj.id,
         metadata: {
-          shape:   spawnType,
-          name:    asset.name,
-          mass:    obj.body.mass,
+          shape: spawnType,
+          name: asset.name,
+          mass: obj.body.mass,
           gravity: GRAVITY_VALUES[gravity],
         },
       });
@@ -1361,10 +1311,7 @@ export const SandboxCanvas: React.FC = () => {
   const onPanelPointerDown = (type: PanelDragType) =>
     (e: React.PointerEvent) => {
       if (!ready) return;
-<<<<<<< HEAD
-      e.currentTarget.setPointerCapture(e.pointerId);
-=======
->>>>>>> origin/orbital-sys
+
 
       // Pause physics engine drag controller during menu drag-and-drop to prevent automatic sticking
       interactionRef.current?.drag.disable();
@@ -1375,79 +1322,6 @@ export const SandboxCanvas: React.FC = () => {
       setGhostPos({ x: e.clientX, y: e.clientY });
     };
 
-<<<<<<< HEAD
-  const onPanelPointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    didDragRef.current = true;    // pointer moved — this is a drag, not a tap
-    setGhostPos({ x: e.clientX, y: e.clientY });
-
-    const canvas = mountRef.current;
-    if (canvas) {
-      const r = canvas.getBoundingClientRect();
-      const over = (
-        e.clientX >= r.left && e.clientX <= r.right &&
-        e.clientY >= r.top && e.clientY <= r.bottom
-      );
-      setIsOverCanvas(over);
-
-      // Query body under cursor for constraints
-      const dragType = panelDragRef.current;
-      if (over && dragType && ['pivot', 'spring', 'rope'].includes(dragType)) {
-        const canvasX = e.clientX - r.left;
-        const canvasY = e.clientY - r.top;
-        const queryPoint = { x: canvasX, y: canvasY };
-        const bodies = dynRef.current;
-
-        import('matter-js').then((Matter) => {
-          const hovered = bodies.find(b => Matter.Vertices.contains(b.vertices, queryPoint));
-          if (hovered) {
-            hoveredBodyRef.current = hovered;
-            setHoveredBodyId(hovered.label || hovered.id.toString());
-          } else {
-            hoveredBodyRef.current = null;
-            setHoveredBodyId(null);
-          }
-        });
-      } else {
-        hoveredBodyRef.current = null;
-        setHoveredBodyId(null);
-      }
-    }
-  };
-
-  const onPanelPointerUp = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const type = panelDragRef.current;
-    panelDragRef.current = null;
-    setIsDragging(false);
-    setIsOverCanvas(false);
-
-    // Re-enable the physics engine drag controller now that panel drag is complete
-    interactionRef.current?.drag.enable();
-
-    const hoveredBody = hoveredBodyRef.current;
-    hoveredBodyRef.current = null;
-    setHoveredBodyId(null);
-
-    if (!type) return;
-    const canvas = mountRef.current;
-    if (!canvas) return;
-    const r = canvas.getBoundingClientRect();
-    // Only drop if released over the canvas
-    if (e.clientX >= r.left && e.clientX <= r.right &&
-      e.clientY >= r.top && e.clientY <= r.bottom) {
-      const canvasX = e.clientX - r.left;
-      const canvasY = e.clientY - r.top;
-      if (['pivot', 'spring', 'rope'].includes(type)) {
-        spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', canvasX, canvasY, hoveredBody);
-      } else if (type === 'pendulum-rope') {
-        spawnPendulumRope(canvasX, canvasY);
-      } else {
-        spawnAt(type as 'circle' | 'rectangle', canvasX, canvasY);
-      }
-    }
-  };
-=======
   useEffect(() => {
     if (!isDragging) return;
 
@@ -1528,7 +1402,6 @@ export const SandboxCanvas: React.FC = () => {
       window.removeEventListener('pointerup', handlePointerUp);
     };
   }, [isDragging, ready, spawnConstraintAt, spawnPendulumRope, spawnAt]);
->>>>>>> origin/orbital-sys
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1631,11 +1504,6 @@ export const SandboxCanvas: React.FC = () => {
         <Sep label="Spawn Shapes — click or drag" />
         <div
           style={S.row}
-<<<<<<< HEAD
-          onPointerMove={onPanelPointerMove}
-          onPointerUp={onPanelPointerUp}
-=======
->>>>>>> origin/orbital-sys
         >
           <button
             style={{ ...S.btn, ...S.btnIndigo, flex: 1, cursor: ready ? 'grab' : 'not-allowed' }}
@@ -1653,11 +1521,6 @@ export const SandboxCanvas: React.FC = () => {
         {/* Rope as a first-class shape asset */}
         <div
           style={{ ...S.row, marginTop: -2 }}
-<<<<<<< HEAD
-          onPointerMove={onPanelPointerMove}
-          onPointerUp={onPanelPointerUp}
-=======
->>>>>>> origin/orbital-sys
         >
           <button
             style={{
@@ -1687,11 +1550,6 @@ export const SandboxCanvas: React.FC = () => {
         <Sep label="Spawn Constraints — click or drag" />
         <div
           style={{ ...S.row, flexWrap: 'wrap' }}
-<<<<<<< HEAD
-          onPointerMove={onPanelPointerMove}
-          onPointerUp={onPanelPointerUp}
-=======
->>>>>>> origin/orbital-sys
         >
           <button
             style={{ ...S.btn, ...S.btnIndigo, flex: '1 1 45%', cursor: ready ? 'grab' : 'not-allowed', padding: '7px 4px', fontSize: 11 }}
@@ -1720,18 +1578,6 @@ export const SandboxCanvas: React.FC = () => {
           <button style={{ ...S.btn, ...S.btnGhost, flex: 1 }} onClick={() => push('right')} disabled={!ready}>Right ▶</button>
         </div>
 
-<<<<<<< HEAD
-        <Sep label="Gravity" />
-        <div style={S.gravRow}>
-          {(Object.keys(GRAVITY_VALUES) as GravityPreset[]).map((k) => (
-            <button key={k}
-              style={{ ...S.gravBtn, ...(gravity === k ? S.gravActive : {}) }}
-              onClick={() => changeGravity(k)} disabled={!ready}
-            >{k}</button>
-          ))}
-        </div>
-
-=======
         <Sep label="Gravity System" />
         <div style={{ ...S.gravRow, gap: 4, display: 'flex', marginBottom: 8 }}>
           <button
@@ -1818,8 +1664,6 @@ export const SandboxCanvas: React.FC = () => {
             </label>
           </div>
         )}
-
->>>>>>> origin/orbital-sys
         <Sep label="Simulation Speed" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <input
@@ -1924,12 +1768,12 @@ export const SandboxCanvas: React.FC = () => {
 
         {/* AI Query Input Section */}
         <div style={{ marginTop: 'auto', paddingTop: 20 }}>
-          <div style={{ 
-            background: 'rgba(255, 255, 255, 0.03)', 
-            border: '1px solid rgba(168, 85, 247, 0.2)', 
-            borderRadius: 12, 
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(168, 85, 247, 0.2)',
+            borderRadius: 12,
             padding: 12,
-            boxShadow: '0 0 15px rgba(168, 85, 247, 0.1) inset' 
+            boxShadow: '0 0 15px rgba(168, 85, 247, 0.1) inset'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
               <Sparkles size={14} color="#c084fc" />
@@ -1988,11 +1832,6 @@ export const SandboxCanvas: React.FC = () => {
           outlineOffset: '-3px',
         }}
         onClick={() => interactionRef.current?.selection.deselect()}
-<<<<<<< HEAD
-        onPointerMove={onPanelPointerMove}
-        onPointerUp={onPanelPointerUp}
-=======
->>>>>>> origin/orbital-sys
       >
         <div style={S.dotGrid} />
         <div ref={mountRef} style={S.mount} />
@@ -2117,14 +1956,14 @@ export const SandboxCanvas: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <button 
+                <button
                   onClick={handleDismiss}
                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   <X size={18} />
                 </button>
               </div>
-              
+
               <div>
                 <h4 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 8 }}>{currentExplanation.insight.title}</h4>
                 <p style={{ fontSize: 13, lineHeight: 1.5, color: '#cbd5e1' }}>{currentExplanation.insight.explanation}</p>
@@ -2150,8 +1989,8 @@ export const SandboxCanvas: React.FC = () => {
 
               <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                 {currentExplanation.insight.suggestions.map((action, i) => (
-                  <button 
-                    key={i} 
+                  <button
+                    key={i}
                     style={{
                       background: 'rgba(168,85,247,0.15)',
                       border: '1px solid rgba(168,85,247,0.3)',
@@ -2200,15 +2039,15 @@ export const SandboxCanvas: React.FC = () => {
             left: ghostPos.x,
             top: ghostPos.y,
             transform: 'translate(-50%, -50%)',
-            width:  ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
-                  : panelDragRef.current === 'pendulum-rope' ? 52
-                  : (panelDragRef.current === 'circle' ? 44 : 40),
+            width: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
+              : panelDragRef.current === 'pendulum-rope' ? 52
+                : (panelDragRef.current === 'circle' ? 44 : 40),
             height: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
-                  : panelDragRef.current === 'pendulum-rope' ? 52
-                  : (panelDragRef.current === 'circle' ? 44 : 40),
+              : panelDragRef.current === 'pendulum-rope' ? 52
+                : (panelDragRef.current === 'circle' ? 44 : 40),
             borderRadius: panelDragRef.current === 'circle' || panelDragRef.current === 'pivot' ? '50%'
-                        : panelDragRef.current === 'pendulum-rope' ? 12
-                        : 10,
+              : panelDragRef.current === 'pendulum-rope' ? 12
+                : 10,
             background: panelDragRef.current === 'circle'
               ? 'rgba(16,185,129,0.55)'
               : panelDragRef.current === 'rectangle'
@@ -2220,12 +2059,11 @@ export const SandboxCanvas: React.FC = () => {
                     : panelDragRef.current === 'spring'
                       ? 'rgba(16,185,129,0.55)'
                       : 'rgba(251,191,36,0.55)',
-            border: `2px solid ${
-              panelDragRef.current === 'pendulum-rope' ? '#818cf8' :
-              panelDragRef.current === 'circle' || panelDragRef.current === 'spring' ? '#6ee7b7' :
-              panelDragRef.current === 'rectangle' ? '#a5b4fc' :
-              panelDragRef.current === 'pivot' ? '#c084fc' : '#fde047'
-            }`,
+            border: `2px solid ${panelDragRef.current === 'pendulum-rope' ? '#818cf8' :
+                panelDragRef.current === 'circle' || panelDragRef.current === 'spring' ? '#6ee7b7' :
+                  panelDragRef.current === 'rectangle' ? '#a5b4fc' :
+                    panelDragRef.current === 'pivot' ? '#c084fc' : '#fde047'
+              }`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

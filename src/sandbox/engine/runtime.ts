@@ -1,10 +1,7 @@
 import { PhysicsEngine } from './physics';
 import { PixiRenderer }  from './renderer';
 import { SyncRegistry }  from './sync';
-<<<<<<< HEAD
-=======
 import { GravitySystem } from '../gravity/gravitySystem';
->>>>>>> origin/orbital-sys
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,24 +29,16 @@ export interface RuntimeHook {
  */
 export class SandboxRuntime {
   // Public so simulation code can reach sub-systems directly
-<<<<<<< HEAD
-  readonly physics  = new PhysicsEngine();
-  readonly renderer = new PixiRenderer();
-  readonly sync     = new SyncRegistry();
-=======
   readonly physics       = new PhysicsEngine();
   readonly renderer      = new PixiRenderer();
   readonly sync          = new SyncRegistry();
   readonly gravitySystem = new GravitySystem(this.physics.getEngine());
->>>>>>> origin/orbital-sys
 
   private state: RuntimeState = 'idle';
   private rafId:  number | null = null;
   private lastTs: number = 0;
   private readonly hooks = new Map<string, RuntimeHook>();
 
-<<<<<<< HEAD
-=======
   constructor() {
     // Add automatic high-performance gravity update hook before each physics step
     this.addHook({
@@ -59,8 +48,6 @@ export class SandboxRuntime {
       },
     });
   }
-
->>>>>>> origin/orbital-sys
   // ── Init ──────────────────────────────────────────────────────────────────
 
   async init(container: HTMLElement): Promise<void> {
