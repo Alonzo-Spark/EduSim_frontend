@@ -116,10 +116,11 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   // Collapsible sections state
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
     newton: false, // Default expanded for STEM lab focus!
-    physics: false,
-    motion: false,
-    visuals: false,
-    constraints: false,
+    celestial: false, // Celestial & Gravity controls!
+    physics: true,
+    motion: true,
+    visuals: true,
+    constraints: true,
     observables: false,
   });
 
@@ -255,6 +256,20 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
 
   const { body, display } = selected;
   const isLocked = store.isObjectLocked(selected.id);
+
+  // Dynamic Gravity/Celestial telemetry and properties
+  const radialGravity = (propertyController as any).runtime?.gravitySystem?.getRadialGravity();
+  const gravitySource = radialGravity?.getSources()?.find((s: any) => s.id === selected.id);
+  const isSource = !!gravitySource;
+  const influenceRadius = gravitySource?.influenceRadius ?? 0;
+
+  const gravityBody = radialGravity?.getBodies()?.find((b: any) => b.id === selected.id);
+  const isAffected = gravityBody ? gravityBody.affectedByGravity : true;
+
+  const customData = (selected.metadata?.customData || {}) as any;
+  const radius = selected.metadata?.shapeInfo?.radius ?? (body as any).circleRadius ?? 25;
+  const orbitalCategory = customData.orbitalCategory ?? (selected.id === 'orbit-star' ? 'star' : 'planet');
+  const gravityStrength = customData.gravityStrength ?? (gravitySource ? 1.0 : 0.0);
 
   return (
     <div style={S.panel}>
@@ -416,6 +431,145 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 🔄 Restore Initial State
               </button>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── SECTION: Celestial & Gravity Properties ────────────────────────── */}
+      <div style={S.section}>
+        <div style={S.sectionHeader} onClick={() => toggleSection('celestial')}>
+          <span style={{ ...S.sectionTitle, color: '#a78bfa' }}>🪐 Celestial & Gravity</span>
+          <span style={S.chevron}>{collapsed.celestial ? '▼' : '▲'}</span>
+        </div>
+
+        {!collapsed.celestial && (
+          <div style={S.sectionBody}>
+            {/* Orbital Category Dropdown */}
+            <div style={S.controlRow}>
+              <span style={S.controlLabel}>Classification</span>
+              <select
+                value={orbitalCategory}
+                onChange={(e) => {
+                  propertyController.updateProperty(selected.id, 'orbitalCategory', e.target.value);
+                  setPropertyVersion(v => v + 1);
+                }}
+                style={S.selectInput}
+              >
+                <option value="star">🌟 Sun/Star</option>
+                <option value="planet">🌍 Terrestrial Planet</option>
+                <option value="gas_giant">🪐 Gas Giant</option>
+                <option value="moon">🌒 Moon/Satellite</option>
+                <option value="dwarf_planet">☄️ Dwarf Planet</option>
+                <option value="black_hole">🕳️ Black Hole</option>
+              </select>
+            </div>
+
+            {/* Gravity Source Toggle */}
+            <div style={S.toggleRow}>
+              <span style={S.controlLabel}>Gravitational Puller</span>
+              <button
+                onClick={() => {
+                  propertyController.updateProperty(selected.id, 'isGravitySource', !isSource);
+                  setPropertyVersion(v => v + 1);
+                }}
+                style={{
+                  ...S.toggleBtn,
+                  backgroundColor: isSource ? 'rgba(167, 139, 250, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                  borderColor: isSource ? 'rgba(167, 139, 250, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+                  color: isSource ? '#c084fc' : '#94a3b8',
+                }}
+              >
+                {isSource ? '🌌 Gravity Source (Active)' : '⚪ No Gravity Field'}
+              </button>
+            </div>
+
+            {/* Affected By Gravity Toggle */}
+            <div style={S.toggleRow}>
+              <span style={S.controlLabel}>Affected by Gravity</span>
+              <button
+                onClick={() => {
+                  propertyController.updateProperty(selected.id, 'affectedByGravity', !isAffected);
+                  setPropertyVersion(v => v + 1);
+                }}
+                style={{
+                  ...S.toggleBtn,
+                  backgroundColor: isAffected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                  borderColor: isAffected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                  color: isAffected ? '#60a5fa' : '#f87171',
+                }}
+              >
+                {isAffected ? '🌌 Attracted by Stars' : '🚀 Gravity Ignored'}
+              </button>
+            </div>
+
+            {/* Radius Slider */}
+            {isCircle && (
+              <SliderRow
+                label="Physical Radius"
+                min={5}
+                max={150}
+                step={1}
+                value={radius}
+                unit="px"
+                precision={0}
+                onChange={(v) => {
+                  propertyController.updateProperty(selected.id, 'radius', v);
+                  setPropertyVersion(v2 => v2 + 1);
+                }}
+                tooltip="The radius of the celestial body. Modifying this scales both collision bounds and visual rendering."
+              />
+            )}
+
+            {/* Virtual Mass Slider */}
+            <SliderRow
+              label="Celestial Mass"
+              min={1}
+              max={selected.id === 'orbit-star' || orbitalCategory === 'star' || orbitalCategory === 'black_hole' ? 1000000 : 10000}
+              step={selected.id === 'orbit-star' || orbitalCategory === 'star' || orbitalCategory === 'black_hole' ? 1000 : 10}
+              value={body.isStatic && customData.mass ? customData.mass : body.mass}
+              unit="M_e"
+              precision={0}
+              onChange={(v) => {
+                propertyController.updateProperty(selected.id, 'mass', v);
+                setPropertyVersion(v2 => v2 + 1);
+              }}
+              tooltip="The gravitational mass of the body. Influences gravity pull, orbital velocity, and escape velocity calculations."
+            />
+
+            {/* Gravity Strength Modifier */}
+            {isSource && (
+              <SliderRow
+                label="Gravity Strength"
+                min={0}
+                max={50}
+                step={0.5}
+                value={gravityStrength}
+                precision={1}
+                onChange={(v) => {
+                  propertyController.updateProperty(selected.id, 'gravityStrength', v);
+                  setPropertyVersion(v2 => v2 + 1);
+                }}
+                tooltip="Scales the gravitational attraction force multiplier of this celestial body."
+              />
+            )}
+
+            {/* Influence Radius Slider */}
+            {isSource && (
+              <SliderRow
+                label="Influence Field Range"
+                min={50}
+                max={3000}
+                step={50}
+                value={influenceRadius || 1500}
+                unit="px"
+                precision={0}
+                onChange={(v) => {
+                  propertyController.updateProperty(selected.id, 'influenceRadius', v);
+                  setPropertyVersion(v2 => v2 + 1);
+                }}
+                tooltip="The boundary size of this object's gravity field. Objects outside this range will not feel its pull."
+              />
+            )}
           </div>
         )}
       </div>
@@ -1174,6 +1328,17 @@ const S: Record<string, React.CSSProperties> = {
     padding: '10px 12px',
     marginBottom: 4,
     textAlign: 'center',
+  },
+  selectInput: {
+    background: 'rgba(0, 0, 0, 0.35)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: 6,
+    color: '#e2e8f0',
+    padding: '4px 8px',
+    fontSize: 10,
+    fontWeight: 600,
+    outline: 'none',
+    cursor: 'pointer',
   },
 };
 

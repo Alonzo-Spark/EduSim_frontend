@@ -8,6 +8,7 @@ interface BaseBodyConfig {
   isStatic?:    boolean;
   restitution?: number;   // bounciness  [0 – 1]
   friction?:    number;   // surface friction
+  frictionAir?: number;   // air resistance / drag
   density?:     number;   // kg / px²
   angle?:       number;   // radians, initial rotation
   label?:       string;   // debug / query identifier
@@ -40,6 +41,7 @@ export function createBody(config: BodyConfig): Matter.Body {
     isStatic    = false,
     restitution = 0.4,
     friction    = 0.1,
+    frictionAir = 0.01,
     density     = 0.001,
     angle       = 0,
     label       = config.type,
@@ -49,6 +51,7 @@ export function createBody(config: BodyConfig): Matter.Body {
     isStatic,
     restitution,
     friction,
+    frictionAir,
     density,
     angle,
     label,

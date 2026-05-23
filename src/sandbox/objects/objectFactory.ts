@@ -51,6 +51,7 @@ export function createObject(config: ObjectConfig): RuntimeObject {
       isStatic:    config.isStatic,
       restitution: config.restitution,
       friction:    config.friction,
+      frictionAir: config.frictionAir,
       density:     config.density,
       angle:       config.angle,
       label:       config.label ?? config.id,
@@ -63,6 +64,7 @@ export function createObject(config: ObjectConfig): RuntimeObject {
   })();
 
   const body = createBody(bodyConfig);
+  (body as any).objectId = config.id;
 
   // ── 2. Rendering ───────────────────────────────────────────────────────────
   const spriteConfig: SpriteConfig = (() => {

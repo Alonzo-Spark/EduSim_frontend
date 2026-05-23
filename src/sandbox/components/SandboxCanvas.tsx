@@ -6,6 +6,7 @@ import type { RuntimeObject } from '../types/RuntimeObject';
 import type { Body } from 'matter-js';
 import { ConstraintRegistry } from '../constraints/constraintRegistry';
 import type { ConstraintRenderer } from '../constraints/constraintRenderer';
+import type { GravityRenderer } from '../gravity/gravityRenderer';
 import { ObservableEngine } from '../observables/observableEngine';
 import { RuntimeStore } from '../state/runtimeStore';
 import { PropertyController } from '../properties/propertyController';
@@ -70,8 +71,8 @@ async function buildScene(
   // Remove non-graphics children, while preserving constraint and observable overlays.
   for (let i = vp.children.length - 1; i >= 0; i--) {
     const child = vp.children[i];
-    const meta = child as { _isConstraintOverlay?: boolean; _isObservableOverlay?: boolean };
-    if (meta._isConstraintOverlay || meta._isObservableOverlay) continue;
+    const meta = child as { _isConstraintOverlay?: boolean; _isObservableOverlay?: boolean; _isGravityOverlay?: boolean };
+    if (meta._isConstraintOverlay || meta._isObservableOverlay || meta._isGravityOverlay) continue;
     vp.removeChildAt(i);
   }
 
@@ -129,6 +130,7 @@ export const SandboxCanvas: React.FC = () => {
   const interactionRef = useRef<InteractionRefs | null>(null);
   const constraintRegRef = useRef<ConstraintRegistry | null>(null);
   const constraintRenRef = useRef<ConstraintRenderer | null>(null);
+  const gravityRenRef = useRef<GravityRenderer | null>(null);
   const observableEngineRef = useRef<ObservableEngine | null>(null);
   const dynRef = useRef<Body[]>([]);
 
@@ -139,6 +141,11 @@ export const SandboxCanvas: React.FC = () => {
   const [speed, setSpeed] = useState(1);
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
   const [tutorEnabled, setTutorEnabled] = useState(true);
+
+  // Modular Switchable Gravity System states
+  const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
+  const [gConstant, setGConstant] = useState(0.0012);
+  const [radialDebug, setRadialDebug] = useState(true);
 
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -351,6 +358,7 @@ export const SandboxCanvas: React.FC = () => {
           { RuntimeControls },
           { ConstraintRegistry },
           { ConstraintRenderer },
+          { GravityRenderer },
         ] = await Promise.all([
           import('../engine/runtime'),
           import('../interactions/drag'),
@@ -358,6 +366,7 @@ export const SandboxCanvas: React.FC = () => {
           import('../interactions/controls'),
           import('../constraints/constraintRegistry'),
           import('../constraints/constraintRenderer'),
+          import('../gravity/gravityRenderer'),
         ]);
 
         const rt = new SandboxRuntime();
@@ -482,6 +491,11 @@ export const SandboxCanvas: React.FC = () => {
         constraintRenRef.current = constraintRen;
         constraintRen.enable(() => constraintReg.getAll());
 
+        // Gravity diagnostics rendering overlay
+        const gravityRen = new GravityRenderer(rt);
+        gravityRenRef.current = gravityRen;
+        gravityRen.enable();
+
         const observableEngine = new ObservableEngine(rt, rt.sync, propertyController);
         observableEngine.enable();
         observableEngineRef.current = observableEngine;
@@ -540,6 +554,7 @@ export const SandboxCanvas: React.FC = () => {
       interactionRef.current?.selection.clear();
       constraintRegRef.current?.clear();
       constraintRenRef.current?.destroy();
+      gravityRenRef.current?.destroy();
       observableEngineRef.current?.destroy();
       runtimeRef.current?.destroy();
       runtimeRef.current = null;
@@ -547,6 +562,7 @@ export const SandboxCanvas: React.FC = () => {
       interactionRef.current = null;
       constraintRegRef.current = null;
       constraintRenRef.current = null;
+      gravityRenRef.current = null;
       observableEngineRef.current = null;
       setReady(false);
       setRunning(false);
@@ -562,6 +578,165 @@ export const SandboxCanvas: React.FC = () => {
     else { ctrl.resume(); setRunning(true); }
   };
 
+  const spawnStar = useCallback(async () => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const el = mountRef.current;
+    const store = storeRef.current;
+    if (!rt || !ia || !el || !store || !ready) return;
+
+    const { createObject } = await import('../objects/objectFactory');
+
+    const W = el.clientWidth || 800;
+    const H = el.clientHeight || 600;
+    const centerX = W / 2;
+    const centerY = H / 2;
+    const starId = 'orbit-star';
+
+    // Remove old star if it exists to avoid duplicates
+    const oldObj = store.getObject(starId);
+    if (oldObj) {
+      rt.physics.removeBodies(oldObj.body);
+      rt.sync.unregister(starId);
+      store.removeObject(starId);
+      rt.gravitySystem.getRadialGravity().removeGravitySource(starId);
+    }
+
+    const starObj = createObject({
+      id: starId,
+      type: 'circle',
+      x: centerX,
+      y: centerY,
+      radius: 35,
+      isStatic: true, // Fixed central solar anchor
+      fillColor: 0xeab308, // Glowing Golden Sun
+      strokeColor: 0xf97316, // Solar Orange Outline
+      strokeWidth: 3.5,
+    });
+    starObj.body.label = 'Orbit Star';
+    (starObj.body as any).customData = { mass: 800 };
+
+    rt.renderer.getViewport().addChild(starObj.display);
+    rt.physics.addBodies(starObj.body);
+    rt.sync.register(starObj.id, starObj.body, starObj.display);
+    store.addObject(starObj);
+
+    // Register as Gravity Source in RadialGravity
+    rt.gravitySystem.getRadialGravity().addGravitySource({
+      id: starId,
+      mass: 800,
+      position: { x: centerX, y: centerY },
+      enabled: true,
+      metadata: { isStar: true }
+    });
+
+    physicsEventBus.emit({
+      type: 'OBJECT_SPAWNED',
+      objectId: starId,
+      metadata: { name: 'Orbit Star', shape: 'circle', mass: 800 }
+    });
+  }, [ready]);
+
+  const spawnOrbitingPlanet = useCallback(async () => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const el = mountRef.current;
+    const store = storeRef.current;
+    if (!rt || !ia || !el || !store || !ready) return;
+
+    const { createObject } = await import('../objects/objectFactory');
+    const Matter = await import('matter-js');
+
+    // 1. Ensure Star exists. If not, spawn it first!
+    let star = store.getObject('orbit-star');
+    if (!star) {
+      await spawnStar();
+      star = store.getObject('orbit-star');
+    }
+    if (!star) return;
+
+    const starPos = star.body.position;
+
+    // 2. Spawn planet at an offset above the star
+    const planetId = uid('planet');
+    const radius = 11 + Math.random() * 5;
+    const offset = 120 + Math.random() * 50;
+    const planetX = starPos.x;
+    const planetY = starPos.y - offset;
+
+    const { fill, stroke } = nextColour();
+    const planetObj = createObject({
+      id: planetId,
+      type: 'circle',
+      x: planetX,
+      y: planetY,
+      radius: radius,
+      restitution: 0.1,
+      friction: 0.05,
+      frictionAir: 0,
+      density: 0.002,
+      fillColor: fill,
+      strokeColor: stroke,
+      strokeWidth: 2,
+    });
+    planetObj.body.label = 'Orbiting Planet';
+
+    // 3. Solve and apply circular orbital velocity using our standardized OrbitSpawner module
+    const G = rt.gravitySystem.getRadialGravity().getConfig().gravitationalConstant;
+    const { OrbitSpawner } = await import('../orbits/orbitSpawner');
+    OrbitSpawner.spawnCircularOrbit({
+      centerBody: star.body,
+      orbitingBody: planetObj.body,
+      radius: offset,
+      angle: -Math.PI / 2,
+      clockwise: true,
+    }, G);
+
+    rt.renderer.getViewport().addChild(planetObj.display);
+    rt.physics.addBodies(planetObj.body);
+    rt.sync.register(planetObj.id, planetObj.body, planetObj.display);
+    ia.selection.register(planetObj);
+    store.addObject(planetObj);
+    dynRef.current.push(planetObj.body);
+    setBodyCount(dynRef.current.length);
+
+    physicsEventBus.emit({
+      type: 'OBJECT_SPAWNED',
+      objectId: planetId,
+      metadata: { name: 'Orbit Planet', shape: 'circle', mass: planetObj.body.mass }
+    });
+  }, [ready, spawnStar]);
+
+  // Synchronize React states reactively to the underlying modular GravitySystem
+  useEffect(() => {
+    const rt = runtimeRef.current;
+    if (rt && ready) {
+      rt.gravitySystem.setMode(gravityMode);
+      rt.gravitySystem.getRadialGravity().setConfig({
+        gravitationalConstant: gConstant,
+        debug: radialDebug,
+      });
+    }
+  }, [ready, gravityMode, gConstant, radialDebug]);
+
+  const handleModeChange = (mode: 'linear' | 'radial') => {
+    setGravityMode(mode);
+    const rt = runtimeRef.current;
+    if (rt) {
+      rt.gravitySystem.setMode(mode);
+      if (mode === 'radial') {
+        rt.gravitySystem.getRadialGravity().setConfig({
+          gravitationalConstant: gConstant,
+          debug: radialDebug
+        });
+        // Auto-spawn Sun/Star if empty
+        if (rt.gravitySystem.getRadialGravity().getSources().length === 0) {
+          spawnStar();
+        }
+      }
+    }
+  };
+
   const handleReset = useCallback(async () => {
     const rt = runtimeRef.current;
     const ia = interactionRef.current;
@@ -573,17 +748,31 @@ export const SandboxCanvas: React.FC = () => {
     const wasRunning = running;
     rt.pause();
     store.reset();
+
+    // Clear old gravity sources during system reset
+    if (rt.gravitySystem) {
+      rt.gravitySystem.getRadialGravity().clear();
+    }
+
     const dyn = await buildScene(rt, el, ia, creg, store);
     dynRef.current = dyn;
     setBodyCount(dyn.length);
     setSelected(null);
-    ia.controls.setGravity(GRAVITY_VALUES[gravity]);
+
+    // Restore correct gravity behaviors based on active mode
+    if (gravityMode === 'linear') {
+      ia.controls.setGravity(GRAVITY_VALUES[gravity]);
+    } else {
+      // Re-spawn the golden sun core after scene boundary cleanups
+      setTimeout(() => spawnStar(), 40);
+    }
+
     ia.controls.setSimulationSpeed(speed);
     if (wasRunning) {
       rt.start();
       store.setRuntimeState('running');
     }
-  }, [ready, running, gravity, speed]);
+  }, [ready, running, gravity, speed, gravityMode, spawnStar]);
 
   const spawnShape = useCallback(async (type: 'circle' | 'rectangle') => {
     const rt = runtimeRef.current;
@@ -658,6 +847,8 @@ export const SandboxCanvas: React.FC = () => {
     setSpeed(val);
     interactionRef.current?.controls.setSimulationSpeed(val);
   };
+
+
 
   // ── Panel drag-and-drop ────────────────────────────────────────────────────
 
@@ -1124,7 +1315,6 @@ export const SandboxCanvas: React.FC = () => {
   const onPanelPointerDown = (type: PanelDragType) =>
     (e: React.PointerEvent) => {
       if (!ready) return;
-      e.currentTarget.setPointerCapture(e.pointerId);
 
       // Pause physics engine drag controller during menu drag-and-drop to prevent automatic sticking
       interactionRef.current?.drag.disable();
@@ -1135,77 +1325,86 @@ export const SandboxCanvas: React.FC = () => {
       setGhostPos({ x: e.clientX, y: e.clientY });
     };
 
-  const onPanelPointerMove = (e: React.PointerEvent) => {
+  useEffect(() => {
     if (!isDragging) return;
-    didDragRef.current = true;    // pointer moved — this is a drag, not a tap
-    setGhostPos({ x: e.clientX, y: e.clientY });
 
-    const canvas = mountRef.current;
-    if (canvas) {
+    const handlePointerMove = (e: PointerEvent) => {
+      didDragRef.current = true;    // pointer moved — this is a drag, not a tap
+      setGhostPos({ x: e.clientX, y: e.clientY });
+
+      const canvas = mountRef.current;
+      if (canvas) {
+        const r = canvas.getBoundingClientRect();
+        const over = (
+          e.clientX >= r.left && e.clientX <= r.right &&
+          e.clientY >= r.top && e.clientY <= r.bottom
+        );
+        setIsOverCanvas(over);
+
+        // Query body under cursor for constraints
+        const dragType = panelDragRef.current;
+        if (over && dragType && ['pivot', 'spring', 'rope'].includes(dragType)) {
+          const canvasX = e.clientX - r.left;
+          const canvasY = e.clientY - r.top;
+          const queryPoint = { x: canvasX, y: canvasY };
+          const bodies = dynRef.current;
+
+          import('matter-js').then((Matter) => {
+            const hovered = bodies.find(b => Matter.Vertices.contains(b.vertices, queryPoint));
+            if (hovered) {
+              hoveredBodyRef.current = hovered;
+              setHoveredBodyId(hovered.label || hovered.id.toString());
+            } else {
+              hoveredBodyRef.current = null;
+              setHoveredBodyId(null);
+            }
+          });
+        } else {
+          hoveredBodyRef.current = null;
+          setHoveredBodyId(null);
+        }
+      }
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      const type = panelDragRef.current;
+      panelDragRef.current = null;
+      setIsDragging(false);
+      setIsOverCanvas(false);
+
+      // Re-enable the physics engine drag controller now that panel drag is complete
+      interactionRef.current?.drag.enable();
+
+      const hoveredBody = hoveredBodyRef.current;
+      hoveredBodyRef.current = null;
+      setHoveredBodyId(null);
+
+      if (!type) return;
+      const canvas = mountRef.current;
+      if (!canvas) return;
       const r = canvas.getBoundingClientRect();
-      const over = (
-        e.clientX >= r.left && e.clientX <= r.right &&
-        e.clientY >= r.top && e.clientY <= r.bottom
-      );
-      setIsOverCanvas(over);
-
-      // Query body under cursor for constraints
-      const dragType = panelDragRef.current;
-      if (over && dragType && ['pivot', 'spring', 'rope'].includes(dragType)) {
+      // Only drop if released over the canvas
+      if (e.clientX >= r.left && e.clientX <= r.right &&
+        e.clientY >= r.top && e.clientY <= r.bottom) {
         const canvasX = e.clientX - r.left;
         const canvasY = e.clientY - r.top;
-        const queryPoint = { x: canvasX, y: canvasY };
-        const bodies = dynRef.current;
-
-        import('matter-js').then((Matter) => {
-          const hovered = bodies.find(b => Matter.Vertices.contains(b.vertices, queryPoint));
-          if (hovered) {
-            hoveredBodyRef.current = hovered;
-            setHoveredBodyId(hovered.label || hovered.id.toString());
-          } else {
-            hoveredBodyRef.current = null;
-            setHoveredBodyId(null);
-          }
-        });
-      } else {
-        hoveredBodyRef.current = null;
-        setHoveredBodyId(null);
+        if (['pivot', 'spring', 'rope'].includes(type)) {
+          spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', canvasX, canvasY, hoveredBody);
+        } else if (type === 'pendulum-rope') {
+          spawnPendulumRope(canvasX, canvasY);
+        } else {
+          spawnAt(type as 'circle' | 'rectangle', canvasX, canvasY);
+        }
       }
-    }
-  };
+    };
 
-  const onPanelPointerUp = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const type = panelDragRef.current;
-    panelDragRef.current = null;
-    setIsDragging(false);
-    setIsOverCanvas(false);
-
-    // Re-enable the physics engine drag controller now that panel drag is complete
-    interactionRef.current?.drag.enable();
-
-    const hoveredBody = hoveredBodyRef.current;
-    hoveredBodyRef.current = null;
-    setHoveredBodyId(null);
-
-    if (!type) return;
-    const canvas = mountRef.current;
-    if (!canvas) return;
-    const r = canvas.getBoundingClientRect();
-    // Only drop if released over the canvas
-    if (e.clientX >= r.left && e.clientX <= r.right &&
-      e.clientY >= r.top && e.clientY <= r.bottom) {
-      const canvasX = e.clientX - r.left;
-      const canvasY = e.clientY - r.top;
-      if (['pivot', 'spring', 'rope'].includes(type)) {
-        spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', canvasX, canvasY, hoveredBody);
-      } else if (type === 'pendulum-rope') {
-        spawnPendulumRope(canvasX, canvasY);
-      } else {
-        spawnAt(type as 'circle' | 'rectangle', canvasX, canvasY);
-      }
-    }
-  };
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDragging, ready, spawnConstraintAt, spawnPendulumRope, spawnAt]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1308,8 +1507,6 @@ export const SandboxCanvas: React.FC = () => {
         <Sep label="Spawn Shapes — click or drag" />
         <div
           style={S.row}
-          onPointerMove={onPanelPointerMove}
-          onPointerUp={onPanelPointerUp}
         >
           <button
             style={{ ...S.btn, ...S.btnIndigo, flex: 1, cursor: ready ? 'grab' : 'not-allowed' }}
@@ -1327,8 +1524,6 @@ export const SandboxCanvas: React.FC = () => {
         {/* Rope as a first-class shape asset */}
         <div
           style={{ ...S.row, marginTop: -2 }}
-          onPointerMove={onPanelPointerMove}
-          onPointerUp={onPanelPointerUp}
         >
           <button
             style={{
@@ -1358,8 +1553,6 @@ export const SandboxCanvas: React.FC = () => {
         <Sep label="Spawn Constraints — click or drag" />
         <div
           style={{ ...S.row, flexWrap: 'wrap' }}
-          onPointerMove={onPanelPointerMove}
-          onPointerUp={onPanelPointerUp}
         >
           <button
             style={{ ...S.btn, ...S.btnIndigo, flex: '1 1 45%', cursor: ready ? 'grab' : 'not-allowed', padding: '7px 4px', fontSize: 11 }}
@@ -1388,15 +1581,92 @@ export const SandboxCanvas: React.FC = () => {
           <button style={{ ...S.btn, ...S.btnGhost, flex: 1 }} onClick={() => push('right')} disabled={!ready}>Right ▶</button>
         </div>
 
-        <Sep label="Gravity" />
-        <div style={S.gravRow}>
-          {(Object.keys(GRAVITY_VALUES) as GravityPreset[]).map((k) => (
-            <button key={k}
-              style={{ ...S.gravBtn, ...(gravity === k ? S.gravActive : {}) }}
-              onClick={() => changeGravity(k)} disabled={!ready}
-            >{k}</button>
-          ))}
+        <Sep label="Gravity System" />
+        <div style={{ ...S.gravRow, gap: 4, display: 'flex', marginBottom: 8 }}>
+          <button
+            style={{
+              ...S.gravBtn,
+              ...(gravityMode === 'linear' ? S.gravActive : {}),
+              flex: 1
+            }}
+            onClick={() => handleModeChange('linear')}
+            disabled={!ready}
+          >
+            🍎 Linear
+          </button>
+          <button
+            style={{
+              ...S.gravBtn,
+              ...(gravityMode === 'radial' ? S.gravActive : {}),
+              flex: 1
+            }}
+            onClick={() => handleModeChange('radial')}
+            disabled={!ready}
+          >
+            🌌 Orbital
+          </button>
         </div>
+
+        {gravityMode === 'linear' ? (
+          <div style={S.gravRow}>
+            {(Object.keys(GRAVITY_VALUES) as GravityPreset[]).map((k) => (
+              <button key={k}
+                style={{ ...S.gravBtn, ...(gravity === k ? S.gravActive : {}) }}
+                onClick={() => changeGravity(k)} disabled={!ready}
+              >{k}</button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, padding: '4px 8px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 8 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                style={{ ...S.btn, ...S.btnIndigo, flex: 1, fontSize: 10, padding: '6px 2px', cursor: 'pointer' }}
+                onClick={spawnStar}
+                disabled={!ready}
+              >
+                ☀️ Spawn Sun
+              </button>
+              <button
+                style={{ ...S.btn, ...S.btnSky, flex: 1, fontSize: 10, padding: '6px 2px', cursor: 'pointer' }}
+                onClick={spawnOrbitingPlanet}
+                disabled={!ready}
+              >
+                🌎 Spawn Orbit Planet
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#94a3b8' }}>
+                <span>Gravitational Pull (G)</span>
+                <span style={{ fontFamily: 'monospace', color: '#fbbf24' }}>{gConstant.toFixed(4)}</span>
+              </div>
+              <input
+                type="range"
+                min={0.0003}
+                max={0.004}
+                step={0.0001}
+                value={gConstant}
+                disabled={!ready}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setGConstant(val);
+                }}
+                style={{ width: '100%', accentColor: '#38bdf8', height: 4, cursor: 'pointer' }}
+              />
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 10, color: '#94a3b8' }}>
+              <input
+                type="checkbox"
+                checked={radialDebug}
+                disabled={!ready}
+                onChange={(e) => setRadialDebug(e.target.checked)}
+                style={{ accentColor: '#38bdf8', cursor: 'pointer' }}
+              />
+              <span>Predict Orbits & Draw Field Lines</span>
+            </label>
+          </div>
+        )}
 
         <Sep label="Simulation Speed" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -1566,8 +1836,6 @@ export const SandboxCanvas: React.FC = () => {
           outlineOffset: '-3px',
         }}
         onClick={() => interactionRef.current?.selection.deselect()}
-        onPointerMove={onPanelPointerMove}
-        onPointerUp={onPanelPointerUp}
       >
         <div style={S.dotGrid} />
         <div ref={mountRef} style={S.mount} />
