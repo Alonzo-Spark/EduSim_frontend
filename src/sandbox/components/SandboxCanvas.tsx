@@ -348,6 +348,10 @@ export const SandboxCanvas: React.FC = () => {
     if (!el) return;
 
     let alive = true;
+    let canvasEl: HTMLCanvasElement | null = null;
+    let handleCanvasClick: ((e: MouseEvent) => void) | null = null;
+    let handleCanvasPreventBubble: ((e: MouseEvent) => void) | null = null;
+    let lastSelectTime = 0;
 
     (async () => {
       try {
@@ -396,14 +400,59 @@ export const SandboxCanvas: React.FC = () => {
 
         // 2. Interaction systems
         const canvas = rt.renderer.getApp().canvas as HTMLCanvasElement;
+        canvasEl = canvas;
         const drag = new DragController(rt.physics.getEngine(), canvas);
         const selection = new SelectionManager();
         const controls = new RuntimeControls(rt);
         drag.enable();
+
+        handleCanvasClick = (e: MouseEvent) => {
+          if (e.button !== 0) return; // Only left clicks
+
+          const rect = canvas.getBoundingClientRect();
+          const clickX = ((e.clientX - rect.left) / rect.width) * canvas.width;
+          const clickY = ((e.clientY - rect.top) / rect.height) * canvas.height;
+
+          import('matter-js').then((Matter) => {
+            const bodies = Matter.Composite.allBodies(rt.physics.getEngine().world);
+            const clickedBodies = Matter.Query.point(bodies, { x: clickX, y: clickY });
+
+            if (clickedBodies.length > 0) {
+              // Filter out environment boundaries like grounds or walls
+              const targetBody = clickedBodies.find(b => {
+                const id = (b as any).objectId || b.label;
+                return id && !id.startsWith('ground') && !id.startsWith('wall') && id !== 'boundary';
+              });
+
+              if (targetBody) {
+                const bodyId = (targetBody as any).objectId || targetBody.label;
+                console.log(`[Canvas Direct Click] Selected body: ${bodyId}`);
+                lastSelectTime = Date.now();
+                selection.select(bodyId);
+                return;
+              }
+            }
+
+            // Clicked empty canvas space — deselect (with cooldown check to prevent hybrid dual-triggering)
+            if (Date.now() - lastSelectTime < 300) {
+              return;
+            }
+            selection.deselect();
+          });
+        };
+
+        handleCanvasPreventBubble = (e: MouseEvent) => {
+          e.stopPropagation();
+        };
+
+        canvas.addEventListener('mousedown', handleCanvasClick);
+        canvas.addEventListener('click', handleCanvasPreventBubble);
+
         selection.onChange((obj) => {
           const prevId = storeRef.current?.getSelectedObjectId();
           setSelected(obj);
           if (obj) {
+            lastSelectTime = Date.now();
             store.setSelectedObject(obj.id);
             // Automatically upgrade observables for the selected object to render Force, Velocity, and Acceleration
             observableEngineRef.current?.registerObservable({
@@ -458,8 +507,7 @@ export const SandboxCanvas: React.FC = () => {
             store.clearSelection();
           }
         });
-        rt.renderer.getApp().stage.eventMode = 'static';
-        rt.renderer.getApp().stage.on('pointerdown', () => selection.deselect());
+
         interactionRef.current = { drag, selection, controls };
 
         // Real-time telemetry updating hook during active loop running
@@ -550,6 +598,14 @@ export const SandboxCanvas: React.FC = () => {
 
     return () => {
       alive = false;
+      if (canvasEl) {
+        if (handleCanvasClick) {
+          canvasEl.removeEventListener('mousedown', handleCanvasClick);
+        }
+        if (handleCanvasPreventBubble) {
+          canvasEl.removeEventListener('click', handleCanvasPreventBubble);
+        }
+      }
       interactionRef.current?.drag.destroy();
       interactionRef.current?.selection.clear();
       constraintRegRef.current?.clear();
@@ -660,7 +716,7 @@ export const SandboxCanvas: React.FC = () => {
     // 2. Spawn planet at an offset above the star or custom position
     const planetId = uid('planet');
     const radius = 11 + Math.random() * 5;
-    
+
     let planetX: number;
     let planetY: number;
     let offset: number;
@@ -823,9 +879,9 @@ export const SandboxCanvas: React.FC = () => {
       type: 'OBJECT_SPAWNED',
       objectId: obj.id,
       metadata: {
-        shape:   type,
-        name:    type === 'circle' ? 'Circle' : 'Rectangle',
-        mass:    obj.body.mass,
+        shape: type,
+        name: type === 'circle' ? 'Circle' : 'Rectangle',
+        mass: obj.body.mass,
         gravity: GRAVITY_VALUES[gravity],
       },
     });
@@ -1104,7 +1160,7 @@ export const SandboxCanvas: React.FC = () => {
     rt.sync.register(pin.id, pin.body, pin.display);
 
     // ── 2. Terminal receptor sensor with visible drop-zone display ──────────
-    const terminalId   = uid('rope-terminal');
+    const terminalId = uid('rope-terminal');
     const sensorDispId = uid('rope-sensor-disp');
 
     const sensor = Matter.Bodies.circle(
@@ -1199,6 +1255,152 @@ export const SandboxCanvas: React.FC = () => {
     checkConstraintSnapping(obj.body);
   }, [ready, checkConstraintSnapping]);
 
+  const initializeCelestialEntity = useCallback(async (
+    obj: any,
+    asset: import('../../config/assetsRegistry').AssetDefinition,
+    canvasX: number,
+    canvasY: number,
+  ) => {
+    const rt = runtimeRef.current;
+    const store = storeRef.current;
+    if (!rt || !store || !asset.celestialConfig) return;
+
+    const config = asset.celestialConfig;
+    const isStar = config.type === 'star';
+    const isPlanet = config.type === 'planet';
+    const isMoon = config.type === 'moon';
+    const isSatellite = config.type === 'satellite';
+    const isAsteroid = config.type === 'asteroid';
+
+    const virtualMass = config.mass ?? obj.body.mass;
+    const customData = {
+      mass: virtualMass,
+      celestialConfig: config,
+      celestialComponent: true,
+      orbitalComponent: true,
+      gravityComponent: true,
+      observableMetadata: { label: asset.name },
+      runtimeCategory: config.type,
+      parentGravitySource: null as string | null,
+    };
+    obj.body.customData = customData;
+    obj.body.label = asset.name;
+    obj.metadata = {
+      ...obj.metadata,
+      ...customData,
+      educationalTags: ['celestial', 'orbital', config.type],
+    };
+
+    console.log(`[Celestial Initializer] Spawning ${asset.name} (${config.type}) at (x: ${canvasX.toFixed(1)}, y: ${canvasY.toFixed(1)})`);
+
+    // Register gravity source
+    if (config.isGravitySource) {
+      console.log(`[Celestial Initializer] Gravity source registered: ${asset.name} with mass ${virtualMass}`);
+      rt.gravitySystem.getRadialGravity().addGravitySource({
+        id: obj.id,
+        mass: virtualMass,
+        position: { x: canvasX, y: canvasY },
+        influenceRadius: config.influenceRadius ?? (config.radius ? config.radius * 20 : 1000),
+        enabled: true,
+        metadata: {
+          isStar,
+          isPlanet,
+          isMoon,
+          gravityStrength: config.gravityStrength ?? 1.0,
+        }
+      });
+    }
+
+    // Register gravity body
+    if (config.affectedByGravity) {
+      console.log(`[Celestial Initializer] Gravity body registered: ${asset.name} with mass ${virtualMass}`);
+      rt.gravitySystem.getRadialGravity().addGravityBody({
+        id: obj.id,
+        body: obj.body,
+        mass: virtualMass,
+        affectedByGravity: true,
+        ignoreGravity: false,
+      });
+    }
+
+    // Register Observables
+    if (config.affectedByGravity) {
+      console.log(`[Celestial Initializer] Observables telemetry HUD registered for: ${asset.name}`);
+      observableEngineRef.current?.registerObservable({
+        objectId: obj.id,
+        types: ['velocity', 'acceleration', 'force'],
+        label: asset.name,
+        color: isPlanet ? 0x38bdf8 : isMoon ? 0xa5b4fc : 0x34d399,
+      });
+    }
+
+    // Orbit Initialization
+    if (config.affectedByGravity && config.orbitalDefaults?.autoOrbit !== false) {
+      const radialGravity = rt.gravitySystem.getRadialGravity();
+      const activeSources = radialGravity.getSources();
+
+      let parentSource = null;
+      let minDist = Infinity;
+
+      for (const src of activeSources) {
+        if (src.id === obj.id) continue;
+        const dist = Math.hypot(src.position.x - canvasX, src.position.y - canvasY);
+        // Find nearest heavier source to establish clean hierarchy
+        if (src.mass > virtualMass && dist < minDist) {
+          minDist = dist;
+          parentSource = src;
+        }
+      }
+
+      // Fallback: nearest active source
+      if (!parentSource) {
+        for (const src of activeSources) {
+          if (src.id === obj.id) continue;
+          const dist = Math.hypot(src.position.x - canvasX, src.position.y - canvasY);
+          if (dist < minDist) {
+            minDist = dist;
+            parentSource = src;
+          }
+        }
+      }
+
+      if (parentSource) {
+        const parentBody = rt.sync.getPairs().get(parentSource.id)?.body || store.getObject(parentSource.id)?.body;
+        if (parentBody) {
+          customData.parentGravitySource = parentSource.id;
+          console.log(`[Celestial Initializer] Parent detected: ${parentSource.id} for child: ${obj.id}`);
+
+          const parentRadius = parentBody.circleRadius || (parentBody as any).customData?.celestialConfig?.radius || 35;
+          const childRadius = obj.body.circleRadius || config.radius || 14;
+          const minSafeRadius = parentRadius + childRadius + 30;
+
+          let currentRadius = minDist;
+          if (currentRadius < minSafeRadius) {
+            currentRadius = minSafeRadius;
+          }
+
+          const angle = Math.atan2(canvasY - parentBody.position.y, canvasX - parentBody.position.x);
+          const G = radialGravity.getConfig().gravitationalConstant;
+
+          const { OrbitSpawner } = await import('../orbits/orbitSpawner');
+          
+          OrbitSpawner.spawnCircularOrbit({
+            centerBody: parentBody,
+            orbitingBody: obj.body,
+            radius: currentRadius,
+            angle: angle,
+            clockwise: config.orbitalDefaults?.preferredDirection !== 'counterclockwise',
+            initialVelocityMultiplier: config.orbitalDefaults?.initialVelocityMultiplier ?? 1.0,
+          }, G);
+
+          console.log(`[Celestial Initializer] Orbit stable initialized around ${parentSource.id} at radius ${currentRadius.toFixed(1)}`);
+        }
+      } else {
+        console.log(`[Celestial Initializer] No compatible gravity source found for ${obj.id}. Spawning in free-fall.`);
+      }
+    }
+  }, []);
+
   // ── Asset Library drop handler ─────────────────────────────────────────────
   // Called by FloatingAssetPanel when user drops an asset onto the simulation canvas.
   // Translates AssetDefinition → RuntimeObject using existing objectFactory, keeping
@@ -1215,6 +1417,7 @@ export const SandboxCanvas: React.FC = () => {
 
     const { createObject } = await import('../objects/objectFactory');
     const { spawnType, spawnConfig } = asset;
+    const isCelestial = !!asset.celestialConfig;
 
     const base = {
       x: canvasX,
@@ -1228,6 +1431,12 @@ export const SandboxCanvas: React.FC = () => {
       isStatic: spawnConfig.isStatic ?? false,
       texture: asset.texture,
     };
+
+    if (isCelestial) {
+      if (asset.celestialConfig?.type === 'star') {
+        base.isStatic = true;
+      }
+    }
 
     let obj;
     if (spawnType === 'circle') {
@@ -1252,26 +1461,39 @@ export const SandboxCanvas: React.FC = () => {
     rt.physics.addBodies(obj.body);
     rt.sync.register(obj.id, obj.body, obj.display);
 
-    if (!spawnConfig.isStatic) {
-      ia.selection.register(obj);
-      store.addObject(obj);
+    if (isCelestial) {
+      const Matter = await import('matter-js');
+      if (asset.celestialConfig?.type === 'star') {
+        Matter.Body.setStatic(obj.body, true);
+      }
+      await initializeCelestialEntity(obj, asset, canvasX, canvasY);
+    }
+
+    // Register with selection and store
+    ia.selection.register(obj);
+    store.addObject(obj);
+
+    if (!obj.body.isStatic) {
       dynRef.current.push(obj.body);
       setBodyCount(dynRef.current.length);
       checkConstraintSnapping(obj.body);
-
-      // Emit spawn event so explanation card shows free-fall context
-      physicsEventBus.emit({
-        type: 'OBJECT_SPAWNED',
-        objectId: obj.id,
-        metadata: {
-          shape:   spawnType,
-          name:    asset.name,
-          mass:    obj.body.mass,
-          gravity: GRAVITY_VALUES[gravity],
-        },
-      });
     }
-  }, [ready, checkConstraintSnapping, gravity]);
+
+    // Select the dropped asset immediately so user can see property panel
+    ia.selection.select(obj.id);
+
+    // Emit spawn event so explanation card shows free-fall context
+    physicsEventBus.emit({
+      type: 'OBJECT_SPAWNED',
+      objectId: obj.id,
+      metadata: {
+        shape: spawnType,
+        name: asset.name,
+        mass: obj.body.mass,
+        gravity: gravityMode === 'radial' ? 'radial' : GRAVITY_VALUES[gravity],
+      },
+    });
+  }, [ready, checkConstraintSnapping, gravity, gravityMode, initializeCelestialEntity]);
 
   // ── Canvas HTML5 drag-and-drop bridge (for FloatingAssetPanel) ────────────
   // Uses native window-level listeners to bypass react-rnd / framer-motion event capture.
@@ -1788,12 +2010,12 @@ export const SandboxCanvas: React.FC = () => {
 
         {/* AI Query Input Section */}
         <div style={{ marginTop: 'auto', paddingTop: 20 }}>
-          <div style={{ 
-            background: 'rgba(255, 255, 255, 0.03)', 
-            border: '1px solid rgba(168, 85, 247, 0.2)', 
-            borderRadius: 12, 
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(168, 85, 247, 0.2)',
+            borderRadius: 12,
             padding: 12,
-            boxShadow: '0 0 15px rgba(168, 85, 247, 0.1) inset' 
+            boxShadow: '0 0 15px rgba(168, 85, 247, 0.1) inset'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
               <Sparkles size={14} color="#c084fc" />
@@ -1851,7 +2073,6 @@ export const SandboxCanvas: React.FC = () => {
           outline: isOverCanvas ? '2px dashed rgba(99,102,241,0.6)' : 'none',
           outlineOffset: '-3px',
         }}
-        onClick={() => interactionRef.current?.selection.deselect()}
       >
         <div style={S.dotGrid} />
         <div ref={mountRef} style={S.mount} />
@@ -1976,14 +2197,14 @@ export const SandboxCanvas: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <button 
+                <button
                   onClick={handleDismiss}
                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   <X size={18} />
                 </button>
               </div>
-              
+
               <div>
                 <h4 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 8 }}>{currentExplanation.insight.title}</h4>
                 <p style={{ fontSize: 13, lineHeight: 1.5, color: '#cbd5e1' }}>{currentExplanation.insight.explanation}</p>
@@ -2009,8 +2230,8 @@ export const SandboxCanvas: React.FC = () => {
 
               <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                 {currentExplanation.insight.suggestions.map((action, i) => (
-                  <button 
-                    key={i} 
+                  <button
+                    key={i}
                     style={{
                       background: 'rgba(168,85,247,0.15)',
                       border: '1px solid rgba(168,85,247,0.3)',
@@ -2059,19 +2280,19 @@ export const SandboxCanvas: React.FC = () => {
             left: ghostPos.x,
             top: ghostPos.y,
             transform: 'translate(-50%, -50%)',
-            width:  ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
-                  : panelDragRef.current === 'pendulum-rope' ? 52
-                  : panelDragRef.current === 'sun' ? 70
+            width: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
+              : panelDragRef.current === 'pendulum-rope' ? 52
+                : panelDragRef.current === 'sun' ? 70
                   : panelDragRef.current === 'planet' ? 32
-                  : (panelDragRef.current === 'circle' ? 44 : 40),
+                    : (panelDragRef.current === 'circle' ? 44 : 40),
             height: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
-                  : panelDragRef.current === 'pendulum-rope' ? 52
-                  : panelDragRef.current === 'sun' ? 70
+              : panelDragRef.current === 'pendulum-rope' ? 52
+                : panelDragRef.current === 'sun' ? 70
                   : panelDragRef.current === 'planet' ? 32
-                  : (panelDragRef.current === 'circle' ? 44 : 40),
+                    : (panelDragRef.current === 'circle' ? 44 : 40),
             borderRadius: panelDragRef.current === 'circle' || panelDragRef.current === 'pivot' || panelDragRef.current === 'sun' || panelDragRef.current === 'planet' ? '50%'
-                        : panelDragRef.current === 'pendulum-rope' ? 12
-                        : 10,
+              : panelDragRef.current === 'pendulum-rope' ? 12
+                : 10,
             background: panelDragRef.current === 'circle'
               ? 'rgba(16,185,129,0.55)'
               : panelDragRef.current === 'rectangle'
@@ -2087,14 +2308,13 @@ export const SandboxCanvas: React.FC = () => {
                         : panelDragRef.current === 'planet'
                           ? 'rgba(14,165,233,0.7)'
                           : 'rgba(251,191,36,0.55)',
-            border: `2px solid ${
-              panelDragRef.current === 'pendulum-rope' ? '#818cf8' :
+            border: `2px solid ${panelDragRef.current === 'pendulum-rope' ? '#818cf8' :
               panelDragRef.current === 'circle' || panelDragRef.current === 'spring' ? '#6ee7b7' :
-              panelDragRef.current === 'rectangle' ? '#a5b4fc' :
-              panelDragRef.current === 'pivot' ? '#c084fc' :
-              panelDragRef.current === 'sun' ? '#f97316' :
-              panelDragRef.current === 'planet' ? '#38bdf8' : '#fde047'
-            }`,
+                panelDragRef.current === 'rectangle' ? '#a5b4fc' :
+                  panelDragRef.current === 'pivot' ? '#c084fc' :
+                    panelDragRef.current === 'sun' ? '#f97316' :
+                      panelDragRef.current === 'planet' ? '#38bdf8' : '#fde047'
+              }`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

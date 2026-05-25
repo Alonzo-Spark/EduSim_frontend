@@ -77,9 +77,13 @@ export class RadialGravity {
   syncBodiesFromWorld(world: Matter.World): void {
     const allBodies = Matter.Composite.allBodies(world);
     const activeIds = new Set<string>();
+    const worldObjectIds = new Set<string>();
 
     for (const body of allBodies) {
       const objectId = (body as any).objectId || body.label;
+      if (objectId) {
+        worldObjectIds.add(objectId);
+      }
 
       // Keep gravity source positions and properties in sync with their physical bodies (even if static)
       if (objectId && this.sources.has(objectId)) {
@@ -114,6 +118,14 @@ export class RadialGravity {
         const existing = this.bodies.get(id)!;
         existing.body = body;
         existing.mass = body.mass;
+      }
+    }
+
+    // Clean up any gravity sources removed from the Matter world composite
+    for (const sourceId of this.sources.keys()) {
+      if (!worldObjectIds.has(sourceId)) {
+        console.log(`[RadialGravity] Cleaning up stale gravity source: ${sourceId}`);
+        this.sources.delete(sourceId);
       }
     }
 
