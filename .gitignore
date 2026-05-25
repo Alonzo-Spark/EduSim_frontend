@@ -59,6 +59,11 @@ coverage/
 /Scripts/
 /Lib/site-packages/
 
+# Unused router / generated files
+src/routes/
+src/router.tsx
+src/routeTree.gen.ts
+
 # Misc
 dist/
 build/

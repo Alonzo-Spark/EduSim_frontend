@@ -1,17 +1,19 @@
-import { create } from 'zustand'
+import { create } from 'zustand';
 
-export interface Asset {
-  id: string
-  name: string
-  category: string
-}
+export type CompiledAsset = {
+  id: string;
+  name: string;
+  category?: string;
+};
 
 interface AssetStore {
-  assets: Asset[]
-  setAssets: (assets: Asset[]) => void
+  assets: CompiledAsset[];
+  setAssets: (a: CompiledAsset[]) => void;
+  addAsset: (a: CompiledAsset) => void;
 }
 
 export const useAssetStore = create<AssetStore>((set) => ({
   assets: [],
-  setAssets: (assets) => set({ assets })
-}))
+  setAssets: (a) => set({ assets: a }),
+  addAsset: (a) => set((s) => ({ assets: [...s.assets, a] })),
+}));

@@ -1,23 +1,29 @@
-import { create } from 'zustand'
+import { create } from 'zustand';
 
-export interface Controller {
-  id: string
-  label: string
-  type: string
-  target: string
-  property: string
-  min: number
-  max: number
-  default: number
-  educationalPurpose: string
+interface InspectorController {
+  id: string;
+  label: string;
+  property: string;
+  min: number;
+  max: number;
+  default: number;
+  educationalPurpose: string;
 }
 
 interface InspectorStore {
-  controllers: Controller[]
-  setControllers: (controllers: Controller[]) => void
+  selectedObject: any | null;
+  setSelectedObject: (obj: any | null) => void;
+  showDebug: boolean;
+  setShowDebug: (show: boolean) => void;
+  controllers: InspectorController[];
+  setControllers: (controllers: InspectorController[]) => void;
 }
 
 export const useInspectorStore = create<InspectorStore>((set) => ({
+  selectedObject: null,
+  setSelectedObject: (obj) => set({ selectedObject: obj }),
+  showDebug: false,
+  setShowDebug: (show) => set({ showDebug: show }),
   controllers: [],
-  setControllers: (controllers) => set({ controllers })
-}))
+  setControllers: (controllers) => set({ controllers }),
+}));
