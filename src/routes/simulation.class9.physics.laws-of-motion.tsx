@@ -61,11 +61,10 @@ function LawsOfMotionLab() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                  active
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${active
                     ? "bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white glow-purple"
                     : "hover:bg-white/5 text-muted-foreground"
-                }`}
+                  }`}
               >
                 <Icon className="w-4 h-4" /> {t.label}
               </button>

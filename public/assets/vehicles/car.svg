@@ -1,0 +1,35 @@
+<svg width="900" height="900" viewBox="0 0 900 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Modern sports car side profile centered in a 900x900 canvas -->
+  <defs>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF3333"/>
+      <stop offset="70%" stop-color="#CC0000"/>
+      <stop offset="100%" stop-color="#880000"/>
+    </linearGradient>
+    <linearGradient id="wheelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#444"/>
+      <stop offset="100%" stop-color="#111"/>
+    </linearGradient>
+    <radialGradient id="glassGrad" cx="40%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#88DDFF" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#225577" stop-opacity="0.95"/>
+    </radialGradient>
+  </defs>
+  <!-- Car main body silhouette shifted down to center vertically -->
+  <g transform="translate(0, 225)">
+    <path d="M100 300 Q140 220 220 200 L320 200 Q400 130 520 130 L640 180 Q780 190 820 280 Q840 310 800 330 L120 330 Z" fill="url(#bodyGrad)" stroke="#FF6666" stroke-width="6"/>
+    <!-- Cabin Glass -->
+    <path d="M340 195 Q420 145 520 145 L620 195 Z" fill="url(#glassGrad)" stroke="#4499CC" stroke-width="4"/>
+    <!-- Wheels -->
+    <!-- Rear Wheel -->
+    <circle cx="240" cy="320" r="60" fill="url(#wheelGrad)" stroke="#666" stroke-width="8"/>
+    <circle cx="240" cy="320" r="32" fill="#222" stroke="#AAA" stroke-width="4"/>
+    <!-- Front Wheel -->
+    <circle cx="660" cy="320" r="60" fill="url(#wheelGrad)" stroke="#666" stroke-width="8"/>
+    <circle cx="660" cy="320" r="32" fill="#222" stroke="#AAA" stroke-width="4"/>
+    <!-- Headlight -->
+    <path d="M800 240 L825 260 L805 285 Z" fill="#FFFF77" opacity="0.9"/>
+    <!-- Tail light -->
+    <rect x="90" y="240" width="20" height="40" rx="5" fill="#FF0000"/>
+  </g>
+</svg>

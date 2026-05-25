@@ -14,6 +14,8 @@ import { RuntimeObserver } from '../../ai/runtimeObserver';
 import { useExplanationEngine } from '../../ai/explanationEngine';
 import { FloatingAssetPanel } from '../../components/AssetLibrary/FloatingAssetPanel';
 import { physicsEventBus } from '../../ai/physicsEventBus';
+import { generateScenario } from '../../modules/scenarioCompiler/scenarioService';
+import { loadScenario } from '../../modules/scenarioCompiler/simulationLoader';
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -147,34 +149,150 @@ export const SandboxCanvas: React.FC = () => {
 
   const { currentExplanation, queueCount, handleDismiss, setIsHovered, pushExplanation } = useExplanationEngine();
 
+  const loadCompiledScenario = useCallback(async (blueprint: any) => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const el = mountRef.current;
+    const store = storeRef.current;
+    const constraintReg = constraintRegRef.current;
+    if (!rt || !ia || !el || !store || !constraintReg || !ready) return;
+
+    // 1. Reset store, clear physics engine sync registry, selection and custom constraints
+    store.reset();
+    rt.physics.clear(false);
+    rt.sync.clear();
+    constraintReg.clear();
+    ia.selection.clear();
+    dynRef.current = [];
+
+    const vp = rt.renderer.getViewport();
+    for (let i = vp.children.length - 1; i >= 0; i--) {
+      const child = vp.children[i];
+      const meta = child as { _isConstraintOverlay?: boolean; _isObservableOverlay?: boolean };
+      if (meta._isConstraintOverlay || meta._isObservableOverlay) continue;
+      vp.removeChildAt(i);
+    }
+
+    // Add boundaries back to matter and Pixi renderer
+    const { createObject } = await import('../objects/objectFactory');
+    const W = el.clientWidth || 800;
+    const H = el.clientHeight || 600;
+
+    // Bottom wall
+    const bottom = createObject({
+      id: 'ground', type: 'rectangle', x: W / 2, y: H - 10, width: W, height: 20,
+      isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1.5
+    });
+    vp.addChild(bottom.display);
+    rt.physics.addBodies(bottom.body);
+    rt.sync.register(bottom.id, bottom.body, bottom.display);
+
+    // Left wall
+    const wallLeft = createObject({
+      id: 'wall-left', type: 'rectangle', x: 10, y: H / 2, width: 20, height: H,
+      isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1.5
+    });
+    vp.addChild(wallLeft.display);
+    rt.physics.addBodies(wallLeft.body);
+    rt.sync.register(wallLeft.id, wallLeft.body, wallLeft.display);
+
+    // Right wall
+    const wallRight = createObject({
+      id: 'wall-right', type: 'rectangle', x: W - 10, y: H / 2, width: 20, height: H,
+      isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1.5
+    });
+    vp.addChild(wallRight.display);
+    rt.physics.addBodies(wallRight.body);
+    rt.sync.register(wallRight.id, wallRight.body, wallRight.display);
+
+    // Ceiling wall
+    const ceiling = createObject({
+      id: 'ceiling', type: 'rectangle', x: W / 2, y: 10, width: W, height: 20,
+      isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1.5
+    });
+    vp.addChild(ceiling.display);
+    rt.physics.addBodies(ceiling.body);
+    rt.sync.register(ceiling.id, ceiling.body, ceiling.display);
+
+    // 2. Load compiled objects
+    if (blueprint.objects && Array.isArray(blueprint.objects)) {
+      for (const objDef of blueprint.objects) {
+        const isCirc = objDef.type === 'planet' || objDef.type === 'circle' || objDef.type === 'bob';
+        const fillColor = objDef.visual?.fillColor ? parseInt(objDef.visual.fillColor.replace('#', '0x')) : 0x818cf8;
+        const strokeColor = objDef.visual?.strokeColor ? parseInt(objDef.visual.strokeColor.replace('#', '0x')) : 0xc7d2fe;
+
+        const baseProps = {
+          x: objDef.position?.x ?? (150 + Math.random() * (W - 300)),
+          y: objDef.position?.y ?? (100 + Math.random() * (H - 200)),
+          restitution: objDef.physics?.restitution ?? 0.6,
+          friction: objDef.physics?.friction ?? 0.1,
+          density: objDef.physics?.density ?? 0.002,
+          isStatic: objDef.physics?.isStatic ?? false,
+          fillColor,
+          strokeColor,
+          strokeWidth: 2,
+        };
+
+        const obj = isCirc
+          ? createObject({
+            id: objDef.id,
+            type: 'circle',
+            radius: objDef.visual?.radius ?? 24,
+            ...baseProps
+          })
+          : createObject({
+            id: objDef.id,
+            type: 'rectangle',
+            width: objDef.visual?.width ?? 48,
+            height: objDef.visual?.height ?? 48,
+            cornerRadius: 6,
+            ...baseProps
+          });
+
+        // Set initial velocity if specified
+        if (objDef.physics?.velocity) {
+          const Matter = await import('matter-js');
+          Matter.Body.setVelocity(obj.body, objDef.physics.velocity);
+        }
+
+        // Add to Pixi, Matter, Sync, Selection, and State Store
+        vp.addChild(obj.display);
+        rt.physics.addBodies(obj.body);
+        rt.sync.register(obj.id, obj.body, obj.display);
+
+        if (!baseProps.isStatic) {
+          ia.selection.register(obj);
+          store.addObject(obj);
+          dynRef.current.push(obj.body);
+        }
+      }
+      setBodyCount(dynRef.current.length);
+    }
+
+    // 3. Load remaining compiled state segments using orchestrator
+    await loadScenario(blueprint);
+
+    // 4. Force trigger updates on UI layers
+    setPropertyVersion((v) => v + 1);
+  }, [ready]);
+
   const handleAiQuery = async () => {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
     try {
-      const resp = await fetch('/api/tutor/sandbox-query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: aiPrompt })
-      });
+      const blueprint = await generateScenario(aiPrompt);
+      if (blueprint) {
+        await loadCompiledScenario(blueprint);
 
-      if (!resp.ok) {
-        throw new Error(`Backend error: ${resp.status} ${resp.statusText}`);
-      }
-
-      const json = await resp.json();
-
-      if (json.success && json.data) {
-        const d = json.data;
-        // sandbox-query returns exact shape: title, explanation, formula, effects[], suggestions[]
         pushExplanation({
-          title: d.title || 'AI Answer',
-          explanation: d.explanation || '',
-          effects: d.effects || [],
-          formula: d.formula || '',
-          suggestions: d.suggestions || []
+          title: blueprint.scenario?.title || 'AI Scenario Compiled',
+          explanation: blueprint.scenario?.description || 'Textbook problem translated into interactive simulation blueprint successfully.',
+          effects: ['Relevant assets loaded in the Left Sidebar', 'Dynamic parameters mapped in the Right Inspector', 'Interactive physics objects spawned in Matter.js', 'Latex mathematical formulas rendering in the Lab panel'],
+          formula: blueprint.formulas?.[0]?.latex || '',
+          suggestions: ['Try dragging new assets from the left panel', 'Adjust custom dynamic controls in the right inspector', 'Click Play to observe the active physics telemetry']
         });
       } else {
-        throw new Error(json.detail || 'Unknown error from backend');
+        throw new Error('Failed to generate simulation blueprint from prompt.');
       }
     } catch (e) {
       pushExplanation({
@@ -283,6 +401,7 @@ export const SandboxCanvas: React.FC = () => {
   const didDragRef = useRef(false);                        // suppresses onClick after a real drag
   const hoveredBodyRef = useRef<Body | null>(null);
   const [hoveredBodyId, setHoveredBodyId] = useState<string | null>(null);
+  const [hoveredMousePos, setHoveredMousePos] = useState<{ x: number, y: number } | null>(null);
   const [ghostPos, setGhostPos] = useState({ x: -999, y: -999 });
   const [isDragging, setIsDragging] = useState(false);
   const [isOverCanvas, setIsOverCanvas] = useState(false);
@@ -294,7 +413,7 @@ export const SandboxCanvas: React.FC = () => {
     if (!rt || !creg) return;
 
     const allBodies = rt.physics.getWorld().bodies;
-    const sensors = allBodies.filter(b => b.label && b.label.startsWith('sensor-target:'));
+    const sensors = allBodies.filter((b: any) => b.label && b.label.startsWith('sensor-target:'));
 
     for (const sensor of sensors) {
       const dist = Math.hypot(newBody.position.x - sensor.position.x, newBody.position.y - sensor.position.y);
@@ -625,9 +744,9 @@ export const SandboxCanvas: React.FC = () => {
       type: 'OBJECT_SPAWNED',
       objectId: obj.id,
       metadata: {
-        shape:   type,
-        name:    type === 'circle' ? 'Circle' : 'Rectangle',
-        mass:    obj.body.mass,
+        shape: type,
+        name: type === 'circle' ? 'Circle' : 'Rectangle',
+        mass: obj.body.mass,
         gravity: GRAVITY_VALUES[gravity],
       },
     });
@@ -904,7 +1023,7 @@ export const SandboxCanvas: React.FC = () => {
     rt.sync.register(pin.id, pin.body, pin.display);
 
     // ── 2. Terminal receptor sensor with visible drop-zone display ──────────
-    const terminalId   = uid('rope-terminal');
+    const terminalId = uid('rope-terminal');
     const sensorDispId = uid('rope-sensor-disp');
 
     const sensor = Matter.Bodies.circle(
@@ -1026,6 +1145,7 @@ export const SandboxCanvas: React.FC = () => {
       strokeColor: spawnConfig.strokeColor,
       strokeWidth: 2,
       isStatic: spawnConfig.isStatic ?? false,
+      texture: asset.texture,
     };
 
     let obj;
@@ -1063,9 +1183,9 @@ export const SandboxCanvas: React.FC = () => {
         type: 'OBJECT_SPAWNED',
         objectId: obj.id,
         metadata: {
-          shape:   spawnType,
-          name:    asset.name,
-          mass:    obj.body.mass,
+          shape: spawnType,
+          name: asset.name,
+          mass: obj.body.mass,
           gravity: GRAVITY_VALUES[gravity],
         },
       });
@@ -1136,20 +1256,19 @@ export const SandboxCanvas: React.FC = () => {
     };
 
   const onPanelPointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    didDragRef.current = true;    // pointer moved — this is a drag, not a tap
-    setGhostPos({ x: e.clientX, y: e.clientY });
-
     const canvas = mountRef.current;
-    if (canvas) {
-      const r = canvas.getBoundingClientRect();
-      const over = (
-        e.clientX >= r.left && e.clientX <= r.right &&
-        e.clientY >= r.top && e.clientY <= r.bottom
-      );
-      setIsOverCanvas(over);
+    if (!canvas) return;
+    const r = canvas.getBoundingClientRect();
+    const over = (
+      e.clientX >= r.left && e.clientX <= r.right &&
+      e.clientY >= r.top && e.clientY <= r.bottom
+    );
+    setIsOverCanvas(over);
 
-      // Query body under cursor for constraints
+    if (isDragging) {
+      didDragRef.current = true;    // pointer moved — this is a drag, not a tap
+      setGhostPos({ x: e.clientX, y: e.clientY });
+
       const dragType = panelDragRef.current;
       if (over && dragType && ['pivot', 'spring', 'rope'].includes(dragType)) {
         const canvasX = e.clientX - r.left;
@@ -1170,6 +1289,36 @@ export const SandboxCanvas: React.FC = () => {
       } else {
         hoveredBodyRef.current = null;
         setHoveredBodyId(null);
+      }
+    } else {
+      if (over) {
+        const canvasX = e.clientX - r.left;
+        const canvasY = e.clientY - r.top;
+        const queryPoint = { x: canvasX, y: canvasY };
+        const rt = runtimeRef.current;
+        const store = storeRef.current;
+
+        if (rt && store) {
+          const bodies = rt.physics.getWorld().bodies;
+          import('matter-js').then((Matter) => {
+            const hovered = bodies.find((b: any) => Matter.Vertices.contains(b.vertices, queryPoint));
+            if (hovered && !hovered.isSensor && !['ground', 'wall-left', 'wall-right', 'ceiling'].includes(hovered.label || '')) {
+              hoveredBodyRef.current = hovered;
+              const matchedObj = store.getAllObjects().find(o => o.body === hovered);
+              const displayName = matchedObj ? matchedObj.id : (hovered.label || `Object #${hovered.id}`);
+              setHoveredBodyId(displayName);
+              setHoveredMousePos({ x: canvasX, y: canvasY - 15 });
+            } else {
+              hoveredBodyRef.current = null;
+              setHoveredBodyId(null);
+              setHoveredMousePos(null);
+            }
+          });
+        }
+      } else {
+        hoveredBodyRef.current = null;
+        setHoveredBodyId(null);
+        setHoveredMousePos(null);
       }
     }
   };
@@ -1502,12 +1651,12 @@ export const SandboxCanvas: React.FC = () => {
 
         {/* AI Query Input Section */}
         <div style={{ marginTop: 'auto', paddingTop: 20 }}>
-          <div style={{ 
-            background: 'rgba(255, 255, 255, 0.03)', 
-            border: '1px solid rgba(168, 85, 247, 0.2)', 
-            borderRadius: 12, 
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(168, 85, 247, 0.2)',
+            borderRadius: 12,
             padding: 12,
-            boxShadow: '0 0 15px rgba(168, 85, 247, 0.1) inset' 
+            boxShadow: '0 0 15px rgba(168, 85, 247, 0.1) inset'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
               <Sparkles size={14} color="#c084fc" />
@@ -1603,7 +1752,7 @@ export const SandboxCanvas: React.FC = () => {
         {/* Floating Asset Library Panel */}
         <FloatingAssetPanel
           onAssetDrop={handleAssetDrop}
-          canvasRef={mountRef}
+          canvasRef={mountRef as React.RefObject<HTMLDivElement>}
         />
 
         {/* Drop hint overlay */}
@@ -1614,6 +1763,41 @@ export const SandboxCanvas: React.FC = () => {
             ) : (
               <span>Release to drop <span style={{ color: '#a5b4fc', fontWeight: 'bold' }}>new {panelDragRef.current}</span></span>
             )}
+          </div>
+        )}
+
+        {/* Hover label tooltip overlay */}
+        {hoveredBodyId && !isDragging && hoveredMousePos && (
+          <div style={{
+            position: 'absolute',
+            left: hoveredMousePos.x,
+            top: hoveredMousePos.y,
+            transform: 'translate(-50%, -100%)',
+            pointerEvents: 'none',
+            zIndex: 1000,
+            background: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(129, 140, 248, 0.4)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35), 0 0 12px rgba(129, 140, 248, 0.2)',
+            borderRadius: '8px',
+            padding: '6px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.05s ease-out'
+          }}>
+            <span style={{ fontSize: '12px' }}>🎯</span>
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 800,
+              color: '#c7d2fe',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              fontFamily: "'Inter', sans-serif",
+              whiteSpace: 'nowrap'
+            }}>
+              {hoveredBodyId}
+            </span>
           </div>
         )}
 
@@ -1692,14 +1876,14 @@ export const SandboxCanvas: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <button 
+                <button
                   onClick={handleDismiss}
                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   <X size={18} />
                 </button>
               </div>
-              
+
               <div>
                 <h4 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 8 }}>{currentExplanation.insight.title}</h4>
                 <p style={{ fontSize: 13, lineHeight: 1.5, color: '#cbd5e1' }}>{currentExplanation.insight.explanation}</p>
@@ -1725,8 +1909,8 @@ export const SandboxCanvas: React.FC = () => {
 
               <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                 {currentExplanation.insight.suggestions.map((action, i) => (
-                  <button 
-                    key={i} 
+                  <button
+                    key={i}
                     style={{
                       background: 'rgba(168,85,247,0.15)',
                       border: '1px solid rgba(168,85,247,0.3)',
@@ -1775,15 +1959,15 @@ export const SandboxCanvas: React.FC = () => {
             left: ghostPos.x,
             top: ghostPos.y,
             transform: 'translate(-50%, -50%)',
-            width:  ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
-                  : panelDragRef.current === 'pendulum-rope' ? 52
-                  : (panelDragRef.current === 'circle' ? 44 : 40),
+            width: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
+              : panelDragRef.current === 'pendulum-rope' ? 52
+                : (panelDragRef.current === 'circle' ? 44 : 40),
             height: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
-                  : panelDragRef.current === 'pendulum-rope' ? 52
-                  : (panelDragRef.current === 'circle' ? 44 : 40),
+              : panelDragRef.current === 'pendulum-rope' ? 52
+                : (panelDragRef.current === 'circle' ? 44 : 40),
             borderRadius: panelDragRef.current === 'circle' || panelDragRef.current === 'pivot' ? '50%'
-                        : panelDragRef.current === 'pendulum-rope' ? 12
-                        : 10,
+              : panelDragRef.current === 'pendulum-rope' ? 12
+                : 10,
             background: panelDragRef.current === 'circle'
               ? 'rgba(16,185,129,0.55)'
               : panelDragRef.current === 'rectangle'
@@ -1795,12 +1979,11 @@ export const SandboxCanvas: React.FC = () => {
                     : panelDragRef.current === 'spring'
                       ? 'rgba(16,185,129,0.55)'
                       : 'rgba(251,191,36,0.55)',
-            border: `2px solid ${
-              panelDragRef.current === 'pendulum-rope' ? '#818cf8' :
-              panelDragRef.current === 'circle' || panelDragRef.current === 'spring' ? '#6ee7b7' :
-              panelDragRef.current === 'rectangle' ? '#a5b4fc' :
-              panelDragRef.current === 'pivot' ? '#c084fc' : '#fde047'
-            }`,
+            border: `2px solid ${panelDragRef.current === 'pendulum-rope' ? '#818cf8' :
+                panelDragRef.current === 'circle' || panelDragRef.current === 'spring' ? '#6ee7b7' :
+                  panelDragRef.current === 'rectangle' ? '#a5b4fc' :
+                    panelDragRef.current === 'pivot' ? '#c084fc' : '#fde047'
+              }`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

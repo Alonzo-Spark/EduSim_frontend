@@ -11,6 +11,7 @@ interface BaseBodyConfig {
   density?:     number;   // kg / px²
   angle?:       number;   // radians, initial rotation
   label?:       string;   // debug / query identifier
+  texture?:     string;   // SVG/image texture path
 }
 
 export interface CircleBodyConfig extends BaseBodyConfig {
@@ -53,6 +54,18 @@ export function createBody(config: BodyConfig): Matter.Body {
     angle,
     label,
   };
+
+  if (config.texture) {
+    const desiredWidth = config.type === 'circle' ? config.radius * 2 : config.width;
+    const desiredHeight = config.type === 'circle' ? config.radius * 2 : config.height;
+    options.render = {
+      sprite: {
+        texture: config.texture,
+        xScale: desiredWidth / 900,
+        yScale: desiredHeight / 900,
+      }
+    };
+  }
 
   switch (config.type) {
     case 'circle':

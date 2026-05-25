@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import type { AssetDefinition } from '../../config/assetsRegistry';
 
 interface AssetCardProps {
@@ -7,6 +7,8 @@ interface AssetCardProps {
 }
 
 export const AssetCard = memo(function AssetCard({ asset, onDragStart }: AssetCardProps) {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div
       draggable
@@ -51,10 +53,25 @@ export const AssetCard = memo(function AssetCard({ asset, onDragStart }: AssetCa
         e.currentTarget.style.cursor = 'grab';
       }}
     >
-      {/* Emoji Icon */}
-      <span style={{ fontSize: 26, lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>
-        {asset.emoji}
-      </span>
+      {/* Icon - SVG or Emoji Fallback */}
+      {asset.texture && !imgError ? (
+        <img
+          src={asset.texture}
+          alt={asset.name}
+          onError={() => setImgError(true)}
+          style={{
+            width: 32,
+            height: 32,
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
+            pointerEvents: 'none',
+          }}
+        />
+      ) : (
+        <span style={{ fontSize: 26, lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>
+          {asset.emoji}
+        </span>
+      )}
 
       {/* Name */}
       <span style={{

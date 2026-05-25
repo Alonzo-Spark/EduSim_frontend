@@ -9,6 +9,7 @@ export interface AssetDefinition {
   category: string;
   tags: string[];
   spawnType: 'circle' | 'rectangle' | 'triangle';
+  texture?: string;         // Optional SVG/image asset texture path
   spawnConfig: {
     radius?: number;
     width?: number;
@@ -23,7 +24,7 @@ export interface AssetDefinition {
   };
 }
 
-export const assetsRegistry: Record<string, AssetDefinition[]> = {
+const baseRegistry: Record<string, AssetDefinition[]> = {
   Shapes: [
     {
       id: 'ball-small',
@@ -206,4 +207,239 @@ export const assetsRegistry: Record<string, AssetDefinition[]> = {
       spawnConfig: { radius: 16, density: 0.001, restitution: 0.6, friction: 0.1, fillColor: 0xeab308, strokeColor: 0xfde047 },
     },
   ],
+  Planets: [
+    {
+      id: 'earth',
+      name: 'Earth',
+      emoji: '🌍',
+      category: 'Planets',
+      tags: ['planet', 'earth', 'space', 'gravity'],
+      spawnType: 'circle',
+      texture: '/assets/planets/earth.svg',
+      spawnConfig: { radius: 40, density: 0.002, restitution: 0.9, friction: 0.1, fillColor: 0x3388cc, strokeColor: 0x66aadd }
+    },
+    {
+      id: 'mars',
+      name: 'Mars',
+      emoji: '🔴',
+      category: 'Planets',
+      tags: ['planet', 'mars', 'space', 'red'],
+      spawnType: 'circle',
+      texture: '/assets/planets/mars.svg',
+      spawnConfig: { radius: 35, density: 0.0018, restitution: 0.8, friction: 0.12, fillColor: 0xe0533c, strokeColor: 0xff8866 }
+    },
+    {
+      id: 'jupiter',
+      name: 'Jupiter',
+      emoji: '🪐',
+      category: 'Planets',
+      tags: ['planet', 'jupiter', 'space', 'gas'],
+      spawnType: 'circle',
+      texture: '/assets/planets/jupiter.svg',
+      spawnConfig: { radius: 55, density: 0.0025, restitution: 0.7, friction: 0.15, fillColor: 0xb07f35, strokeColor: 0xd4a35c }
+    },
+    {
+      id: 'saturn',
+      name: 'Saturn',
+      emoji: '🪐',
+      category: 'Planets',
+      tags: ['planet', 'saturn', 'space', 'rings'],
+      spawnType: 'circle',
+      texture: '/assets/planets/saturn.svg',
+      spawnConfig: { radius: 48, density: 0.0015, restitution: 0.75, friction: 0.14, fillColor: 0xe2bf7d, strokeColor: 0xf9e3b4 }
+    },
+    {
+      id: 'mercury',
+      name: 'Mercury',
+      emoji: '🌑',
+      category: 'Planets',
+      tags: ['planet', 'mercury', 'space', 'hot'],
+      spawnType: 'circle',
+      texture: '/assets/planets/mercury.svg',
+      spawnConfig: { radius: 28, density: 0.0022, restitution: 0.65, friction: 0.1, fillColor: 0x9e9e9e, strokeColor: 0xcccccc }
+    },
+    {
+      id: 'venus',
+      name: 'Venus',
+      emoji: '🟡',
+      category: 'Planets',
+      tags: ['planet', 'venus', 'space', 'atmosphere'],
+      spawnType: 'circle',
+      texture: '/assets/planets/venus.svg',
+      spawnConfig: { radius: 38, density: 0.002, restitution: 0.78, friction: 0.11, fillColor: 0xe3bb76, strokeColor: 0xffe6a3 }
+    },
+    {
+      id: 'neptune',
+      name: 'Neptune',
+      emoji: '🔵',
+      category: 'Planets',
+      tags: ['planet', 'neptune', 'space', 'cold'],
+      spawnType: 'circle',
+      texture: '/assets/planets/neptune.svg',
+      spawnConfig: { radius: 44, density: 0.0021, restitution: 0.82, friction: 0.13, fillColor: 0x274687, strokeColor: 0x4f70b5 }
+    },
+    {
+      id: 'uranus',
+      name: 'Uranus',
+      emoji: '💎',
+      category: 'Planets',
+      tags: ['planet', 'uranus', 'space', 'cyan'],
+      spawnType: 'circle',
+      texture: '/assets/planets/uranus.svg',
+      spawnConfig: { radius: 42, density: 0.0019, restitution: 0.85, friction: 0.12, fillColor: 0x76c0c2, strokeColor: 0xaee1e3 }
+    },
+    {
+      id: 'sun',
+      name: 'Sun',
+      emoji: '☀️',
+      category: 'Planets',
+      tags: ['star', 'sun', 'space', 'giant'],
+      spawnType: 'circle',
+      texture: '/assets/planets/sun.svg',
+      spawnConfig: { radius: 65, density: 0.003, restitution: 0.1, friction: 0.2, fillColor: 0xffaa00, strokeColor: 0xffdd44 }
+    },
+    {
+      id: 'moon',
+      name: 'Moon',
+      emoji: '🌙',
+      category: 'Planets',
+      tags: ['satellite', 'moon', 'space', 'orbit'],
+      spawnType: 'circle',
+      texture: '/assets/planets/moon.svg',
+      spawnConfig: { radius: 20, density: 0.0016, restitution: 0.6, friction: 0.18, fillColor: 0xd6d6d6, strokeColor: 0xffffff }
+    }
+  ],
+  Vehicles: [
+    {
+      id: 'car',
+      name: 'Sports Car',
+      emoji: '🏎️',
+      category: 'Vehicles',
+      tags: ['vehicle', 'car', 'fast', 'wheel'],
+      spawnType: 'rectangle',
+      texture: '/assets/vehicles/car.svg',
+      spawnConfig: { width: 80, height: 40, density: 0.0025, restitution: 0.45, friction: 0.25, fillColor: 0xdc2626, strokeColor: 0xfca5a5, cornerRadius: 6 }
+    }
+  ]
 };
+
+// Dynamically load SVGs from root svgs/ folder
+const svgModules = import.meta.glob('../../svgs/**/*.svg', { eager: true, import: 'default' }) as Record<string, string>;
+
+// Helper to capitalize words
+function capitalize(str: string): string {
+  return str.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+// Copy baseRegistry to exportable assetsRegistry
+export const assetsRegistry: Record<string, AssetDefinition[]> = { ...baseRegistry };
+
+// Process the glob files and dynamically populate categories
+Object.entries(svgModules).forEach(([filePath, url]) => {
+  // Extract category and name from path: "../../svgs/planets/earth.svg"
+  const match = filePath.match(/\/svgs\/([^/]+)\/([^/]+)\.svg$/);
+  if (!match) return;
+
+  const rawCategory = match[1];
+  const rawName = match[2];
+
+  // Capitalize category name (e.g. "planets" -> "Planets")
+  const category = capitalize(rawCategory);
+
+  // Strip common trailing "_svg" or "-svg" suffixes and format clean item name
+  const cleanName = rawName.replace(/[_-]svg$/i, '');
+  const name = capitalize(cleanName.replace(/[_-]+/g, ' '));
+  const id = cleanName.toLowerCase();
+
+  // Map appropriate premium emojis based on category or name
+  let emoji = '📦';
+  const nameLower = name.toLowerCase();
+  const catLower = category.toLowerCase();
+
+  if (catLower.includes('planet')) {
+    if (nameLower.includes('earth')) emoji = '🌍';
+    else if (nameLower.includes('mars')) emoji = '🔴';
+    else if (nameLower.includes('jupiter')) emoji = '🪐';
+    else if (nameLower.includes('saturn')) emoji = '🪐';
+    else if (nameLower.includes('mercury')) emoji = '🌑';
+    else if (nameLower.includes('venus')) emoji = '🟡';
+    else if (nameLower.includes('neptune')) emoji = '🔵';
+    else if (nameLower.includes('uranus')) emoji = '💎';
+    else if (nameLower.includes('sun')) emoji = '☀️';
+    else if (nameLower.includes('moon')) emoji = '🌙';
+    else emoji = '🪐';
+  } else if (catLower.includes('vehicle')) {
+    if (nameLower.includes('car')) emoji = '🏎️';
+    else if (nameLower.includes('bus')) emoji = '🚌';
+    else if (nameLower.includes('truck')) emoji = '🚚';
+    else if (nameLower.includes('train')) emoji = '🚊';
+    else if (nameLower.includes('rocket')) emoji = '🚀';
+    else emoji = '🚗';
+  } else if (catLower.includes('animal')) {
+    if (nameLower.includes('tiger') || nameLower.includes('lion')) emoji = '🦁';
+    else if (nameLower.includes('bear')) emoji = '🐻';
+    else if (nameLower.includes('cat')) emoji = '🐱';
+    else if (nameLower.includes('dog')) emoji = '🐶';
+    else if (nameLower.includes('bird')) emoji = '🐦';
+    else if (nameLower.includes('frog')) emoji = '🐸';
+    else emoji = '🦁';
+  } else if (catLower.includes('food')) {
+    emoji = '🍎';
+  } else if (catLower.includes('instrument') || catLower.includes('music')) {
+    emoji = '🎸';
+  } else if (catLower.includes('weapon')) {
+    emoji = '⚔️';
+  } else {
+    emoji = '🎨';
+  }
+
+  // Smart shape matching based on naming conventions and category
+  const isCircle = catLower.includes('planet') ||
+                   nameLower.includes('ball') ||
+                   nameLower.includes('wheel') ||
+                   nameLower.includes('disk') ||
+                   nameLower.includes('circle');
+
+  const spawnType = isCircle ? 'circle' : 'rectangle';
+
+  // Config parameters with fine-tuned premium defaults
+  const spawnConfig: any = {
+    density: 0.002,
+    restitution: 0.6,
+    friction: 0.1,
+    fillColor: 0x818cf8,
+    strokeColor: 0xc7d2fe,
+  };
+
+  if (isCircle) {
+    spawnConfig.radius = catLower.includes('planet')
+      ? (nameLower.includes('sun') ? 65 : nameLower.includes('jupiter') ? 55 : 35)
+      : 24;
+  } else {
+    spawnConfig.width = 60;
+    spawnConfig.height = 40;
+    spawnConfig.cornerRadius = 6;
+  }
+
+  const asset: AssetDefinition = {
+    id,
+    name,
+    emoji,
+    category,
+    tags: [catLower, rawName.toLowerCase(), ...rawName.split(/[_-]/).map((t) => t.toLowerCase())],
+    spawnType,
+    texture: url,
+    spawnConfig,
+  };
+
+  if (!assetsRegistry[category]) {
+    assetsRegistry[category] = [];
+  }
+
+  // Prevent duplicate definitions to preserve static custom/fine-tuned physics properties
+  const exists = assetsRegistry[category].some((a) => a.id === id);
+  if (!exists) {
+    assetsRegistry[category].push(asset);
+  }
+});
+

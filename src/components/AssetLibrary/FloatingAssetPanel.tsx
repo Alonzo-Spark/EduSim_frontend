@@ -3,6 +3,7 @@ import { Rnd } from 'react-rnd';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AssetCategory } from './AssetCategory';
 import { assetsRegistry, type AssetDefinition } from '../../config/assetsRegistry';
+import { useAssetStore } from '../../store/assetStore';
 
 interface FloatingAssetPanelProps {
   onAssetDrop?: (asset: AssetDefinition, canvasX: number, canvasY: number) => void;
@@ -40,16 +41,52 @@ export function FloatingAssetPanel({ onAssetDrop, canvasRef }: FloatingAssetPane
   const rndRef       = useRef<Rnd | null>(null);
   const scrollRef    = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef(0);
-  // Drag-guard: record pointer position on mousedown to distinguish
-  // a panel reposition drag from an intentional click on the pill.
   const dragGuardRef = useRef<{ x: number; y: number } | null>(null);
+
+  const compiledAssets = useAssetStore((state) => state.assets);
+
+  const mappedCompiledRegistry = useMemo(() => {
+    const baseRegistry = { ...assetsRegistry };
+    if (compiledAssets && compiledAssets.length > 0) {
+      const definitions: AssetDefinition[] = compiledAssets.map((asset) => {
+        let emoji = '🪐';
+        if (asset.category === 'Mechanics') emoji = '⚙️';
+        else if (asset.category === 'Optics') emoji = '🔍';
+        else if (asset.category === 'Electricity') emoji = '⚡';
+        
+        return {
+          id: asset.id,
+          name: asset.name,
+          emoji,
+          category: asset.category || 'Compiled',
+          tags: ['compiled', asset.name.toLowerCase()],
+          spawnType: asset.id.includes('block') || asset.id.includes('rect') ? 'rectangle' : 'circle',
+          spawnConfig: {
+            radius: 24,
+            width: 48,
+            height: 48,
+            density: 0.002,
+            restitution: 0.6,
+            friction: 0.1,
+            fillColor: 0x818cf8,
+            strokeColor: 0xc7d2fe
+          }
+        };
+      });
+      return {
+        '✨ Compiled': definitions,
+        ...assetsRegistry
+      };
+    }
+    return baseRegistry;
+  }, [compiledAssets]);
 
   // ── Search filter ────────────────────────────────────────────────────────────
   const filteredRegistry = useMemo(() => {
-    if (!search.trim()) return assetsRegistry;
+    if (!search.trim()) return mappedCompiledRegistry;
     const q = search.toLowerCase();
-    const result: typeof assetsRegistry = {};
-    for (const [cat, assets] of Object.entries(assetsRegistry)) {
+    const result: Record<string, AssetDefinition[]> = {};
+    for (const [cat, assets] of Object.entries(mappedCompiledRegistry)) {
       const filtered = assets.filter(a =>
         a.name.toLowerCase().includes(q) ||
         a.category.toLowerCase().includes(q) ||
@@ -58,11 +95,11 @@ export function FloatingAssetPanel({ onAssetDrop, canvasRef }: FloatingAssetPane
       if (filtered.length > 0) result[cat] = filtered;
     }
     return result;
-  }, [search]);
+  }, [search, mappedCompiledRegistry]);
 
   const totalAssets = useMemo(() =>
-    Object.values(assetsRegistry).reduce((sum, arr) => sum + arr.length, 0),
-  []);
+    Object.values(mappedCompiledRegistry).reduce((sum, arr) => sum + arr.length, 0),
+  [mappedCompiledRegistry]);
 
   // ── Collapse / Expand ────────────────────────────────────────────────────────
   const toggle = useCallback(() => {

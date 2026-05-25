@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="100%" height="100%" aria-label="Photorealistic Natural Moon from Space">
+  <defs>
+    <clipPath id="moon-sphere">
+      <circle cx="500" cy="500" r="380" />
+    </clipPath>
+
+    <radialGradient id="regolith-base" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#dcd6cd" />
+      <stop offset="25%" stop-color="#c5bdaf" />
+      <stop offset="50%" stop-color="#a09687" />
+      <stop offset="75%" stop-color="#645c50" />
+      <stop offset="92%" stop-color="#2a2620" />
+      <stop offset="100%" stop-color="#0a0907" />
+    </radialGradient>
+
+    <radialGradient id="maria-grad" cx="42%" cy="38%" r="55%">
+      <stop offset="0%" stop-color="#554d42" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#3c362e" stop-opacity="0.9" />
+      <stop offset="85%" stop-color="#1f1b16" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#080706" stop-opacity="1" />
+    </radialGradient>
+
+    <radialGradient id="lunar-terminator" cx="35%" cy="35%" r="68%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0" />
+      <stop offset="40%" stop-color="#000000" stop-opacity="0.05" />
+      <stop offset="65%" stop-color="#000000" stop-opacity="0.55" />
+      <stop offset="85%" stop-color="#000000" stop-opacity="0.92" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="1" />
+    </radialGradient>
+
+    <radialGradient id="lunar-rim-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="94%" stop-color="#eae6df" stop-opacity="0" />
+      <stop offset="97%" stop-color="#ded9cf" stop-opacity="0.3" />
+      <stop offset="99%" stop-color="#f5f2eb" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+
+    <filter id="blur-xs"><feGaussianBlur stdDeviation="1.5" /></filter>
+    <filter id="blur-sm"><feGaussianBlur stdDeviation="4" /></filter>
+    <filter id="blur-md"><feGaussianBlur stdDeviation="10" /></filter>
+    <filter id="blur-lg"><feGaussianBlur stdDeviation="20" /></filter>
+  </defs>
+
+  <circle cx="500" cy="500" r="400" fill="url(#lunar-rim-glow)" filter="url(#blur-md)" />
+
+  <g clip-path="url(#moon-sphere)">
+    <circle cx="500" cy="500" r="380" fill="url(#regolith-base)" />
+
+    <g id="lunar-maria" filter="url(#blur-md)" opacity="0.85">
+      <path d="M 220,280 C 180,340 160,420 190,520 C 220,620 280,680 340,650 C 400,620 380,540 420,480 C 460,420 440,350 410,310 C 380,270 260,220 220,280 Z" fill="url(#maria-grad)" />
+      
+      <path d="M 430,320 C 460,290 520,300 550,340 C 580,380 540,430 580,470 C 620,510 590,560 540,550 C 490,540 470,490 450,480 C 430,470 400,350 430,320 Z" fill="url(#maria-grad)" />
+      
+      <path d="M 600,430 C 630,410 670,440 680,480 C 690,520 650,560 610,540 C 580,520 570,450 600,430 Z" fill="url(#maria-grad)" />
+      <circle cx="650" cy="350" r="35" fill="url(#maria-grad)" />
+      
+      <path d="M 280,580 C 320,560 360,590 380,640 C 400,690 350,740 310,720 C 270,700 240,600 280,580 Z" fill="url(#maria-grad)" />
+      
+      <path d="M 510,570 C 540,560 560,580 555,610 C 550,640 520,630 510,570 Z" fill="url(#maria-grad)" />
+    </g>
+
+    <g id="crater-rays" stroke="#ffffff" stroke-opacity="0.22" stroke-linecap="round" filter="url(#blur-sm)">
+      <line x1="420" y1="720" x2="220" y2="400" stroke-width="3" />
+      <line x1="420" y1="720" x2="320" y2="250" stroke-width="2.5" />
+      <line x1="420" y1="720" x2="520" y2="300" stroke-width="4" />
+      <line x1="420" y1="720" x2="650" y2="450" stroke-width="2" />
+      <line x1="420" y1="720" x2="600" y2="600" stroke-width="3.5" />
+      <line x1="420" y1="720" x2="190" y2="650" stroke-width="2" />
+      
+      <line x1="330" y1="380" x2="200" y2="320" stroke-width="2" />
+      <line x1="330" y1="380" x2="360" y2="200" stroke-width="2.5" />
+      <line x1="330" y1="380" x2="480" y2="350" stroke-width="3" />
+      <line x1="330" y1="380" x2="280" y2="500" stroke-width="1.5" />
+    </g>
+
+    <g id="major-craters" filter="url(#blur-xs)">
+      <circle cx="420" cy="720" r="16" fill="#b5aba0" stroke="#ffffff" stroke-width="1.5" opacity="0.9" />
+      <circle cx="418" cy="719" r="12" fill="#4a433a" />
+      <circle cx="421" cy="721" r="5" fill="#f5eedf" />
+
+      <ellipse cx="330" cy="380" rx="18" ry="14" fill="#a89e90" stroke="#ffffff" stroke-width="1.2" opacity="0.85" />
+      <ellipse cx="328" cy="379" rx="13" ry="10" fill="#38322a" />
+      <circle cx="330" cy="380" r="4" fill="#eee5d5" />
+
+      <circle cx="260" cy="400" r="10" fill="#9e9486" stroke="#ffffff" stroke-width="1" opacity="0.8" />
+      <circle cx="259" cy="399" r="7" fill="#2e2922" />
+
+      <circle cx="240" cy="310" r="9" fill="#ffffff" stroke="#e0dacf" stroke-width="2" opacity="0.95" />
+      <circle cx="240" cy="310" r="3" fill="#ffffff" />
+
+      <ellipse cx="660" cy="510" rx="14" ry="16" fill="#8f8474" stroke="#d5cbd2" stroke-width="1" opacity="0.7" />
+      <ellipse cx="675" cy="580" rx="12" ry="15" fill="#7a7061" stroke="#c5bdaf" stroke-width="1" opacity="0.6" />
+
+      <ellipse cx="390" cy="180" rx="16" ry="10" fill="#24201a" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.7" opacity="0.85" />
+    </g>
+
+    <g id="surface-noise" fill="#ffffff" opacity="0.25" filter="url(#blur-xs)">
+      <circle cx="450" cy="220" r="3" /><circle cx="490" cy="250" r="5" /><circle cx="530" cy="210" r="2" />
+      <circle cx="580" cy="280" r="4" /><circle cx="620" cy="300" r="6" /><circle cx="310" cy="260" r="4" />
+      <circle cx="270" cy="480" r="5" /><circle cx="300" cy="540" r="3" /><circle cx="350" cy="490" r="7" />
+      <circle cx="470" cy="610" r="4" /><circle cx="500" cy="660" r="6" /><circle cx="560" cy="650" r="3" />
+      <circle cx="610" cy="620" r="5" /><circle cx="630" cy="400" r="4" /><circle cx="600" cy="370" r="3" />
+      <circle cx="450" cy="780" r="5" /><circle cx="490" cy="750" r="3" /><circle cx="360" cy="760" r="4" />
+    </g>
+
+    <g id="rugged-highlands" fill="#9e9384" opacity="0.4" filter="url(#blur-sm)">
+      <path d="M 350,740 Q 400,710 460,730 T 520,750 Q 450,770 350,740 Z" />
+      <path d="M 480,200 Q 530,180 580,210 T 620,240 Q 540,230 480,200 Z" />
+    </g>
+
+    <circle cx="500" cy="500" r="380" fill="url(#lunar-terminator)" />
+
+    <circle cx="500" cy="500" r="380" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.25" />
+  </g>
+
+  <circle cx="500" cy="500" r="380" fill="none" stroke="#d5cbd2" stroke-width="1" opacity="0.4" />
+</svg>

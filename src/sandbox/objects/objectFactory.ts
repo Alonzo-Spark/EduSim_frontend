@@ -54,6 +54,7 @@ export function createObject(config: ObjectConfig): RuntimeObject {
       density:     config.density,
       angle:       config.angle,
       label:       config.label ?? config.id,
+      texture:     config.texture,
     };
 
     if (config.type === 'circle') {
@@ -72,6 +73,7 @@ export function createObject(config: ObjectConfig): RuntimeObject {
       strokeWidth:  config.strokeWidth,
       alpha:        config.alpha,
       cornerRadius: config.cornerRadius,
+      texture:      config.texture,
     };
 
     if (config.type === 'circle') {

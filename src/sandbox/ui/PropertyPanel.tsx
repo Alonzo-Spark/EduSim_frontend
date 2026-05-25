@@ -5,6 +5,7 @@ import type { PropertyController } from '../properties/propertyController';
 import type { ObservableEngine } from '../observables/observableEngine';
 import type { RuntimeObject } from '../types/RuntimeObject';
 import type { RuntimeConstraint } from '../constraints/constraintFactory';
+import { useInspectorStore } from '../../store/inspectorStore';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -112,6 +113,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
   const [propertyVersion, setPropertyVersion] = useState(0);
   const [activeConstraints, setActiveConstraints] = useState<RuntimeConstraint[]>([]);
+  const compiledControllers = useInspectorStore((state) => state.controllers);
 
   // Collapsible sections state
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
@@ -121,6 +123,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     visuals: false,
     constraints: false,
     observables: false,
+    aiCompiled: false,
   });
 
   // Observable ref nodes for raw DOM injection (high-performance 60 FPS telemetry update)
@@ -286,6 +289,62 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           {isLocked ? '🔒 Locked' : '🔓 Active'}
         </button>
       </div>
+
+      {/* ── SECTION: AI Compiled Controls ───────────────────────────────────── */}
+      {compiledControllers.length > 0 && (
+        <div style={S.section}>
+          <div style={S.sectionHeader} onClick={() => toggleSection('aiCompiled')}>
+            <span style={{ ...S.sectionTitle, color: '#818cf8' }}>🤖 AI Compiled Controls</span>
+            <span style={S.chevron}>{collapsed.aiCompiled ? '▼' : '▲'}</span>
+          </div>
+
+          {!collapsed.aiCompiled && (
+            <div style={S.sectionBody}>
+              {compiledControllers.map((ctrl) => {
+                let currentVal = ctrl.default;
+                if (selected) {
+                  if (ctrl.property === 'mass') currentVal = selected.body.mass;
+                  else if (ctrl.property === 'friction') currentVal = selected.body.friction;
+                  else if (ctrl.property === 'restitution') currentVal = selected.body.restitution;
+                  else if (ctrl.property === 'velocity') {
+                    currentVal = Math.hypot(selected.body.velocity.x, selected.body.velocity.y);
+                  }
+                }
+                
+                return (
+                  <SliderRow
+                    key={ctrl.id}
+                    label={ctrl.label}
+                    min={ctrl.min}
+                    max={ctrl.max}
+                    step={(ctrl.max - ctrl.min) / 100}
+                    value={currentVal}
+                    precision={2}
+                    onChange={(v) => {
+                      if (selected) {
+                        if (ctrl.property === 'velocity') {
+                          const body = selected.body;
+                          const currentSpeed = Math.hypot(body.velocity.x, body.velocity.y);
+                          if (currentSpeed > 0.001) {
+                            const scale = v / currentSpeed;
+                            propertyController.updateProperty(selected.id, 'vx', body.velocity.x * scale);
+                            propertyController.updateProperty(selected.id, 'vy', body.velocity.y * scale);
+                          } else {
+                            propertyController.updateProperty(selected.id, 'vx', v);
+                          }
+                        } else {
+                          propertyController.updateProperty(selected.id, ctrl.property, v);
+                        }
+                      }
+                    }}
+                    tooltip={ctrl.educationalPurpose}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── SECTION: Newton's Second Law Lab ─────────────────────────────────── */}
       <div style={S.section}>
