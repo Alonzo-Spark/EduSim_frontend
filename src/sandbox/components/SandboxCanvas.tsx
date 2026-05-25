@@ -285,7 +285,7 @@ export const SandboxCanvas: React.FC = () => {
   }, [selected, propertyVersion]);
 
   // Panel drag-and-drop state
-  type PanelDragType = 'circle' | 'rectangle' | 'pendulum-rope' | 'pivot' | 'spring' | 'rope' | null;
+  type PanelDragType = 'circle' | 'rectangle' | 'pendulum-rope' | 'pivot' | 'spring' | 'rope' | 'sun' | 'planet' | null;
   const panelDragRef = useRef<PanelDragType>(null);          // type being dragged
   const didDragRef = useRef(false);                        // suppresses onClick after a real drag
   const hoveredBodyRef = useRef<Body | null>(null);
@@ -578,7 +578,7 @@ export const SandboxCanvas: React.FC = () => {
     else { ctrl.resume(); setRunning(true); }
   };
 
-  const spawnStar = useCallback(async () => {
+  const spawnStar = useCallback(async (customX?: number, customY?: number) => {
     const rt = runtimeRef.current;
     const ia = interactionRef.current;
     const el = mountRef.current;
@@ -589,8 +589,8 @@ export const SandboxCanvas: React.FC = () => {
 
     const W = el.clientWidth || 800;
     const H = el.clientHeight || 600;
-    const centerX = W / 2;
-    const centerY = H / 2;
+    const centerX = customX ?? (W / 2);
+    const centerY = customY ?? (H / 2);
     const starId = 'orbit-star';
 
     // Remove old star if it exists to avoid duplicates
@@ -637,7 +637,7 @@ export const SandboxCanvas: React.FC = () => {
     });
   }, [ready]);
 
-  const spawnOrbitingPlanet = useCallback(async () => {
+  const spawnOrbitingPlanet = useCallback(async (customX?: number, customY?: number) => {
     const rt = runtimeRef.current;
     const ia = interactionRef.current;
     const el = mountRef.current;
@@ -657,12 +657,28 @@ export const SandboxCanvas: React.FC = () => {
 
     const starPos = star.body.position;
 
-    // 2. Spawn planet at an offset above the star
+    // 2. Spawn planet at an offset above the star or custom position
     const planetId = uid('planet');
     const radius = 11 + Math.random() * 5;
-    const offset = 120 + Math.random() * 50;
-    const planetX = starPos.x;
-    const planetY = starPos.y - offset;
+    
+    let planetX: number;
+    let planetY: number;
+    let offset: number;
+    let angle: number;
+
+    if (customX !== undefined && customY !== undefined) {
+      planetX = customX;
+      planetY = customY;
+      const dx = planetX - starPos.x;
+      const dy = planetY - starPos.y;
+      offset = Math.hypot(dx, dy);
+      angle = Math.atan2(dy, dx);
+    } else {
+      offset = 120 + Math.random() * 50;
+      planetX = starPos.x;
+      planetY = starPos.y - offset;
+      angle = -Math.PI / 2;
+    }
 
     const { fill, stroke } = nextColour();
     const planetObj = createObject({
@@ -688,7 +704,7 @@ export const SandboxCanvas: React.FC = () => {
       centerBody: star.body,
       orbitingBody: planetObj.body,
       radius: offset,
-      angle: -Math.PI / 2,
+      angle: angle,
       clockwise: true,
     }, G);
 
@@ -729,10 +745,6 @@ export const SandboxCanvas: React.FC = () => {
           gravitationalConstant: gConstant,
           debug: radialDebug
         });
-        // Auto-spawn Sun/Star if empty
-        if (rt.gravitySystem.getRadialGravity().getSources().length === 0) {
-          spawnStar();
-        }
       }
     }
   };
@@ -762,9 +774,6 @@ export const SandboxCanvas: React.FC = () => {
     // Restore correct gravity behaviors based on active mode
     if (gravityMode === 'linear') {
       ia.controls.setGravity(GRAVITY_VALUES[gravity]);
-    } else {
-      // Re-spawn the golden sun core after scene boundary cleanups
-      setTimeout(() => spawnStar(), 40);
     }
 
     ia.controls.setSimulationSpeed(speed);
@@ -772,7 +781,7 @@ export const SandboxCanvas: React.FC = () => {
       rt.start();
       store.setRuntimeState('running');
     }
-  }, [ready, running, gravity, speed, gravityMode, spawnStar]);
+  }, [ready, running, gravity, speed, gravityMode]);
 
   const spawnShape = useCallback(async (type: 'circle' | 'rectangle') => {
     const rt = runtimeRef.current;
@@ -1392,6 +1401,10 @@ export const SandboxCanvas: React.FC = () => {
           spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', canvasX, canvasY, hoveredBody);
         } else if (type === 'pendulum-rope') {
           spawnPendulumRope(canvasX, canvasY);
+        } else if (type === 'sun') {
+          spawnStar(canvasX, canvasY);
+        } else if (type === 'planet') {
+          spawnOrbitingPlanet(canvasX, canvasY);
         } else {
           spawnAt(type as 'circle' | 'rectangle', canvasX, canvasY);
         }
@@ -1620,16 +1633,18 @@ export const SandboxCanvas: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, padding: '4px 8px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 8 }}>
             <div style={{ display: 'flex', gap: 6 }}>
               <button
-                style={{ ...S.btn, ...S.btnIndigo, flex: 1, fontSize: 10, padding: '6px 2px', cursor: 'pointer' }}
-                onClick={spawnStar}
+                style={{ ...S.btn, ...S.btnIndigo, flex: 1, fontSize: 10, padding: '6px 2px', cursor: ready ? 'grab' : 'not-allowed' }}
                 disabled={!ready}
+                onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnStar(); }}
+                onPointerDown={onPanelPointerDown('sun')}
               >
                 ☀️ Spawn Sun
               </button>
               <button
-                style={{ ...S.btn, ...S.btnSky, flex: 1, fontSize: 10, padding: '6px 2px', cursor: 'pointer' }}
-                onClick={spawnOrbitingPlanet}
+                style={{ ...S.btn, ...S.btnSky, flex: 1, fontSize: 10, padding: '6px 2px', cursor: ready ? 'grab' : 'not-allowed' }}
                 disabled={!ready}
+                onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnOrbitingPlanet(); }}
+                onPointerDown={onPanelPointerDown('planet')}
               >
                 🌎 Spawn Orbit Planet
               </button>
@@ -2045,11 +2060,15 @@ export const SandboxCanvas: React.FC = () => {
             transform: 'translate(-50%, -50%)',
             width:  ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
                   : panelDragRef.current === 'pendulum-rope' ? 52
+                  : panelDragRef.current === 'sun' ? 70
+                  : panelDragRef.current === 'planet' ? 32
                   : (panelDragRef.current === 'circle' ? 44 : 40),
             height: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
                   : panelDragRef.current === 'pendulum-rope' ? 52
+                  : panelDragRef.current === 'sun' ? 70
+                  : panelDragRef.current === 'planet' ? 32
                   : (panelDragRef.current === 'circle' ? 44 : 40),
-            borderRadius: panelDragRef.current === 'circle' || panelDragRef.current === 'pivot' ? '50%'
+            borderRadius: panelDragRef.current === 'circle' || panelDragRef.current === 'pivot' || panelDragRef.current === 'sun' || panelDragRef.current === 'planet' ? '50%'
                         : panelDragRef.current === 'pendulum-rope' ? 12
                         : 10,
             background: panelDragRef.current === 'circle'
@@ -2062,12 +2081,18 @@ export const SandboxCanvas: React.FC = () => {
                     ? 'rgba(139,92,246,0.55)'
                     : panelDragRef.current === 'spring'
                       ? 'rgba(16,185,129,0.55)'
-                      : 'rgba(251,191,36,0.55)',
+                      : panelDragRef.current === 'sun'
+                        ? 'rgba(234,179,8,0.7)'
+                        : panelDragRef.current === 'planet'
+                          ? 'rgba(14,165,233,0.7)'
+                          : 'rgba(251,191,36,0.55)',
             border: `2px solid ${
               panelDragRef.current === 'pendulum-rope' ? '#818cf8' :
               panelDragRef.current === 'circle' || panelDragRef.current === 'spring' ? '#6ee7b7' :
               panelDragRef.current === 'rectangle' ? '#a5b4fc' :
-              panelDragRef.current === 'pivot' ? '#c084fc' : '#fde047'
+              panelDragRef.current === 'pivot' ? '#c084fc' :
+              panelDragRef.current === 'sun' ? '#f97316' :
+              panelDragRef.current === 'planet' ? '#38bdf8' : '#fde047'
             }`,
             display: 'flex',
             alignItems: 'center',
@@ -2087,6 +2112,8 @@ export const SandboxCanvas: React.FC = () => {
           {panelDragRef.current === 'spring' && '🌀'}
           {panelDragRef.current === 'rope' && '🔗'}
           {panelDragRef.current === 'pendulum-rope' && '🪢'}
+          {panelDragRef.current === 'sun' && '☀️'}
+          {panelDragRef.current === 'planet' && '🌎'}
         </div>
       )}
 
