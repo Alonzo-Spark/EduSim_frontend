@@ -502,9 +502,10 @@ export class PropertyController {
 
     // Sync centralized store metadata AND the in-place object metadata
     if (['mass', 'friction', 'restitution', 'static', 'radius', 'influenceRadius', 'gravityStrength', 'isGravitySource', 'affectedByGravity', 'orbitalCategory'].includes(property)) {
-      if (!obj.metadata) obj.metadata = {};
-      if (!obj.metadata.customData) obj.metadata.customData = {};
-      (obj.metadata.customData as any)[property] = value;
+      const anyObj = obj as any;
+      if (!anyObj.metadata) anyObj.metadata = {};
+      if (!anyObj.metadata.customData) anyObj.metadata.customData = {};
+      anyObj.metadata.customData[property] = value;
 
       this.store.updateMetadata(objectId, {
         customData: {

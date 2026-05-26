@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X } from 'lucide-react';
+import { Sparkles, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SandboxRuntime } from '../engine/runtime';
 import type { RuntimeObject } from '../types/RuntimeObject';
 import type { Body } from 'matter-js';
@@ -86,6 +86,7 @@ async function buildScene(
     vp.addChild(obj.display);
     rt.physics.addBodies(obj.body);
     rt.sync.register(obj.id, obj.body, obj.display);
+    store.addObject(obj);
   };
 
   const addDynamic = (obj: RuntimeObject) => {
@@ -104,17 +105,17 @@ async function buildScene(
   // ── Static boundaries ─────────────────────────────────────────────────────
   addStatic(createObject({
     id: 'ground', type: 'rectangle',
-    x: W / 2, y: H - 40, width: W, height: 28,
+    x: W / 2, y: H - 40, width: 5000, height: 28,
     isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1,
   }));
   addStatic(createObject({
     id: 'wall-l', type: 'rectangle',
-    x: -4, y: H / 2, width: 16, height: H * 2,
+    x: -8, y: H / 2, width: 16, height: 5000,
     isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1,
   }));
   addStatic(createObject({
     id: 'wall-r', type: 'rectangle',
-    x: W + 4, y: H / 2, width: 16, height: H * 2,
+    x: W + 8, y: H / 2, width: 16, height: 5000,
     isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1,
   }));
 
@@ -135,6 +136,8 @@ export const SandboxCanvas: React.FC = () => {
   const dynRef = useRef<Body[]>([]);
 
   const [running, setRunning] = useState(false);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [ready, setReady] = useState(false);
   const [bodyCount, setBodyCount] = useState(0);
   const [gravity, setGravity] = useState<GravityPreset>('earth');
@@ -301,7 +304,7 @@ export const SandboxCanvas: React.FC = () => {
     if (!rt || !creg) return;
 
     const allBodies = rt.physics.getWorld().bodies;
-    const sensors = allBodies.filter(b => b.label && b.label.startsWith('sensor-target:'));
+    const sensors = allBodies.filter((b: any) => b.label && b.label.startsWith('sensor-target:'));
 
     for (const sensor of sensors) {
       const dist = Math.hypot(newBody.position.x - sensor.position.x, newBody.position.y - sensor.position.y);
@@ -494,7 +497,7 @@ export const SandboxCanvas: React.FC = () => {
 
             if (clickedBodies.length > 0) {
               // Filter out environment boundaries like grounds or walls
-              const targetBody = clickedBodies.find(b => {
+              const targetBody = clickedBodies.find((b: any) => {
                 const id = (b as any).objectId || b.label;
                 return id && !id.startsWith('ground') && !id.startsWith('wall') && id !== 'boundary';
               });
@@ -705,6 +708,52 @@ export const SandboxCanvas: React.FC = () => {
       setRunning(false);
     };
   }, []);
+
+  // Dynamically reposition static borders (ground and walls) when the canvas container resizes
+  useEffect(() => {
+    const el = mountRef.current;
+    if (!el || !ready) return;
+
+    let resizeObserver: ResizeObserver | null = null;
+
+    import('matter-js').then((Matter) => {
+      resizeObserver = new ResizeObserver((entries) => {
+        const store = storeRef.current;
+        if (!store) return;
+
+        for (const entry of entries) {
+          const W = entry.contentRect.width || el.clientWidth;
+          const H = entry.contentRect.height || el.clientHeight;
+
+          const ground = store.getObject('ground');
+          const wallR = store.getObject('wall-r');
+          const wallL = store.getObject('wall-l');
+
+          if (ground) {
+            Matter.Body.setPosition(ground.body, { x: W / 2, y: H - 40 });
+            ground.display.x = W / 2;
+            ground.display.y = H - 40;
+          }
+          if (wallR) {
+            Matter.Body.setPosition(wallR.body, { x: W + 8, y: H / 2 });
+            wallR.display.x = W + 8;
+            wallR.display.y = H / 2;
+          }
+          if (wallL) {
+            Matter.Body.setPosition(wallL.body, { x: -8, y: H / 2 });
+            wallL.display.x = -8;
+            wallL.display.y = H / 2;
+          }
+        }
+      });
+
+      resizeObserver.observe(el);
+    });
+
+    return () => {
+      resizeObserver?.disconnect();
+    };
+  }, [ready]);
 
   // ── Controls ───────────────────────────────────────────────────────────────
 
@@ -1733,7 +1782,19 @@ export const SandboxCanvas: React.FC = () => {
   return (
     <div style={S.root}>
       {/* ── Left panel ─────────────────────────────────────── */}
-      <aside style={S.panel}>
+      <aside
+        style={{
+          ...S.panel,
+          width: leftPanelOpen ? 288 : 0,
+          minWidth: leftPanelOpen ? 268 : 0,
+          padding: leftPanelOpen ? '20px 16px' : 0,
+          borderRight: leftPanelOpen ? S.panel.borderRight : 'none',
+          opacity: leftPanelOpen ? 1 : 0,
+          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          overflowY: leftPanelOpen ? 'auto' : 'hidden',
+          overflowX: 'hidden',
+        }}
+      >
         <div style={S.header}>
           <span style={S.pulse} />
           <span style={S.tag}>Interactive Physics</span>
@@ -2163,6 +2224,83 @@ export const SandboxCanvas: React.FC = () => {
         <div style={S.dotGrid} />
         <div ref={mountRef} style={S.mount} />
 
+        {/* Floating Sidebar Toggle Buttons */}
+        <button
+          onClick={() => setLeftPanelOpen((open) => !open)}
+          style={{
+            position: 'absolute',
+            left: 14,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 350,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(15, 23, 42, 0.65)',
+            color: '#a5b4fc',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            outline: 'none',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(99, 102, 241, 0.85)';
+            e.currentTarget.style.color = '#ffffff';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(15, 23, 42, 0.65)';
+            e.currentTarget.style.color = '#a5b4fc';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+          }}
+          title={leftPanelOpen ? 'Collapse Left Panel' : 'Expand Left Panel'}
+        >
+          {leftPanelOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+        </button>
+
+        <button
+          onClick={() => setRightPanelOpen((open) => !open)}
+          style={{
+            position: 'absolute',
+            right: 14,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 350,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(15, 23, 42, 0.65)',
+            color: '#a5b4fc',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            outline: 'none',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(99, 102, 241, 0.85)';
+            e.currentTarget.style.color = '#ffffff';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(15, 23, 42, 0.65)';
+            e.currentTarget.style.color = '#a5b4fc';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+          }}
+          title={rightPanelOpen ? 'Collapse Right Panel' : 'Expand Right Panel'}
+        >
+          {rightPanelOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+
         {/* Asset drag-over visual highlight — pointer events always off, window listener handles the drop */}
         <div
           style={{
@@ -2348,7 +2486,19 @@ export const SandboxCanvas: React.FC = () => {
       </div>
 
       {/* ── Right panel ─────────────────────────────────────── */}
-      <aside style={S.rightSidebar}>
+      <aside
+        style={{
+          ...S.rightSidebar,
+          width: rightPanelOpen ? 320 : 0,
+          minWidth: rightPanelOpen ? 300 : 0,
+          padding: rightPanelOpen ? '20px 16px' : 0,
+          borderLeft: rightPanelOpen ? S.rightSidebar.borderLeft : 'none',
+          opacity: rightPanelOpen ? 1 : 0,
+          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          overflowY: rightPanelOpen ? 'auto' : 'hidden',
+          overflowX: 'hidden',
+        }}
+      >
         {propertyControllerRef.current && storeRef.current && (
           <PropertyPanel
             store={storeRef.current}
@@ -2451,12 +2601,14 @@ const S: Record<string, React.CSSProperties> = {
     width: 288, minWidth: 268, height: '100%', padding: '20px 16px',
     background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(20px)',
     borderRight: '1px solid rgba(255,255,255,0.06)',
-    display: 'flex', flexDirection: 'column', overflowY: 'auto'
+    display: 'flex', flexDirection: 'column', overflowY: 'auto',
+    flexShrink: 0
   },
   rightSidebar: {
     width: 320, minWidth: 300, height: '100%', background: 'rgba(15,23,42,0.92)',
     backdropFilter: 'blur(20px)', borderLeft: '1px solid rgba(255,255,255,0.06)',
-    display: 'flex', flexDirection: 'column', overflowY: 'auto'
+    display: 'flex', flexDirection: 'column', overflowY: 'auto',
+    flexShrink: 0
   },
   header: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 },
   pulse: {
