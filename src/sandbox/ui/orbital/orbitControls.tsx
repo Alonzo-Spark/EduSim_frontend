@@ -66,8 +66,11 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
   const setOrbitRadius = (newRadius: number) => {
     if (!centralSource || !runtime) return;
 
-    const dx = body.position.x - centralSource.position.x;
-    const dy = body.position.y - centralSource.position.y;
+    const parentBody = runtime?.sync.getPairs().get(centralSource.id)?.body || store?.getObject(centralSource.id)?.body;
+    const parentPos = parentBody ? parentBody.position : centralSource.position;
+
+    const dx = body.position.x - parentPos.x;
+    const dy = body.position.y - parentPos.y;
     const dist = Math.hypot(dx, dy);
 
     if (dist > 0.001) {
@@ -75,30 +78,37 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
       const dirX = dx / dist;
       const dirY = dy / dist;
 
-      const newX = centralSource.position.x + dirX * newRadius;
-      const newY = centralSource.position.y + dirY * newRadius;
+      const newX = parentPos.x + dirX * newRadius;
+      const newY = parentPos.y + dirY * newRadius;
 
       // Position Matter body cleanly
       Matter.Body.setPosition(body, { x: newX, y: newY });
 
-      // 2. Recompute orbital velocity & tangential direction
+      // 2. Recompute orbital velocity & tangential direction with softening matching gravitySystem
+      const gravityStrength = centralSource.metadata?.gravityStrength ?? 1.0;
       const G = radialGravity?.config?.gravitationalConstant ?? OrbitUtils.DEFAULT_G;
-      const M = centralSource.mass;
+      const M = centralSource.mass * gravityStrength;
+      const softening = radialGravity?.config?.softeningFactor ?? 100;
 
-      // v = sqrt(GM / r) * 16.67
-      const circSpeed = OrbitUtils.computeStableOrbitVelocity(G, M, newRadius) * 16.67;
+      // v = sqrt(G * M * newRadius / (newRadius * newRadius + softening)) * 16.67
+      const circSpeed = Math.sqrt((G * M * newRadius) / (newRadius * newRadius + softening)) * 16.67;
 
-      const crossProduct = dx * body.velocity.y - dy * body.velocity.x;
+      const currentVxRel = body.velocity.x - (parentBody ? parentBody.velocity.x : 0);
+      const currentVyRel = body.velocity.y - (parentBody ? parentBody.velocity.y : 0);
+      const crossProduct = dx * currentVyRel - dy * currentVxRel;
       const clockwise = crossProduct >= 0;
       const tangentDir = OrbitUtils.computeTangentialDirection(
-        centralSource.position,
+        parentPos,
         { x: newX, y: newY },
         clockwise
       );
 
-      // 3. Apply new velocity
-      const newVx = tangentDir.x * circSpeed;
-      const newVy = tangentDir.y * circSpeed;
+      // 3. Apply new velocity (incorporating parent body velocity transition)
+      const parentVx = parentBody ? parentBody.velocity.x : 0;
+      const parentVy = parentBody ? parentBody.velocity.y : 0;
+
+      const newVx = parentVx + tangentDir.x * circSpeed;
+      const newVy = parentVy + tangentDir.y * circSpeed;
 
       propertyController.updateProperty(selectedObject.id, 'vx', newVx);
       propertyController.updateProperty(selectedObject.id, 'vy', newVy);
@@ -123,14 +133,18 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
   // ─── 2. Velocity Adjustments & Stabilization ──────────────────────────────
 
   const applyThrust = (percentChange: number) => {
-    const vx = body.velocity.x;
-    const vy = body.velocity.y;
-    const speed = Math.hypot(vx, vy);
+    const parentBody = runtime?.sync.getPairs().get(centralSource?.id)?.body || store?.getObject(centralSource?.id)?.body;
+    const parentVx = parentBody ? parentBody.velocity.x : 0;
+    const parentVy = parentBody ? parentBody.velocity.y : 0;
 
-    if (speed > 0.0001) {
-      const newSpeed = speed * (1 + percentChange);
-      const newVx = (vx / speed) * newSpeed;
-      const newVy = (vy / speed) * newSpeed;
+    const relVx = body.velocity.x - parentVx;
+    const relVy = body.velocity.y - parentVy;
+    const relSpeed = Math.hypot(relVx, relVy);
+
+    if (relSpeed > 0.0001) {
+      const newRelSpeed = relSpeed * (1 + percentChange);
+      const newVx = parentVx + (relVx / relSpeed) * newRelSpeed;
+      const newVy = parentVy + (relVy / relSpeed) * newRelSpeed;
 
       propertyController.updateProperty(selectedObject.id, 'vx', newVx);
       propertyController.updateProperty(selectedObject.id, 'vy', newVy);
@@ -143,33 +157,68 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
   const circularizeOrbit = () => {
     if (!centralSource) return;
 
-    const r = OrbitUtils.calculateDistance(centralSource.position, body.position);
-    const G = radialGravity?.config?.gravitationalConstant ?? OrbitUtils.DEFAULT_G;
-    const M = centralSource.mass;
+    // STEP 2 — Compute Correct Radius Vector using actual runtime body centers (Matter.js body positions)
+    const parentBody = runtime?.sync.getPairs().get(centralSource.id)?.body || store?.getObject(centralSource.id)?.body;
+    const parentPos = parentBody ? parentBody.position : centralSource.position;
 
-    // 1. Compute stable circular velocity
-    const circSpeed = OrbitUtils.computeStableOrbitVelocity(G, M, r) * 16.67;
+    const dx = body.position.x - parentPos.x;
+    const dy = body.position.y - parentPos.y;
 
-    // 2. Compute tangential direction and remove radial velocity component
-    const dx = body.position.x - centralSource.position.x;
-    const dy = body.position.y - centralSource.position.y;
-    const crossProduct = dx * body.velocity.y - dy * body.velocity.x;
+    // STEP 3 — Normalize Radius Vector and handle division by zero
+    const r = Math.hypot(dx, dy);
+    if (r <= 0.0001) return;
+
+    const normalizedRadius = {
+      x: dx / r,
+      y: dy / r,
+    };
+
+    // STEP 4 — Compute Correct Tangential Direction
+    // velocity MUST be perpendicular to radius vector.
+    // Determine orbit direction based on the current velocity cross product
+    const currentVxRel = body.velocity.x - (parentBody ? parentBody.velocity.x : 0);
+    const currentVyRel = body.velocity.y - (parentBody ? parentBody.velocity.y : 0);
+    const crossProduct = dx * currentVyRel - dy * currentVxRel;
     const clockwise = crossProduct >= 0;
 
-    const tangentDir = OrbitUtils.computeTangentialDirection(
-      centralSource.position,
-      body.position,
-      clockwise
-    );
+    // tangent vector = {-ny, nx} for clockwise, {ny, -nx} for counter-clockwise
+    const tangent = clockwise
+      ? { x: -normalizedRadius.y, y: normalizedRadius.x }
+      : { x: normalizedRadius.y, y: -normalizedRadius.x };
 
-    // 3. Apply new tangential velocity
-    const newVx = tangentDir.x * circSpeed;
-    const newVy = tangentDir.y * circSpeed;
+    // STEP 5 — Compute Correct Circular Velocity using Plummer Softening
+    const gravityStrength = centralSource.metadata?.gravityStrength ?? 1.0;
+    const G = radialGravity?.config?.gravitationalConstant ?? OrbitUtils.DEFAULT_G;
+    const M = centralSource.mass * gravityStrength;
+    const softening = radialGravity?.config?.softeningFactor ?? 100;
 
+    // v = sqrt(G * M * r / (r^2 + softening)) * 16.67
+    const circSpeed = Math.sqrt((G * M * r) / (r * r + softening)) * 16.67;
+
+    // STEP 6 — Completely Overwrite Velocity (incorporating parent body velocity transition)
+    const parentVx = parentBody ? parentBody.velocity.x : 0;
+    const parentVy = parentBody ? parentBody.velocity.y : 0;
+
+    const newVx = parentVx + tangent.x * circSpeed;
+    const newVy = parentVy + tangent.y * circSpeed;
+
+    // STEP 7 — Remove Radial Velocity Completely (tangent vector calculation ensures radial component is exactly 0)
+    // Diagnostics / Debugging output (STEP 11)
+    const radialVelocity = currentVxRel * normalizedRadius.x + currentVyRel * normalizedRadius.y;
+    console.log("[Orbit Circularization Diagnostics] (fix1010)");
+    console.log("Radius:", r);
+    console.log("Circular Velocity:", circSpeed);
+    console.log("Tangential Vector:", tangent);
+    console.log("Radial Velocity:", radialVelocity);
+    console.log("Circular Speed Ratio:", 1.0);
+    console.log("Parent Velocity:", { x: parentVx, y: parentVy });
+    console.log("New World Velocity:", { x: newVx, y: newVy });
+
+    // Apply the absolute new velocity to both property controller and Matter.js body
     propertyController.updateProperty(selectedObject.id, 'vx', newVx);
     propertyController.updateProperty(selectedObject.id, 'vy', newVy);
-
     Matter.Body.setVelocity(body, { x: newVx, y: newVy });
+
     triggerRefresh();
   };
 
@@ -177,7 +226,14 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
   const setEllipticalOrbit = () => {
     if (!centralSource) return;
 
-    const r = OrbitUtils.calculateDistance(centralSource.position, body.position);
+    const parentBody = runtime?.sync.getPairs().get(centralSource.id)?.body || store?.getObject(centralSource.id)?.body;
+    const parentPos = parentBody ? parentBody.position : centralSource.position;
+
+    const dx = body.position.x - parentPos.x;
+    const dy = body.position.y - parentPos.y;
+    const r = Math.hypot(dx, dy);
+    if (r <= 0.0001) return;
+
     const G = radialGravity?.config?.gravitationalConstant ?? OrbitUtils.DEFAULT_G;
     const M = centralSource.mass;
 
@@ -185,17 +241,24 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
     const eccentricity = 0.35;
     const ellipSpeed = Math.sqrt((G * M * (1 + eccentricity)) / r) * 16.67;
 
-    const dx = body.position.x - centralSource.position.x;
-    const dy = body.position.y - centralSource.position.y;
-    const crossProduct = dx * body.velocity.y - dy * body.velocity.x;
+    const currentVxRel = body.velocity.x - (parentBody ? parentBody.velocity.x : 0);
+    const currentVyRel = body.velocity.y - (parentBody ? parentBody.velocity.y : 0);
+    const crossProduct = dx * currentVyRel - dy * currentVxRel;
     const clockwise = crossProduct >= 0;
 
-    const velVec = OrbitUtils.calculateTangentialVelocityVector(
-      centralSource.position,
+    const tangentDir = OrbitUtils.computeTangentialDirection(
+      parentPos,
       body.position,
-      ellipSpeed,
       clockwise
     );
+
+    const parentVx = parentBody ? parentBody.velocity.x : 0;
+    const parentVy = parentBody ? parentBody.velocity.y : 0;
+
+    const velVec = {
+      x: parentVx + tangentDir.x * ellipSpeed,
+      y: parentVy + tangentDir.y * ellipSpeed,
+    };
 
     propertyController.updateProperty(selectedObject.id, 'vx', velVec.x);
     propertyController.updateProperty(selectedObject.id, 'vy', velVec.y);
@@ -268,6 +331,7 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
 
     // Calculate stable circular speed around the parent
     const G = radialGravity?.config?.gravitationalConstant ?? OrbitUtils.DEFAULT_G;
+    const softening = radialGravity?.config?.softeningFactor ?? 100;
     OrbitSpawner.spawnCircularOrbit(
       {
         centerBody: parentObj.body,
@@ -276,7 +340,8 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
         angle: -Math.PI / 2,
         clockwise: true,
       },
-      G
+      G,
+      softening
     );
 
     // Register into the runtime and visual layers

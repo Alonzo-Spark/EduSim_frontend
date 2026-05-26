@@ -164,8 +164,35 @@ export class OrbitalObservables {
     G: number
   ): OrbitalStateSnapshot {
     const timestamp = Date.now();
-    const M = (centerBody as any).customData?.mass ?? centerBody.mass ?? 800;
-    const m = orbitingBody.mass || 1.0;
+    
+    let baseMass = 800;
+    let strength = 1.0;
+
+    if (centerBody) {
+      if ((centerBody as any).customData?.mass !== undefined) {
+        baseMass = (centerBody as any).customData.mass;
+      } else if (centerBody.mass !== undefined) {
+        baseMass = centerBody.mass;
+      }
+
+      // Retrieve gravityStrength from either Matter.Body customData or GravitySource metadata
+      const customData = (centerBody as any).customData;
+      if (customData) {
+        if (customData.gravityStrength !== undefined) {
+          strength = customData.gravityStrength;
+        } else if (customData.celestialConfig?.gravityStrength !== undefined) {
+          strength = customData.celestialConfig.gravityStrength;
+        }
+      }
+
+      const metadata = (centerBody as any).metadata;
+      if (metadata && metadata.gravityStrength !== undefined) {
+        strength = metadata.gravityStrength;
+      }
+    }
+
+    const M = baseMass * strength;
+    const m = (orbitingBody as any).customData?.mass ?? orbitingBody.mass ?? 1.0;
     const r = this.calculateOrbitalRadius(centerBody.position, orbitingBody.position);
     const speed = this.calculateOrbitalVelocity(orbitingBody.velocity);
 

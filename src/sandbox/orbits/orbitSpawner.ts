@@ -18,21 +18,34 @@ export class OrbitSpawner {
    */
   public static getEffectiveMass(body: Matter.Body): number {
     if (!body) return 1;
+    let baseMass = 1;
     if ((body as any).customData?.mass !== undefined) {
-      return (body as any).customData.mass;
+      baseMass = (body as any).customData.mass;
+    } else if (body.isStatic) {
+      baseMass = 800; // Standard solar mass default
+    } else {
+      baseMass = body.mass || 1;
     }
-    // If the body is a static central star
-    if (body.isStatic) {
-      return 800; // Standard solar mass default
+
+    // Multiply by gravityStrength multiplier if configured
+    const customData = (body as any).customData;
+    let strength = 1.0;
+    if (customData) {
+      if (customData.gravityStrength !== undefined) {
+        strength = customData.gravityStrength;
+      } else if (customData.celestialConfig?.gravityStrength !== undefined) {
+        strength = customData.celestialConfig.gravityStrength;
+      }
     }
-    return body.mass || 1;
+
+    return baseMass * strength;
   }
 
   /**
    * Spawns a stable circular orbit around a center body.
    * If radius is not specified, uses the current distance between the two bodies.
    */
-  public static spawnCircularOrbit(options: OrbitSpawnOptions, G = OrbitUtils.DEFAULT_G): void {
+  public static spawnCircularOrbit(options: OrbitSpawnOptions, G = OrbitUtils.DEFAULT_G, softeningFactor = 100): void {
     const { centerBody, orbitingBody, angle = 0, clockwise = true, initialVelocityMultiplier = 1.0 } = options;
 
     if (!centerBody || !orbitingBody) {
@@ -43,14 +56,9 @@ export class OrbitSpawner {
     // 1. Calculate effective radius
     let r = options.radius;
     if (r === undefined || r <= 0) {
-      // Sandbox-friendly: Use current distance if no radius is explicitly configured
       r = OrbitUtils.calculateDistance(centerBody.position, orbitingBody.position);
     }
-
-    // Edge case: If they are overlapping or distance is zero, default to a safe value
-    if (r < 10) {
-      r = 150;
-    }
+    if (r < 10) r = 150;
 
     // 2. Position orbiting body at the target radius relative to the center body
     const finalAngle = options.radius !== undefined ? angle : Math.atan2(
@@ -60,25 +68,26 @@ export class OrbitSpawner {
 
     const targetX = centerBody.position.x + r * Math.cos(finalAngle);
     const targetY = centerBody.position.y + r * Math.sin(finalAngle);
-
     Matter.Body.setPosition(orbitingBody, { x: targetX, y: targetY });
 
-    // 3. Compute stable orbital circular speed: v = sqrt(G * M / r) * dt
+    // 3. Compute stable orbital circular speed using softening-aware formula:
+    //    v = sqrt(G * M * r / (r^2 + softening)) * dt
     const M = this.getEffectiveMass(centerBody);
-    let speed = OrbitUtils.calculateCircularOrbitVelocity(G, M, r) * 16.67;
-
-    // Apply scaling factor (e.g. for escape velocity demonstration or user offsets)
+    let speed = OrbitUtils.calculateCircularOrbitVelocity(G, M, r, softeningFactor) * 16.67;
     speed *= initialVelocityMultiplier;
 
     // 4. Compute perpendicular velocity vector tangent to center body
     const velVec = OrbitUtils.calculateTangentialVelocityVector(
       centerBody.position,
-      orbitingBody.position,
+      { x: targetX, y: targetY },
       speed,
       clockwise
     );
 
-    // 5. Apply velocity safely to the Matter body without breaking its rotation
+    // Galilean frame transition: Add parent velocity for stable orbit in moving frame
+    velVec.x += centerBody.velocity.x;
+    velVec.y += centerBody.velocity.y;
+
     Matter.Body.setVelocity(orbitingBody, velVec);
   }
 
@@ -135,6 +144,10 @@ export class OrbitSpawner {
       speed,
       clockwise
     );
+
+    // Galilean frame transition: Add parent velocity to make the orbit stable in a moving frame
+    velVec.x += centerBody.velocity.x;
+    velVec.y += centerBody.velocity.y;
 
     // 5. Apply velocity cleanly to Matter body
     Matter.Body.setVelocity(orbitingBody, velVec);

@@ -58,7 +58,8 @@ export const OrbitalInspector: React.FC<OrbitalInspectorProps> = ({
   }
 
   const G = radialGravity?.config?.gravitationalConstant ?? OrbitUtils.DEFAULT_G;
-  const M = centralSource.mass;
+  const gravityStrength = centralSource.metadata?.gravityStrength ?? 1.0;
+  const M = centralSource.mass * gravityStrength;
   const m = body.mass;
 
   // 1. Generate live telemetry snapshot using our centralized Observables calculations
@@ -109,14 +110,15 @@ export const OrbitalInspector: React.FC<OrbitalInspectorProps> = ({
       break;
   }
 
-  // Force pulling F_g
-  const gravityStrength = centralSource.metadata?.gravityStrength ?? 1.0;
+  // Force pulling F_g using physical radius scale (r = radiusVal / 100)
   const radiusVal = snap.radius.value as number;
-  const force = (G * M * m * gravityStrength) / (radiusVal * radiusVal + (radialGravity?.config?.softeningFactor ?? 100));
+  const physicalR = radiusVal / 100;
+  const force = (G * M * m) / (physicalR * physicalR + (radialGravity?.config?.softeningFactor ?? 100));
 
-  // Circular speed ratio
-  const vCircular = OrbitUtils.calculateCircularOrbitVelocity(G, M, snap.radius.value as number) * 16.67;
-  const speedRatio = (snap.velocity.value as number) / (vCircular || 1.0);
+  // Circular speed ratio using physical velocity scales for accurate educational values
+  const physicalVCircular = OrbitUtils.calculateCircularOrbitVelocity(G, M, physicalR, radialGravity?.config?.softeningFactor ?? 100) * 16.67;
+  const physicalSpeed = (snap.velocity.value as number) / 10;
+  const speedRatio = physicalSpeed / (physicalVCircular || 1.0);
 
   return (
     <div style={S.container}>

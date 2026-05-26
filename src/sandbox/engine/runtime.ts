@@ -37,6 +37,7 @@ export class SandboxRuntime {
   private state: RuntimeState = 'idle';
   private rafId:  number | null = null;
   private lastTs: number = 0;
+  private accumulator = 0;
   private readonly hooks = new Map<string, RuntimeHook>();
 
   constructor() {
@@ -67,6 +68,7 @@ export class SandboxRuntime {
     if (this.state === 'destroyed') throw new Error('[SandboxRuntime] Cannot start a destroyed runtime.');
     this.state  = 'running';
     this.lastTs = performance.now();
+    this.accumulator = 0;
     this.rafId  = requestAnimationFrame(this.loop);
   }
 
@@ -95,6 +97,7 @@ export class SandboxRuntime {
     this.pause();
     this.physics.reset();
     this.sync.clear();
+    this.accumulator = 0;
 
     const vp = this.renderer.getViewport();
     vp.removeChildren();
@@ -122,11 +125,22 @@ export class SandboxRuntime {
     const dt = Math.min(ts - this.lastTs, 100);
     this.lastTs = ts;
 
-    // 1. beforeStep hooks (drag forces, user input, etc.)
-    this.hooks.forEach((h) => h.beforeStep?.(dt));
+    // Fixed timestep accumulator to prevent orbital velocity decay and numerical drift
+    this.accumulator += dt;
+    const fixedTimeStep = 16.67;
+    let stepsRun = 0;
 
-    // 2. Physics step
-    this.physics.step(dt);
+    // Limit maximum steps per frame to avoid "spiral of death" during extreme lag spikes
+    while (this.accumulator >= fixedTimeStep && stepsRun < 5) {
+      // 1. beforeStep hooks (gravity, drag forces, user input, etc.)
+      this.hooks.forEach((h) => h.beforeStep?.(fixedTimeStep));
+
+      // 2. Physics step
+      this.physics.step(fixedTimeStep);
+
+      this.accumulator -= fixedTimeStep;
+      stepsRun++;
+    }
 
     // 3. Sync sprites → physics positions
     this.sync.flush();

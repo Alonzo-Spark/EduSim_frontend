@@ -137,7 +137,8 @@ export const OrbitVectorsOverlay: React.FC<OrbitVectorsOverlayProps> = ({
 
       const starPos = centralSource.position;
       const G = radialGravity?.config?.gravitationalConstant ?? OrbitUtils.DEFAULT_G;
-      const M = centralSource.mass;
+      const gravityStrength = centralSource.metadata?.gravityStrength ?? 1.0;
+      const M = centralSource.mass * gravityStrength;
       const m = body.mass;
       const r = minDistance;
 
@@ -175,8 +176,7 @@ export const OrbitVectorsOverlay: React.FC<OrbitVectorsOverlayProps> = ({
 
       // 4. Draw Gravitational Pull / Force Vector (Red Arrow)
       if (vectorConfig.showForceVectors) {
-        const gravityStrength = centralSource.metadata?.gravityStrength ?? 1.0;
-        const force = (G * M * m * gravityStrength) / (r * r + (radialGravity?.config?.softeningFactor ?? 100));
+        const force = (G * M * m) / (r * r + (radialGravity?.config?.softeningFactor ?? 100));
 
         // Point arrow exactly towards central body center
         const dx = starPos.x - bodyPos.x;

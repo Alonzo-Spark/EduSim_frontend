@@ -13,21 +13,22 @@ export class OrbitUtils {
   public static readonly DEFAULT_G = 0.0012;
 
   /**
-   * Calculates the orbital velocity required for a stable circular orbit at radius r.
-   * Formula: v = sqrt(G * M / r)
+   * Calculates the orbital velocity required for a stable circular orbit at radius r,
+   * incorporating the gravity engine's softening factor for perfect stability.
+   * Formula: v = sqrt(G * M * r / (r^2 + softening))
    */
-  public static calculateCircularOrbitVelocity(G: number, M: number, r: number): number {
+  public static calculateCircularOrbitVelocity(G: number, M: number, r: number, softening = 100): number {
     if (r <= 0 || G <= 0 || M <= 0) return 0;
-    return Math.sqrt((G * M) / r);
+    return Math.sqrt((G * M * r) / (r * r + softening));
   }
 
   /**
-   * Calculates the escape velocity at a given radius r.
-   * Formula: v = sqrt(2 * G * M / r)
+   * Calculates the escape velocity at a given radius r, incorporating softening.
+   * Formula: v = sqrt(2 * G * M * r / (r^2 + softening))
    */
-  public static calculateEscapeVelocity(G: number, M: number, r: number): number {
+  public static calculateEscapeVelocity(G: number, M: number, r: number, softening = 100): number {
     if (r <= 0 || G <= 0 || M <= 0) return 0;
-    return Math.sqrt((2 * G * M) / r);
+    return Math.sqrt((2 * G * M * r) / (r * r + softening));
   }
 
   /**
@@ -127,8 +128,8 @@ export class OrbitUtils {
   /**
    * Computes circular orbit velocity.
    */
-  public static computeStableOrbitVelocity(G: number, M: number, r: number): number {
-    return this.calculateCircularOrbitVelocity(G, M, r);
+  public static computeStableOrbitVelocity(G: number, M: number, r: number, softening = 100): number {
+    return this.calculateCircularOrbitVelocity(G, M, r, softening);
   }
 
   /**
@@ -190,6 +191,10 @@ export class OrbitUtils {
       speed,
       clockwise
     );
+
+    // Galilean frame transition: Add parent velocity to make the orbit stable in a moving frame
+    velVec.x += centerBody.velocity.x;
+    velVec.y += centerBody.velocity.y;
 
     Matter.Body.setVelocity(orbitingBody, velVec);
   }

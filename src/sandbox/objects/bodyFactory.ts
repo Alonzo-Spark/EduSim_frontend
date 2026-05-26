@@ -42,11 +42,13 @@ export function createBody(config: BodyConfig): Matter.Body {
     isStatic    = false,
     restitution = 0.4,
     friction    = 0.1,
-    frictionAir = 0.01,
     density     = 0.001,
     angle       = 0,
     label       = config.type,
   } = config;
+
+  // Use nullish coalescing so frictionAir=0 is respected (not treated as falsy like JS default= would do)
+  const frictionAir = config.frictionAir ?? 0.01;
 
   const options: Matter.IChamferableBodyDefinition = {
     isStatic,

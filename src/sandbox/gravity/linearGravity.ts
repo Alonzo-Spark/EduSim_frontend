@@ -28,12 +28,11 @@ export class LinearGravity {
   }
 
   /**
-   * Disable built-in linear gravity (sets gravity vector to 0).
+   * Disable built-in linear gravity (sets scale to 0 so the gravity vector direction is preserved).
    */
   disable(): void {
     this.isEnabled = false;
-    this.engine.gravity.x = 0;
-    this.engine.gravity.y = 0;
+    this.engine.gravity.scale = 0;
   }
 
   /**
@@ -54,8 +53,7 @@ export class LinearGravity {
     if (this.isEnabled) {
       this.applyToEngine();
     } else {
-      this.engine.gravity.x = 0;
-      this.engine.gravity.y = 0;
+      this.engine.gravity.scale = 0;
     }
   }
 
@@ -76,5 +74,6 @@ export class LinearGravity {
   private applyToEngine(): void {
     this.engine.gravity.x = this.gravityX;
     this.engine.gravity.y = this.gravityY;
+    this.engine.gravity.scale = 0.001; // standard Matter.js gravity scale
   }
 }

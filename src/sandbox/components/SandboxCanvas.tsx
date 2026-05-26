@@ -341,6 +341,81 @@ export const SandboxCanvas: React.FC = () => {
     }
   }, []);
 
+  const stabilizeDraggedCelestial = useCallback(async (body: Body) => {
+    const rt = runtimeRef.current;
+    const store = storeRef.current;
+    const customData = (body as any).customData;
+    if (!rt || !store || !customData?.celestialConfig) return;
+
+    const config = customData.celestialConfig;
+    const virtualMass = customData.mass ?? body.mass;
+    const canvasX = body.position.x;
+    const canvasY = body.position.y;
+
+    const radialGravity = rt.gravitySystem.getRadialGravity();
+    const activeSources = radialGravity.getSources();
+
+    let parentSource = null;
+    let minDist = Infinity;
+
+    for (const src of activeSources) {
+      if (src.id === (body as any).objectId) continue;
+      const dist = Math.hypot(src.position.x - canvasX, src.position.y - canvasY);
+      if (src.mass > virtualMass && dist < minDist) {
+        minDist = dist;
+        parentSource = src;
+      }
+    }
+
+    if (!parentSource) {
+      for (const src of activeSources) {
+        if (src.id === (body as any).objectId) continue;
+        const dist = Math.hypot(src.position.x - canvasX, src.position.y - canvasY);
+        if (dist < minDist) {
+          minDist = dist;
+          parentSource = src;
+        }
+      }
+    }
+
+    if (parentSource) {
+      const parentBody = rt.sync.getPairs().get(parentSource.id)?.body || store.getObject(parentSource.id)?.body;
+      if (parentBody) {
+        customData.parentGravitySource = parentSource.id;
+        console.log(`[Celestial Drag Stabilizer] Parent detected: ${parentSource.id} for dragged body: ${(body as any).objectId}`);
+
+        const parentRadius = parentBody.circleRadius || (parentBody as any).customData?.celestialConfig?.radius || 35;
+        const childRadius = body.circleRadius || config.radius || 14;
+        const minSafeRadius = parentRadius + childRadius + 30;
+
+        let currentRadius = minDist;
+        if (currentRadius < minSafeRadius) {
+          currentRadius = minSafeRadius;
+        }
+
+        const angle = Math.atan2(canvasY - parentBody.position.y, canvasX - parentBody.position.x);
+        const G = radialGravity.getConfig().gravitationalConstant;
+        const softening = radialGravity.getConfig().softeningFactor ?? 100;
+
+        const { OrbitSpawner } = await import('../orbits/orbitSpawner');
+        
+        OrbitSpawner.spawnCircularOrbit({
+          centerBody: parentBody,
+          orbitingBody: body,
+          radius: currentRadius,
+          angle: angle,
+          clockwise: config.orbitalDefaults?.preferredDirection !== 'counterclockwise',
+          initialVelocityMultiplier: config.orbitalDefaults?.initialVelocityMultiplier ?? 1.0,
+        }, G, softening);
+
+        console.log(`[Celestial Drag Stabilizer] Orbit re-stabilized around ${parentSource.id} at radius ${currentRadius.toFixed(1)}`);
+      }
+    }
+  }, []);
+
+  const stabilizeDraggedCelestialRef = useRef<((body: Body) => void) | null>(null);
+  stabilizeDraggedCelestialRef.current = stabilizeDraggedCelestial;
+
   // ── Mount ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -527,6 +602,12 @@ export const SandboxCanvas: React.FC = () => {
             Matter.Events.on(mc, 'enddrag', (event: any) => {
               if (event.body) {
                 checkConstraintSnapping(event.body);
+
+                // If it is a celestial body, automatically stabilize its orbit around the nearest gravity source!
+                const customData = (event.body as any).customData;
+                if (customData?.celestialComponent && customData?.celestialConfig?.affectedByGravity) {
+                  stabilizeDraggedCelestialRef.current?.(event.body);
+                }
               }
             });
           }
@@ -755,6 +836,7 @@ export const SandboxCanvas: React.FC = () => {
 
     // 3. Solve and apply circular orbital velocity using our standardized OrbitSpawner module
     const G = rt.gravitySystem.getRadialGravity().getConfig().gravitationalConstant;
+    const softening = rt.gravitySystem.getRadialGravity().getConfig().softeningFactor ?? 100;
     const { OrbitSpawner } = await import('../orbits/orbitSpawner');
     OrbitSpawner.spawnCircularOrbit({
       centerBody: star.body,
@@ -762,7 +844,7 @@ export const SandboxCanvas: React.FC = () => {
       radius: offset,
       angle: angle,
       clockwise: true,
-    }, G);
+    }, G, softening);
 
     rt.renderer.getViewport().addChild(planetObj.display);
     rt.physics.addBodies(planetObj.body);
@@ -1285,6 +1367,8 @@ export const SandboxCanvas: React.FC = () => {
     };
     obj.body.customData = customData;
     obj.body.label = asset.name;
+    // Ensure all celestial bodies have exactly 0 air friction (no atmosphere in space)
+    obj.body.frictionAir = 0;
     obj.metadata = {
       ...obj.metadata,
       ...customData,
@@ -1381,6 +1465,7 @@ export const SandboxCanvas: React.FC = () => {
 
           const angle = Math.atan2(canvasY - parentBody.position.y, canvasX - parentBody.position.x);
           const G = radialGravity.getConfig().gravitationalConstant;
+          const softening = radialGravity.getConfig().softeningFactor ?? 100;
 
           const { OrbitSpawner } = await import('../orbits/orbitSpawner');
           
@@ -1391,7 +1476,7 @@ export const SandboxCanvas: React.FC = () => {
             angle: angle,
             clockwise: config.orbitalDefaults?.preferredDirection !== 'counterclockwise',
             initialVelocityMultiplier: config.orbitalDefaults?.initialVelocityMultiplier ?? 1.0,
-          }, G);
+          }, G, softening);
 
           console.log(`[Celestial Initializer] Orbit stable initialized around ${parentSource.id} at radius ${currentRadius.toFixed(1)}`);
         }
@@ -1419,7 +1504,7 @@ export const SandboxCanvas: React.FC = () => {
     const { spawnType, spawnConfig } = asset;
     const isCelestial = !!asset.celestialConfig;
 
-    const base = {
+    const base: any = {
       x: canvasX,
       y: canvasY,
       restitution: spawnConfig.restitution ?? 0.5,
@@ -1433,6 +1518,7 @@ export const SandboxCanvas: React.FC = () => {
     };
 
     if (isCelestial) {
+      base.frictionAir = 0; // Space has no atmosphere; celestial bodies must orbit without drag!
       if (asset.celestialConfig?.type === 'star') {
         base.isStatic = true;
       }

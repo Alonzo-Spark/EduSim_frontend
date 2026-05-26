@@ -26,7 +26,7 @@ export class RadialGravity {
       mode: 'radial',
       gravitationalConstant: config.gravitationalConstant ?? 0.001,
       softeningFactor: config.softeningFactor ?? 100, // plummer softening
-      maxForceClamp: config.maxForceClamp ?? 0.05,   // prevents explosions
+      maxForceClamp: config.maxForceClamp ?? 50.0,   // prevents explosions while allowing stable orbital physics
       debug: config.debug ?? false,
     };
   }
@@ -194,11 +194,12 @@ export class RadialGravity {
 
     if (denominator <= 0) return targetForceVec;
 
-    const dist = Math.sqrt(denominator);
+    const physicalDist = Math.sqrt(distSq);
+    if (physicalDist <= 0.0001) return targetForceVec;
 
-    // Normalize force direction
-    const dirX = dx / dist;
-    const dirY = dy / dist;
+    // Normalize force direction along the true physical line of sight
+    const dirX = dx / physicalDist;
+    const dirY = dy / physicalDist;
 
     // F = (G * M * m) / denominator
     const G = this.config.gravitationalConstant;
@@ -299,9 +300,12 @@ export class RadialGravity {
         const denominator = distSq + softening;
         if (denominator <= 0) continue;
 
-        const dist = Math.sqrt(denominator);
-        const dirX = dx / dist;
-        const dirY = dy / dist;
+        const physicalDist = Math.sqrt(distSq);
+        if (physicalDist <= 0.0001) continue;
+
+        // Normalize force direction along the true physical line of sight
+        const dirX = dx / physicalDist;
+        const dirY = dy / physicalDist;
 
         const strength = source.metadata?.gravityStrength !== undefined ? source.metadata.gravityStrength : 1.0;
         let forceMag = (G * source.mass * mass * strength) / denominator;
