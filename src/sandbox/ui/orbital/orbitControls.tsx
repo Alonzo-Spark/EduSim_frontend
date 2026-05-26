@@ -227,43 +227,33 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
     if (!centralSource) return;
 
     const parentBody = runtime?.sync.getPairs().get(centralSource.id)?.body || store?.getObject(centralSource.id)?.body;
-    const parentPos = parentBody ? parentBody.position : centralSource.position;
+    if (!parentBody) return;
 
-    const dx = body.position.x - parentPos.x;
-    const dy = body.position.y - parentPos.y;
-    const r = Math.hypot(dx, dy);
-    if (r <= 0.0001) return;
-
+    const dx = body.position.x - parentBody.position.x;
+    const dy = body.position.y - parentBody.position.y;
     const G = radialGravity?.config?.gravitationalConstant ?? OrbitUtils.DEFAULT_G;
-    const M = centralSource.mass;
 
-    // Vis-Viva elliptical velocity equation at periapsis: v_p = sqrt(G * M * (1 + e) / r) * 16.67
-    const eccentricity = 0.35;
-    const ellipSpeed = Math.sqrt((G * M * (1 + eccentricity)) / r) * 16.67;
-
-    const currentVxRel = body.velocity.x - (parentBody ? parentBody.velocity.x : 0);
-    const currentVyRel = body.velocity.y - (parentBody ? parentBody.velocity.y : 0);
+    // Determine current orbit direction based on the velocity cross product
+    const currentVxRel = body.velocity.x - parentBody.velocity.x;
+    const currentVyRel = body.velocity.y - parentBody.velocity.y;
     const crossProduct = dx * currentVyRel - dy * currentVxRel;
     const clockwise = crossProduct >= 0;
 
-    const tangentDir = OrbitUtils.computeTangentialDirection(
-      parentPos,
-      body.position,
-      clockwise
-    );
+    // Use our new complete elliptical orbit spawner
+    import('../../orbits/ellipticalOrbit').then(({ spawnEllipticalOrbit }) => {
+      spawnEllipticalOrbit({
+        centerBody: parentBody,
+        orbitingBody: body,
+        velocityMultiplier: 0.8, // 0.8 creates a beautiful bound elliptical orbit (periapsis < radius)
+        clockwise,
+        stabilization: true
+      }, G);
 
-    const parentVx = parentBody ? parentBody.velocity.x : 0;
-    const parentVy = parentBody ? parentBody.velocity.y : 0;
-
-    const velVec = {
-      x: parentVx + tangentDir.x * ellipSpeed,
-      y: parentVy + tangentDir.y * ellipSpeed,
-    };
-
-    propertyController.updateProperty(selectedObject.id, 'vx', velVec.x);
-    propertyController.updateProperty(selectedObject.id, 'vy', velVec.y);
-    Matter.Body.setVelocity(body, velVec);
-    triggerRefresh();
+      // Sync computed velocities back to the property controllers
+      propertyController.updateProperty(selectedObject.id, 'vx', body.velocity.x);
+      propertyController.updateProperty(selectedObject.id, 'vy', body.velocity.y);
+      triggerRefresh();
+    });
   };
 
   // Dynamically Stabilize Orbit: snaps velocity to stable circular orbit at current distance
