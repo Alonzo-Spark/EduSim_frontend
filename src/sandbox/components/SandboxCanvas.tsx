@@ -231,61 +231,7 @@ export const SandboxCanvas: React.FC = () => {
     };
   }, [ready]);
 
-  // Newton Second Law HUD DOM refs
-  const hudForceRef = useRef<HTMLSpanElement>(null);
-  const hudMassRef = useRef<HTMLSpanElement>(null);
-  const hudAccRef = useRef<HTMLSpanElement>(null);
-  const hudFormulaRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let frameId: number;
-    const updateHud = () => {
-      const store = storeRef.current;
-      const controller = propertyControllerRef.current;
-      const obs = observableEngineRef.current;
-      if (selected && store && controller) {
-        const force = controller.getActiveForce(selected.id);
-        const forceMag = Math.hypot(force.x, force.y);
-        const mass = selected.body.mass;
-
-        let accMag = 0;
-        if (obs) {
-          const metrics = obs.getObservables(selected.id);
-          if (metrics && metrics.acceleration) {
-            accMag = metrics.acceleration.magnitude;
-          }
-        }
-
-        // Live text updates based directly on the applied force to isolate F = ma physics educationally
-        const forceMagScaled = forceMag * 100;
-        const accMagScaled = forceMagScaled / mass;
-
-        if (hudForceRef.current) {
-          hudForceRef.current.innerText = `${forceMagScaled.toFixed(1)} N`;
-        }
-        if (hudMassRef.current) {
-          hudMassRef.current.innerText = `${mass.toFixed(1)} kg`;
-        }
-        if (hudAccRef.current) {
-          hudAccRef.current.innerText = `${accMagScaled.toFixed(2)} m/s²`;
-        }
-        if (hudFormulaRef.current) {
-          hudFormulaRef.current.innerHTML = `
-            <div style="font-size: 15px; font-weight: 800; color: #fde047; text-shadow: 0 0 10px rgba(253,224,71,0.25);">
-              F = m &middot; a
-            </div>
-            <div style="font-size: 11px; color: #94a3b8; margin-top: 4px; font-family: monospace; font-weight: 600;">
-              ${forceMagScaled.toFixed(1)} N = ${mass.toFixed(1)} kg &times; ${accMagScaled.toFixed(2)} m/s&sup2;
-            </div>
-          `;
-        }
-      }
-      frameId = requestAnimationFrame(updateHud);
-    };
-
-    frameId = requestAnimationFrame(updateHud);
-    return () => cancelAnimationFrame(frameId);
-  }, [selected, propertyVersion]);
 
   // Panel drag-and-drop state
   type PanelDragType = 'circle' | 'rectangle' | 'pendulum-rope' | 'pivot' | 'spring' | 'rope' | 'sun' | 'planet' | null;
@@ -2353,34 +2299,7 @@ export const SandboxCanvas: React.FC = () => {
 
 
 
-        {/* Floating glassmorphic STEM Laboratory HUD Overlay */}
-        {selected && (
-          <div style={S.floatingHud}>
-            <div style={S.floatingHudTitle}>🔬 F = ma Educational HUD</div>
-            <div ref={hudFormulaRef} style={S.floatingHudEq}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#fde047', textShadow: '0 0 10px rgba(253,224,71,0.25)' }}>
-                F = m &middot; a
-              </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, fontFamily: 'monospace' }}>
-                0.0 N = 10.0 kg &times; 0.00 m/s&sup2;
-              </div>
-            </div>
-            <div style={S.floatingHudGrid}>
-              <div style={S.floatingHudCard}>
-                <span style={S.floatingHudLabel}>Applied Force</span>
-                <span ref={hudForceRef} style={{ ...S.floatingHudValue, color: '#ef4444' }}>0.0 N</span>
-              </div>
-              <div style={S.floatingHudCard}>
-                <span style={S.floatingHudLabel}>Mass</span>
-                <span ref={hudMassRef} style={{ ...S.floatingHudValue, color: '#c084fc' }}>10.0 kg</span>
-              </div>
-              <div style={S.floatingHudCard}>
-                <span style={S.floatingHudLabel}>Applied Accel.</span>
-                <span ref={hudAccRef} style={{ ...S.floatingHudValue, color: '#10b981' }}>0.00 m/s²</span>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Floating AI Response Panel — hidden when tutor is off */}
         <AnimatePresence>

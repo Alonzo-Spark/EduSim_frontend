@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { OrbitUtils } from '../../orbits/orbitUtils';
 import { OrbitalObservables } from '../../observables/orbital/orbitalObservables';
+import { KeplerObservable } from '../../observables/orbital/keplerObservable';
 import type { PropertyController } from '../../properties/propertyController';
 import type { RuntimeObject } from '../../types/RuntimeObject';
 
@@ -14,6 +15,7 @@ export const OrbitalInspector: React.FC<OrbitalInspectorProps> = ({
   propertyController,
 }) => {
   const [, setTick] = useState(0);
+  const keplerInstancesRef = useRef<Map<string, KeplerObservable>>(new Map());
 
   // High-frequency telemetry updates
   useEffect(() => {
@@ -65,7 +67,17 @@ export const OrbitalInspector: React.FC<OrbitalInspectorProps> = ({
   // 1. Generate live telemetry snapshot using our centralized Observables calculations
   const snap = OrbitalObservables.generateOrbitalSnapshot(centralSource, body, G);
 
-  // 2. Fetch forward projected orbit path to get periapsis/apoapsis
+  // 2. Resolve or construct our state-preserving Kepler analytics instance
+  let keplerObs = keplerInstancesRef.current.get(selectedObject.id);
+  if (!keplerObs || (keplerObs as any).centerBody.id !== centralSource.id) {
+    keplerObs = new KeplerObservable(centralSource, body, G);
+    keplerInstancesRef.current.set(selectedObject.id, keplerObs);
+  }
+
+  // 3. Compute continuous Keplerian metrics and educational insights
+  const keplerMetrics = keplerObs.updateKeplerMetrics(16.67);
+
+  // 4. Fetch forward projected orbit path to get periapsis/apoapsis prediction bounds
   const predictedPoints = radialGravity?.getPredictedOrbit(
     { id: selectedObject.id, body, mass: m, affectedByGravity: true },
     220
@@ -170,6 +182,70 @@ export const OrbitalInspector: React.FC<OrbitalInspectorProps> = ({
         </div>
       </div>
 
+      {/* ── Kepler Orbital Analytics (Example 7.1) ── */}
+      <div style={S.telemetryGroup}>
+        <div style={S.groupLabel}>🪐 Kepler Orbital Analytics (Ex. 7.1)</div>
+
+        <div style={S.teleRow}>
+          <span style={S.teleLabel}>Measured Eccentricity (e)</span>
+          <div style={S.teleValueWrapper}>
+            <span style={{
+              ...S.teleValue,
+              color: keplerMetrics.orbitType === 'circular' ? '#34d399' : keplerMetrics.orbitType === 'elliptical' ? '#7dd3fc' : '#fbbf24'
+            }}>
+              {keplerMetrics.eccentricity.toFixed(4)}
+            </span>
+            <span style={{
+              fontSize: 9,
+              fontWeight: 800,
+              padding: '1px 5px',
+              borderRadius: 4,
+              textTransform: 'uppercase',
+              background: keplerMetrics.orbitType === 'circular' ? 'rgba(16, 185, 129, 0.15)' : keplerMetrics.orbitType === 'elliptical' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(251, 191, 36, 0.15)',
+              color: keplerMetrics.orbitType === 'circular' ? '#34d399' : keplerMetrics.orbitType === 'elliptical' ? '#7dd3fc' : '#fcd34d',
+            }}>
+              {keplerMetrics.orbitType}
+            </span>
+          </div>
+        </div>
+
+        <div style={S.teleRow}>
+          <span style={S.teleLabel}>Perihelion Speed (v_P)</span>
+          <div style={S.teleValueWrapper}>
+            <span style={{ ...S.teleValue, color: '#34d399' }}>
+              {(keplerMetrics.perihelionVelocity * 10).toFixed(1)} km/s
+            </span>
+          </div>
+        </div>
+
+        <div style={S.teleRow}>
+          <span style={S.teleLabel}>Aphelion Speed (v_A)</span>
+          <div style={S.teleValueWrapper}>
+            <span style={{ ...S.teleValue, color: '#fbbf24' }}>
+              {snap.isStable.status === 'escape' ? 'N/A' : `${(keplerMetrics.aphelionVelocity * 10).toFixed(1)} km/s`}
+            </span>
+          </div>
+        </div>
+
+        <div style={S.teleRow}>
+          <span style={S.teleLabel}>Kepler Velocity Ratio</span>
+          <div style={S.teleValueWrapper}>
+            <span style={{ ...S.teleValue, color: '#a78bfa' }}>
+              {snap.isStable.status === 'escape' ? '∞' : `${keplerMetrics.velocityRatio.toFixed(2)}x`}
+            </span>
+          </div>
+        </div>
+
+        {/* Live Tutor / Educational Insights Callout Box */}
+        <div style={S.insightBox}>
+          {keplerMetrics.insights.map((insight, idx) => (
+            <p key={idx} style={S.insightText}>
+              ● {insight}
+            </p>
+          ))}
+        </div>
+      </div>
+
       {/* ── Apoapsis / Periapsis HUD ── */}
       <div style={S.telemetryGroup}>
         <div style={S.groupLabel}>📏 Predicted Extremes</div>
@@ -177,7 +253,7 @@ export const OrbitalInspector: React.FC<OrbitalInspectorProps> = ({
         <div style={S.teleRow}>
           <span style={S.teleLabel}>Periapsis (Closest)</span>
           <div style={S.teleValueWrapper}>
-            <span style={{ ...S.teleValue, color: '#10b981' }}>{periapsis.toFixed(1)} px</span>
+            <span style={{ ...S.teleValue, color: '#10b981' }}>{(periapsis * 100).toFixed(0)} km</span>
           </div>
         </div>
 
@@ -185,7 +261,7 @@ export const OrbitalInspector: React.FC<OrbitalInspectorProps> = ({
           <span style={S.teleLabel}>Apoapsis (Furthest)</span>
           <div style={S.teleValueWrapper}>
             <span style={{ ...S.teleValue, color: '#fbbf24' }}>
-              {snap.isStable.status === 'escape' ? '∞' : `${apoapsis.toFixed(1)} px`}
+              {snap.isStable.status === 'escape' ? '∞' : `${(apoapsis * 100).toFixed(0)} km`}
             </span>
           </div>
         </div>
@@ -318,5 +394,22 @@ const S = {
     fontWeight: 700,
     color: '#f8fafc',
     fontFamily: 'monospace',
+  },
+  insightBox: {
+    marginTop: 6,
+    padding: '8px 10px',
+    background: 'rgba(167, 139, 250, 0.06)',
+    borderLeft: '3px solid #a78bfa',
+    borderRadius: 4,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 4,
+  },
+  insightText: {
+    fontSize: 9.5,
+    color: '#cbd5e1',
+    lineHeight: 1.4,
+    margin: 0,
+    textAlign: 'left' as const,
   },
 };
