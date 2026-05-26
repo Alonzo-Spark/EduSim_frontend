@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { OrbitUtils } from '../../orbits/orbitUtils';
 import { OrbitalObservables } from '../../observables/orbital/orbitalObservables';
 import { KeplerObservable } from '../../observables/orbital/keplerObservable';
+import { KeplerThirdLawObservable } from '../../observables/orbital/keplerThirdLawObservable';
 import type { PropertyController } from '../../properties/propertyController';
 import type { RuntimeObject } from '../../types/RuntimeObject';
 
@@ -16,6 +17,7 @@ export const OrbitalInspector: React.FC<OrbitalInspectorProps> = ({
 }) => {
   const [, setTick] = useState(0);
   const keplerInstancesRef = useRef<Map<string, KeplerObservable>>(new Map());
+  const keplerThirdLawInstancesRef = useRef<Map<string, KeplerThirdLawObservable>>(new Map());
 
   // High-frequency telemetry updates
   useEffect(() => {
@@ -74,8 +76,15 @@ export const OrbitalInspector: React.FC<OrbitalInspectorProps> = ({
     keplerInstancesRef.current.set(selectedObject.id, keplerObs);
   }
 
+  let keplerThirdLawObs = keplerThirdLawInstancesRef.current.get(selectedObject.id);
+  if (!keplerThirdLawObs || (keplerThirdLawObs as any).centerBody.id !== centralSource.id) {
+    keplerThirdLawObs = new KeplerThirdLawObservable(centralSource, body, G);
+    keplerThirdLawInstancesRef.current.set(selectedObject.id, keplerThirdLawObs);
+  }
+
   // 3. Compute continuous Keplerian metrics and educational insights
   const keplerMetrics = keplerObs.updateKeplerMetrics(16.67);
+  const thirdLawMetrics = keplerThirdLawObs.updateOrbitalPeriodMetrics(16.67);
 
   // 4. Fetch forward projected orbit path to get periapsis/apoapsis prediction bounds
   const predictedPoints = radialGravity?.getPredictedOrbit(
@@ -236,9 +245,45 @@ export const OrbitalInspector: React.FC<OrbitalInspectorProps> = ({
           </div>
         </div>
 
+        <div style={S.teleRow}>
+          <span style={S.teleLabel}>Completed Years (Revs)</span>
+          <div style={S.teleValueWrapper}>
+            <span style={{ ...S.teleValue, color: '#38bdf8' }}>
+              {thirdLawMetrics.revolutionCount} revs
+            </span>
+          </div>
+        </div>
+
+        <div style={S.teleRow}>
+          <span style={S.teleLabel}>Current Year Progress</span>
+          <div style={S.teleValueWrapper}>
+            <span style={{ ...S.teleValue, color: '#fb7185' }}>
+              {((Math.abs((thirdLawMetrics as any).accumulatedAngle || 0) / (2 * Math.PI)) * 100).toFixed(0)}%
+            </span>
+          </div>
+        </div>
+
+        <div style={S.teleRow}>
+          <span style={S.teleLabel}>Measured Year Length (T)</span>
+          <div style={S.teleValueWrapper}>
+            <span style={{ ...S.teleValue, color: '#34d399' }}>
+              {thirdLawMetrics.rollingAveragePeriod > 0 ? `${thirdLawMetrics.rollingAveragePeriod.toFixed(2)} s` : 'Measuring...'}
+            </span>
+          </div>
+        </div>
+
+        <div style={S.teleRow}>
+          <span style={S.teleLabel}>Kepler T²/a³ Constant</span>
+          <div style={S.teleValueWrapper}>
+            <span style={{ ...S.teleValue, color: '#a78bfa', fontSize: 11 }}>
+              {thirdLawMetrics.rollingAveragePeriod > 0 ? thirdLawMetrics.keplerConstant.toExponential(4) : 'Measuring...'}
+            </span>
+          </div>
+        </div>
+
         {/* Live Tutor / Educational Insights Callout Box */}
         <div style={S.insightBox}>
-          {keplerMetrics.insights.map((insight, idx) => (
+          {[...keplerMetrics.insights, ...thirdLawMetrics.insights].map((insight, idx) => (
             <p key={idx} style={S.insightText}>
               ● {insight}
             </p>
