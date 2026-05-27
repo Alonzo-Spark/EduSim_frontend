@@ -8,6 +8,7 @@ export interface EllipticalOrbitOptions {
   velocityMultiplier: number;
   clockwise?: boolean;
   initialRadius?: number;
+  initialAngle?: number;
   stabilization?: boolean;
 }
 
@@ -53,6 +54,7 @@ export function spawnEllipticalOrbit(
     velocityMultiplier,
     clockwise = true,
     initialRadius,
+    initialAngle,
     stabilization = true,
   } = options;
 
@@ -85,17 +87,28 @@ export function spawnEllipticalOrbit(
     r = minSafeRadius;
   }
 
+  let finalAngle = Math.atan2(radiusVector.y, radiusVector.x);
+
   // Use initialRadius if specifically provided and stabilization is enabled
   if (stabilization && initialRadius !== undefined && initialRadius > 0) {
     r = Math.max(minSafeRadius, initialRadius);
-    const angle = Math.atan2(radiusVector.y, radiusVector.x);
-    const targetX = centerBody.position.x + r * Math.cos(angle);
-    const targetY = centerBody.position.y + r * Math.sin(angle);
+    if (initialAngle !== undefined) {
+      finalAngle = initialAngle;
+    }
+    const targetX = centerBody.position.x + r * Math.cos(finalAngle);
+    const targetY = centerBody.position.y + r * Math.sin(finalAngle);
     Matter.Body.setPosition(orbitingBody, { x: targetX, y: targetY });
   }
 
+  // Recalculate radiusVector based on final actual position
+  const finalRadiusVector = {
+    x: orbitingBody.position.x - centerBody.position.x,
+    y: orbitingBody.position.y - centerBody.position.y,
+  };
+  const finalR = Math.hypot(finalRadiusVector.x, finalRadiusVector.y);
+
   // STEP 4 — Compute Tangential Direction
-  const normalizedRadius = r > 0.0001 ? { x: radiusVector.x / r, y: radiusVector.y / r } : { x: 1, y: 0 };
+  const normalizedRadius = finalR > 0.0001 ? { x: finalRadiusVector.x / finalR, y: finalRadiusVector.y / finalR } : { x: Math.cos(finalAngle), y: Math.sin(finalAngle) };
   const clockwiseDir = clockwise !== false;
   const tangent = clockwiseDir
     ? { x: -normalizedRadius.y, y: normalizedRadius.x }
@@ -168,6 +181,8 @@ export function spawnEllipticalOrbit(
   customData.periapsis = periapsis;
   customData.apoapsis = apoapsis;
   customData.isEscapeTrajectory = isEscape;
+  customData.referenceRadius = r;
+  customData.referenceAngle = finalAngle;
   (orbitingBody as any).customData = customData;
 
   // STEP 13 — Debugging & Diagnostics

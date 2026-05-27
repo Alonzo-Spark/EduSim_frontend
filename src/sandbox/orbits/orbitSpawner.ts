@@ -89,6 +89,11 @@ export class OrbitSpawner {
     velVec.y += centerBody.velocity.y;
 
     Matter.Body.setVelocity(orbitingBody, velVec);
+
+    if (!(orbitingBody as any).customData) (orbitingBody as any).customData = {};
+    (orbitingBody as any).customData.referenceRadius = r;
+    (orbitingBody as any).customData.referenceAngle = finalAngle;
+    (orbitingBody as any).customData.orbitType = 'circular';
   }
 
   /**
@@ -151,5 +156,10 @@ export class OrbitSpawner {
 
     // 5. Apply velocity cleanly to Matter body
     Matter.Body.setVelocity(orbitingBody, velVec);
+
+    if (!(orbitingBody as any).customData) (orbitingBody as any).customData = {};
+    (orbitingBody as any).customData.referenceRadius = r_p;
+    (orbitingBody as any).customData.referenceAngle = finalAngle;
+    (orbitingBody as any).customData.orbitType = 'elliptical';
   }
 }

@@ -114,6 +114,13 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
       propertyController.updateProperty(selectedObject.id, 'vy', newVy);
 
       Matter.Body.setVelocity(body, { x: newVx, y: newVy });
+
+      const customData = (body as any).customData || {};
+      customData.referenceRadius = newRadius;
+      customData.referenceAngle = Math.atan2(dy, dx);
+      customData.orbitType = 'circular';
+      (body as any).customData = customData;
+
       triggerRefresh();
     }
   };
@@ -149,6 +156,13 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
       propertyController.updateProperty(selectedObject.id, 'vx', newVx);
       propertyController.updateProperty(selectedObject.id, 'vy', newVy);
       Matter.Body.setVelocity(body, { x: newVx, y: newVy });
+
+      const customData = (body as any).customData || {};
+      customData.referenceRadius = Math.hypot(body.position.x - parentBody.position.x, body.position.y - parentBody.position.y);
+      customData.referenceAngle = Math.atan2(body.position.y - parentBody.position.y, body.position.x - parentBody.position.x);
+      customData.orbitType = 'elliptical';
+      (body as any).customData = customData;
+
       triggerRefresh();
     }
   };
@@ -219,6 +233,12 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
     propertyController.updateProperty(selectedObject.id, 'vy', newVy);
     Matter.Body.setVelocity(body, { x: newVx, y: newVy });
 
+    const customData = (body as any).customData || {};
+    customData.referenceRadius = r;
+    customData.referenceAngle = Math.atan2(dy, dx);
+    customData.orbitType = 'circular';
+    (body as any).customData = customData;
+
     triggerRefresh();
   };
 
@@ -239,6 +259,11 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
     const crossProduct = dx * currentVyRel - dy * currentVxRel;
     const clockwise = crossProduct >= 0;
 
+    // Retrieve stable reference radius and angle to make successive clicks idempotent
+    const customData = (body as any).customData || {};
+    const refRadius = customData.referenceRadius || Math.hypot(dx, dy);
+    const refAngle = customData.referenceAngle !== undefined ? customData.referenceAngle : Math.atan2(dy, dx);
+
     // Use our new complete elliptical orbit spawner
     import('../../orbits/ellipticalOrbit').then(({ spawnEllipticalOrbit }) => {
       spawnEllipticalOrbit({
@@ -246,6 +271,8 @@ export const OrbitControls: React.FC<OrbitControlsProps> = ({
         orbitingBody: body,
         velocityMultiplier: 0.8, // 0.8 creates a beautiful bound elliptical orbit (periapsis < radius)
         clockwise,
+        initialRadius: refRadius,
+        initialAngle: refAngle,
         stabilization: true
       }, G);
 
