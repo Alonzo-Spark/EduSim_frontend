@@ -49,7 +49,7 @@ export default function InteractiveFormulaCard({ formulaRaw }: Props) {
           <Activity className="w-4 h-4" />
           {title}
         </h4>
-        <div className="text-3xl sm:text-4xl">
+        <div className="text-2xl sm:text-3xl md:text-4xl overflow-x-auto w-full max-w-full custom-scrollbar py-2 text-center">
           <BlockMath math={expression} />
         </div>
       </div>

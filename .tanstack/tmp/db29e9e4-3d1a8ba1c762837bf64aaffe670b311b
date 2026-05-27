@@ -11,15 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TutorRouteImport } from './routes/tutor'
 import { Route as SimulationGeneratorRouteImport } from './routes/simulation-generator'
-import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as MySimulationsRouteImport } from './routes/my-simulations'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as FavoritesRouteImport } from './routes/favorites'
-import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AiAgentRouteImport } from './routes/ai-agent'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubjectsClassIdRouteImport } from './routes/subjects.$classId'
@@ -39,11 +36,6 @@ const TutorRoute = TutorRouteImport.update({
 const SimulationGeneratorRoute = SimulationGeneratorRouteImport.update({
   id: '/simulation-generator',
   path: '/simulation-generator',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -66,11 +58,6 @@ const MySimulationsRoute = MySimulationsRouteImport.update({
   path: '/my-simulations',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
   path: '/library',
@@ -79,11 +66,6 @@ const LibraryRoute = LibraryRouteImport.update({
 const FavoritesRoute = FavoritesRouteImport.update({
   id: '/favorites',
   path: '/favorites',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AiAgentRoute = AiAgentRouteImport.update({
@@ -143,15 +125,12 @@ const SimulationClass9PhysicsLawsOfMotionProjectileMotionRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ai-agent': typeof AiAgentRoute
-  '/dashboard': typeof DashboardRoute
   '/favorites': typeof FavoritesRoute
   '/library': typeof LibraryRoute
-  '/login': typeof LoginRoute
   '/my-simulations': typeof MySimulationsRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
-  '/signup': typeof SignupRoute
   '/simulation-generator': typeof SimulationGeneratorRoute
   '/tutor': typeof TutorRoute
   '/formula-lab/$topic': typeof FormulaLabTopicRoute
@@ -166,15 +145,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ai-agent': typeof AiAgentRoute
-  '/dashboard': typeof DashboardRoute
   '/favorites': typeof FavoritesRoute
   '/library': typeof LibraryRoute
-  '/login': typeof LoginRoute
   '/my-simulations': typeof MySimulationsRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
-  '/signup': typeof SignupRoute
   '/simulation-generator': typeof SimulationGeneratorRoute
   '/tutor': typeof TutorRoute
   '/formula-lab/$topic': typeof FormulaLabTopicRoute
@@ -190,15 +166,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ai-agent': typeof AiAgentRoute
-  '/dashboard': typeof DashboardRoute
   '/favorites': typeof FavoritesRoute
   '/library': typeof LibraryRoute
-  '/login': typeof LoginRoute
   '/my-simulations': typeof MySimulationsRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
-  '/signup': typeof SignupRoute
   '/simulation-generator': typeof SimulationGeneratorRoute
   '/tutor': typeof TutorRoute
   '/formula-lab/$topic': typeof FormulaLabTopicRoute
@@ -215,15 +188,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ai-agent'
-    | '/dashboard'
     | '/favorites'
     | '/library'
-    | '/login'
     | '/my-simulations'
     | '/profile'
     | '/progress'
     | '/settings'
-    | '/signup'
     | '/simulation-generator'
     | '/tutor'
     | '/formula-lab/$topic'
@@ -238,15 +208,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/ai-agent'
-    | '/dashboard'
     | '/favorites'
     | '/library'
-    | '/login'
     | '/my-simulations'
     | '/profile'
     | '/progress'
     | '/settings'
-    | '/signup'
     | '/simulation-generator'
     | '/tutor'
     | '/formula-lab/$topic'
@@ -261,15 +228,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/ai-agent'
-    | '/dashboard'
     | '/favorites'
     | '/library'
-    | '/login'
     | '/my-simulations'
     | '/profile'
     | '/progress'
     | '/settings'
-    | '/signup'
     | '/simulation-generator'
     | '/tutor'
     | '/formula-lab/$topic'
@@ -285,15 +249,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AiAgentRoute: typeof AiAgentRoute
-  DashboardRoute: typeof DashboardRoute
   FavoritesRoute: typeof FavoritesRoute
   LibraryRoute: typeof LibraryRoute
-  LoginRoute: typeof LoginRoute
   MySimulationsRoute: typeof MySimulationsRoute
   ProfileRoute: typeof ProfileRoute
   ProgressRoute: typeof ProgressRoute
   SettingsRoute: typeof SettingsRoute
-  SignupRoute: typeof SignupRoute
   SimulationGeneratorRoute: typeof SimulationGeneratorRoute
   TutorRoute: typeof TutorRoute
   FormulaLabTopicRoute: typeof FormulaLabTopicRoute
@@ -319,13 +280,6 @@ declare module '@tanstack/react-router' {
       path: '/simulation-generator'
       fullPath: '/simulation-generator'
       preLoaderRoute: typeof SimulationGeneratorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -356,13 +310,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MySimulationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/library': {
       id: '/library'
       path: '/library'
@@ -375,13 +322,6 @@ declare module '@tanstack/react-router' {
       path: '/favorites'
       fullPath: '/favorites'
       preLoaderRoute: typeof FavoritesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ai-agent': {
@@ -475,15 +415,12 @@ const SimulationClass9PhysicsLawsOfMotionRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AiAgentRoute: AiAgentRoute,
-  DashboardRoute: DashboardRoute,
   FavoritesRoute: FavoritesRoute,
   LibraryRoute: LibraryRoute,
-  LoginRoute: LoginRoute,
   MySimulationsRoute: MySimulationsRoute,
   ProfileRoute: ProfileRoute,
   ProgressRoute: ProgressRoute,
   SettingsRoute: SettingsRoute,
-  SignupRoute: SignupRoute,
   SimulationGeneratorRoute: SimulationGeneratorRoute,
   TutorRoute: TutorRoute,
   FormulaLabTopicRoute: FormulaLabTopicRoute,

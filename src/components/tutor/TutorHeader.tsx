@@ -1,5 +1,5 @@
 import React from "react";
-import { Moon, Bell, User } from "lucide-react";
+import { Plus } from "lucide-react";
 
 interface TutorHeaderProps {
   onNewChat: () => void;
@@ -13,11 +13,11 @@ interface TutorHeaderProps {
 
 export function TutorHeader({ onNewChat, topicTitle, topicContext }: TutorHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex w-full items-center justify-between px-6 py-4 border-b border-border/20 bg-background/80 backdrop-blur-2xl">
-      <div className="flex items-center gap-6">
+    <header className="sticky top-0 z-30 flex w-full items-center justify-between px-4 sm:px-6 py-4 border-b border-white/5 bg-background/80 backdrop-blur-2xl">
+      <div className="flex items-center gap-4 sm:gap-6">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">AI Tutor</h1>
-          <p className="text-sm text-muted-foreground hidden sm:block">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">AI Tutor</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
             Your personal AI learning assistant
           </p>
         </div>
@@ -43,6 +43,14 @@ export function TutorHeader({ onNewChat, topicTitle, topicContext }: TutorHeader
           </div>
         )}
       </div>
+
+      <button
+        onClick={onNewChat}
+        className="flex items-center gap-1.5 rounded-xl border border-white/10 hover:border-violet-500/30 bg-white/5 hover:bg-violet-500/10 px-3 py-2 text-xs font-semibold text-foreground hover:text-violet-200 transition-all cursor-pointer"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        <span>New Chat</span>
+      </button>
     </header>
   );
 }

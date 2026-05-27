@@ -1,13 +1,41 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts, useRouterState } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute, HeadContent, Scripts, useRouterState, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
 
 import { useSidebarStore } from "@/store/useSidebarStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import "katex/dist/katex.min.css";
 
 import appCss from "../styles.css?url";
+
+const PUBLIC_ROUTE_ALLOWLIST = new Set([
+  "/",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+]);
+
+const normalizePathname = (pathname: string) => {
+  if (!pathname) {
+    return "/";
+  }
+
+  if (pathname !== "/" && pathname.endsWith("/")) {
+    return pathname.slice(0, -1);
+  }
+
+  return pathname;
+};
+
+const isPublicRoute = (pathname: string) => PUBLIC_ROUTE_ALLOWLIST.has(normalizePathname(pathname));
+
+const EMPTY_LOGIN_SEARCH = {
+  verify_token: "",
+  reset_token: "",
+};
 
 function NotFoundComponent() {
   return (
@@ -62,14 +90,68 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const routerState = useRouterState();
   const { isCollapsed } = useSidebarStore();
+  const { isAuthenticated, checkAuth } = useAuthStore();
+  const navigate = useNavigate();
   const [isDesktop, setIsDesktop] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    const updateDesktop = () => setIsDesktop(window.innerWidth >= 768);
+    const updateDesktop = () => setIsDesktop(window.innerWidth >= 1024);
     updateDesktop();
     window.addEventListener("resize", updateDesktop);
     return () => window.removeEventListener("resize", updateDesktop);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const verifySession = async () => {
+      await checkAuth();
+      if (!cancelled) {
+        setAuthChecked(true);
+      }
+    };
+
+    verifySession();
+    return () => {
+      cancelled = true;
+    };
+  }, [checkAuth]);
+
+  const pathname = normalizePathname(routerState.location.pathname);
+  const isLandingOrAuthPage = pathname === "/" || pathname === "/login" || pathname === "/signup";
+  const isAuthPage = pathname === "/login" || pathname === "/signup" || pathname === "/forgot-password" || pathname === "/reset-password";
+  const requiresAuth = !isPublicRoute(pathname);
+
+  useEffect(() => {
+    if (!authChecked) {
+      return;
+    }
+
+    if (!isAuthenticated && requiresAuth) {
+      navigate({ to: "/login", search: EMPTY_LOGIN_SEARCH });
+    } else if (isAuthenticated && isAuthPage) {
+      navigate({ to: "/dashboard" });
+    }
+  }, [isAuthenticated, requiresAuth, navigate, isAuthPage, authChecked]);
+
+  if (isLandingOrAuthPage) {
+    return (
+      <div className="min-h-screen w-full relative bg-[#09080F] text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar">
+        <AnimatePresence mode="popLayout">
+          <motion.div
+            key={routerState.location.pathname}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="w-full"
+          >
+            <Outlet />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    );
+  }
   
   return (
     <div className="flex min-h-screen w-full relative bg-background text-foreground overflow-hidden">

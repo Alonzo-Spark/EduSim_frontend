@@ -29,10 +29,11 @@
 .tutor-table-shell tbody tr:last-child td:first-child { border-bottom-left-radius: 1.5rem; }
 .tutor-table-shell tbody tr:last-child td:last-child { border-bottom-right-radius: 1.5rem; }
 
-/* Prevent global vertical scrolling for desktop-app-like pages */
+/* Base sizing — overflow is handled per-route in __root.tsx */
 html, body, #root {
   height: 100%;
-  overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 @custom-variant dark (&:is(.dark *));

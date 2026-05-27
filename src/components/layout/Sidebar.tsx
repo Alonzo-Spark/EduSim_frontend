@@ -51,7 +51,7 @@ export function Sidebar() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setMobileOpen(false)}
-            className="fixed inset-0 z-[35] bg-black/40 backdrop-blur-sm md:hidden"
+            className="fixed inset-0 z-[35] bg-black/40 backdrop-blur-sm lg:hidden"
           />
         )}
       </AnimatePresence>
@@ -62,7 +62,7 @@ export function Sidebar() {
         variants={sidebarVariants}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
         className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-background/80 backdrop-blur-2xl border-r border-border/20 shadow-2xl overflow-hidden transition-colors duration-300 ${
-          isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
         <div className="flex items-center h-20 px-5 mb-4 shrink-0">

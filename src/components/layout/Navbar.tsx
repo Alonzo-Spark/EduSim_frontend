@@ -28,7 +28,7 @@ export function Navbar() {
         <div className="flex items-center gap-3 shrink-0 pointer-events-auto">
           <button 
             onClick={() => setMobileOpen(true)}
-            className="md:hidden w-12 h-12 rounded-full flex items-center justify-center bg-background/80 backdrop-blur-xl border border-border/40 shadow-lg hover:bg-secondary transition-all hover:scale-105 active:scale-95"
+            className="lg:hidden w-12 h-12 rounded-full flex items-center justify-center bg-background/80 backdrop-blur-xl border border-border/40 shadow-lg hover:bg-secondary transition-all hover:scale-105 active:scale-95"
           >
             <Menu className="w-5 h-5 text-foreground" />
           </button>

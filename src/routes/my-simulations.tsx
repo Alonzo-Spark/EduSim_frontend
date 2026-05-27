@@ -94,7 +94,7 @@ function MySimulationsPage() {
 
         <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4">
           {/* Left Panel: Library Sidebar */}
-          <div className="glass-strong rounded-3xl p-4 flex flex-col gap-4 h-[calc(100vh-280px)] min-h-[600px]">
+          <div className="glass-strong rounded-3xl p-4 flex flex-col gap-4 xl:h-[calc(100vh-280px)] xl:min-h-[600px] h-[350px] min-h-[300px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -211,7 +211,7 @@ function MySimulationsPage() {
                     </div>
                     <h2 className="text-2xl font-bold text-foreground">{active.title}</h2>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => toggleFavorite(active.id)}
                       className={`p-2 rounded-xl border transition-all ${active.favorite

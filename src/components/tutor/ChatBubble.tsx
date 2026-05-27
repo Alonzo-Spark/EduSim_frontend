@@ -51,22 +51,22 @@ export function ChatBubble({ content, role, timestamp, topicTitle, onCopy, onReg
       className={`flex w-full mb-2 ${isAi ? "justify-start" : "justify-end"}`}
     >
       <div
-        className={`flex flex-col w-full ${isAi ? "max-w-[800px] items-start" : "max-w-[450px] items-end"}`}
+        className={`flex flex-col w-full ${isAi ? "max-w-[1600px] items-start" : "max-w-[80%] sm:max-w-[70%] md:max-w-[600px] items-end"}`}
       >
         <div
-          className={`relative group flex items-start gap-3 w-fit ${isAi ? "" : "flex-row-reverse"}`}
+          className={`relative group flex items-start gap-2.5 sm:gap-3 w-fit ${isAi ? "" : "flex-row-reverse"}`}
         >
           {isAi && (
-            <div className="w-10 h-10 mt-1 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-[var(--neon-purple)] to-[var(--neon-blue)] glow-purple shadow-lg">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 mt-1 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-[var(--neon-purple)] to-[var(--neon-blue)] glow-purple shadow-lg">
               <span className="text-white text-xs font-bold tracking-wider">AI</span>
             </div>
           )}
 
           <div
-            className={`relative px-6 py-5 rounded-[24px] text-[15px] leading-7 shadow-lg transition-all ${
+            className={`relative rounded-[20px] transition-all duration-200 shadow-md ${
               isAi
-                ? "glass-card border border-white/10 bg-white/5 text-foreground rounded-tl-sm shadow-[0_10px_40px_rgba(0,0,0,0.15)]"
-                : "border border-violet-400/20 bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-tr-sm shadow-[0_10px_30px_rgba(99,102,241,0.25)]"
+                ? "px-4 py-3.5 sm:px-6 sm:py-5 border border-slate-800 bg-slate-900/20 backdrop-blur-sm text-foreground rounded-tl-sm shadow-[0_10px_35px_rgba(0,0,0,0.15)] text-[14.5px] sm:text-[15px] leading-relaxed w-full hover:border-slate-700/80 hover:shadow-[0_12px_40px_rgba(0,0,0,0.2)]"
+                : "px-4 py-2.5 bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-tr-sm shadow-[0_4px_12px_rgba(109,40,217,0.15)] text-sm sm:text-[14.5px] font-medium leading-relaxed hover:-translate-y-[1px] hover:shadow-[0_6px_18px_rgba(109,40,217,0.25)]"
             }`}
           >
             {isAi ? (

@@ -113,7 +113,7 @@ export function ChatWorkspace({
 
       <main className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
         <div
-          className={`mx-auto w-full max-w-[850px] min-h-full flex flex-col px-4 sm:px-6 pb-40 pt-6 ${messages.length === 0 ? "justify-center" : "justify-start"} space-y-6`}
+          className={`mx-auto w-full max-w-[1600px] min-h-full flex flex-col px-4 sm:px-6 md:px-8 pb-40 pt-6 ${messages.length === 0 ? "justify-center" : "justify-start"} space-y-6`}
         >
           {messages.length === 0 && !loading && (
             <div className="flex flex-col items-center justify-center w-full space-y-10 mt-[-5vh]">
