@@ -15,6 +15,11 @@ import { RuntimeObserver } from '../../ai/runtimeObserver';
 import { useExplanationEngine } from '../../ai/explanationEngine';
 import { FloatingAssetPanel } from '../../components/AssetLibrary/FloatingAssetPanel';
 import { physicsEventBus } from '../../ai/physicsEventBus';
+import { useAssetStore } from '../../store/assetStore';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -160,32 +165,73 @@ export const SandboxCanvas: React.FC = () => {
   const handleAiQuery = async () => {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
+
+    // Clear previous AI asset suggestions on every new query
+    useAssetStore.getState().clearSuggestedAssets();
+
     try {
-      const resp = await fetch('/api/tutor/sandbox-query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: aiPrompt })
-      });
+      // ── Fire both calls in parallel ────────────────────────────────────────
+      const [tutorResp, sceneResp] = await Promise.allSettled([
+        // 1. Tutor explanation call — correct endpoint
+        fetch('/api/tutor/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: aiPrompt })
+        }),
+        // 2. Scene parser call
+        fetch('/api/scene/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_input: aiPrompt })
+        }),
+      ]);
 
-      if (!resp.ok) {
-        throw new Error(`Backend error: ${resp.status} ${resp.statusText}`);
-      }
-
-      const json = await resp.json();
-
-      if (json.success && json.data) {
-        const d = json.data;
-        // sandbox-query returns exact shape: title, explanation, formula, effects[], suggestions[]
-        pushExplanation({
-          title: d.title || 'AI Answer',
-          explanation: d.explanation || '',
-          effects: d.effects || [],
-          formula: d.formula || '',
-          suggestions: d.suggestions || []
-        });
+      // ── Handle tutor response ──────────────────────────────────────────────
+      if (tutorResp.status === 'fulfilled') {
+        const resp = tutorResp.value;
+        if (!resp.ok) throw new Error(`Backend error: ${resp.status} ${resp.statusText}`);
+        const json = await resp.json();
+        if (json.success && json.data) {
+          const d = json.data;
+          pushExplanation({
+            title: d.title || 'AI Answer',
+            explanation: d.ai_explanation || d.explanation || '',
+            effects: d.related_concepts?.map((c: string) => `📌 ${c}`) || [],
+            formula: d.formula || '',
+            suggestions: d.concepts || []
+          });
+        } else {
+          throw new Error(json.detail || 'Unknown error from backend');
+        }
       } else {
-        throw new Error(json.detail || 'Unknown error from backend');
+        pushExplanation({
+          title: 'Connection Error',
+          explanation: tutorResp.reason?.message || 'Tutor call failed',
+          effects: ['Ensure the EduSim API is running on port 8000'],
+          formula: '',
+          suggestions: []
+        });
       }
+
+
+      // ── Handle scene parse response ────────────────────────────────────────
+      if (sceneResp.status === 'fulfilled') {
+        try {
+          const sceneJson = await sceneResp.value.json();
+          if (sceneJson.success && sceneJson.data) {
+            const scene = sceneJson.data;
+            const assets: string[] = scene.recommended_assets || [];
+            const topic: string   = scene.topic || '';
+            if (assets.length > 0) {
+              useAssetStore.getState().setSuggestedAssets(assets, topic);
+            }
+          }
+        } catch (_) {
+          // Non-critical — scene parse failure doesn't break the tutor UX
+          console.warn('[SceneParser] Failed to parse scene response');
+        }
+      }
+
     } catch (e) {
       pushExplanation({
         title: 'Connection Error',
@@ -2314,21 +2360,22 @@ export const SandboxCanvas: React.FC = () => {
               onMouseLeave={() => setIsHovered(false)}
               style={{
                 position: 'absolute',
-                top: 24,
+                top: 20,
                 left: '50%',
                 zIndex: 100,
-                width: 420,
-                background: 'rgba(15, 23, 42, 0.9)',
+                width: 370,
+                background: 'rgba(15, 23, 42, 0.94)',
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(168, 85, 247, 0.5)',
-                borderRadius: 16,
-                padding: 20,
-                boxShadow: '0 10px 40px -10px rgba(168, 85, 247, 0.4), 0 0 20px rgba(168, 85, 247, 0.15) inset',
+                border: '1px solid rgba(168, 85, 247, 0.45)',
+                borderRadius: 14,
+                padding: 14,
+                boxShadow: '0 8px 30px -8px rgba(168, 85, 247, 0.35), 0 0 16px rgba(168, 85, 247, 0.1) inset',
                 color: '#f8fafc',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 14
+                gap: 10
               }}
+
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2348,10 +2395,33 @@ export const SandboxCanvas: React.FC = () => {
                 </button>
               </div>
 
-              <div>
-                <h4 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 8 }}>{currentExplanation.insight.title}</h4>
-                <p style={{ fontSize: 13, lineHeight: 1.5, color: '#cbd5e1' }}>{currentExplanation.insight.explanation}</p>
+              <div style={{ maxHeight: 320, overflowY: 'auto', paddingRight: 6 }} className="tutor-scroll-container">
+                <ReactMarkdown
+                  remarkPlugins={[remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                  components={{
+                    h1: ({node, ...props}) => <h1 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '14px 0 8px', color: '#c084fc' }} {...props} />,
+                    h2: ({node, ...props}) => <h2 style={{ fontSize: '1.0rem', fontWeight: 700, margin: '12px 0 6px', color: '#e9d5ff' }} {...props} />,
+                    h3: ({node, ...props}) => <h3 style={{ fontSize: '0.9rem', fontWeight: 600, margin: '10px 0 4px', color: '#cbd5e1' }} {...props} />,
+                    p: ({node, ...props}) => <p style={{ fontSize: '0.82rem', lineHeight: 1.6, margin: '0 0 10px', color: '#cbd5e1' }} {...props} />,
+                    ul: ({node, ...props}) => <ul style={{ listStyleType: 'disc', margin: '0 0 10px 16px', fontSize: '0.82rem', color: '#cbd5e1' }} {...props} />,
+                    ol: ({node, ...props}) => <ol style={{ listStyleType: 'decimal', margin: '0 0 10px 16px', fontSize: '0.82rem', color: '#cbd5e1' }} {...props} />,
+                    li: ({node, ...props}) => <li style={{ marginBottom: 4 }} {...props} />,
+                    table: ({node, ...props}) => (
+                      <div style={{ overflowX: 'auto', margin: '12px 0', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', color: '#cbd5e1' }} {...props} />
+                      </div>
+                    ),
+                    thead: ({node, ...props}) => <thead style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.1)' }} {...props} />,
+                    th: ({node, ...props}) => <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600 }} {...props} />,
+                    td: ({node, ...props}) => <td style={{ padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)' }} {...props} />,
+                    hr: ({node, ...props}) => <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0' }} {...props} />,
+                  }}
+                >
+                  {currentExplanation.insight.explanation}
+                </ReactMarkdown>
               </div>
+
 
               <div>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Effects:</span>
