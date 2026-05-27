@@ -1,6 +1,6 @@
 import { PhysicsEngine } from './physics';
-import { PixiRenderer }  from './renderer';
-import { SyncRegistry }  from './sync';
+import { PixiRenderer } from './renderer';
+import { SyncRegistry } from './sync';
 import { GravitySystem } from '../gravity/gravitySystem';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -11,7 +11,7 @@ export type RuntimeState = 'idle' | 'running' | 'paused' | 'destroyed';
 export interface RuntimeHook {
   id: string;
   beforeStep?: (dt: number) => void;
-  afterStep?:  (dt: number) => void;
+  afterStep?: (dt: number) => void;
 }
 
 // ─── SandboxRuntime ───────────────────────────────────────────────────────────
@@ -29,13 +29,13 @@ export interface RuntimeHook {
  */
 export class SandboxRuntime {
   // Public so simulation code can reach sub-systems directly
-  readonly physics       = new PhysicsEngine();
-  readonly renderer      = new PixiRenderer();
-  readonly sync          = new SyncRegistry();
+  readonly physics = new PhysicsEngine();
+  readonly renderer = new PixiRenderer();
+  readonly sync = new SyncRegistry();
   readonly gravitySystem = new GravitySystem(this.physics.getEngine());
 
   private state: RuntimeState = 'idle';
-  private rafId:  number | null = null;
+  private rafId: number | null = null;
   private lastTs: number = 0;
   private accumulator = 0;
   private readonly hooks = new Map<string, RuntimeHook>();
@@ -66,10 +66,10 @@ export class SandboxRuntime {
   start(): void {
     if (this.state === 'running') return;
     if (this.state === 'destroyed') throw new Error('[SandboxRuntime] Cannot start a destroyed runtime.');
-    this.state  = 'running';
+    this.state = 'running';
     this.lastTs = performance.now();
     this.accumulator = 0;
-    this.rafId  = requestAnimationFrame(this.loop);
+    this.rafId = requestAnimationFrame(this.loop);
   }
 
   pause(): void {
@@ -88,8 +88,8 @@ export class SandboxRuntime {
 
   // ── Hooks (drag, observables, constraints, etc.) ──────────────────────────
 
-  addHook(hook: RuntimeHook): void    { this.hooks.set(hook.id, hook); }
-  removeHook(id: string): void        { this.hooks.delete(id); }
+  addHook(hook: RuntimeHook): void { this.hooks.set(hook.id, hook); }
+  removeHook(id: string): void { this.hooks.delete(id); }
 
   // ── Simulation control ────────────────────────────────────────────────────
 

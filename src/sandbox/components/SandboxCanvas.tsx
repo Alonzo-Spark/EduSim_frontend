@@ -347,7 +347,7 @@ export const SandboxCanvas: React.FC = () => {
         const softening = radialGravity.getConfig().softeningFactor ?? 100;
 
         const { OrbitSpawner } = await import('../orbits/orbitSpawner');
-        
+
         OrbitSpawner.spawnCircularOrbit({
           centerBody: parentBody,
           orbitingBody: body,
@@ -1463,7 +1463,7 @@ export const SandboxCanvas: React.FC = () => {
           const softening = radialGravity.getConfig().softeningFactor ?? 100;
 
           const { OrbitSpawner } = await import('../orbits/orbitSpawner');
-          
+
           OrbitSpawner.spawnCircularOrbit({
             centerBody: parentBody,
             orbitingBody: obj.body,

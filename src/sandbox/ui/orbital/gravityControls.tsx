@@ -81,18 +81,18 @@ export const GravityControls: React.FC<GravityControlsProps> = ({
         <div style={S.sliderRow}>
           <div style={S.sliderMeta}>
             <span style={S.sliderLabel}>Physical Radius</span>
-            <span style={S.sliderVal}>{radius} px</span>
+            <span style={S.sliderVal}>{(radius * 100).toLocaleString()} km</span>
           </div>
           <input
             type="range"
-            min={5}
-            max={150}
-            step={1}
-            value={radius}
-            onChange={(e) => handleUpdate('radius', parseFloat(e.target.value))}
+            min={500}
+            max={15000}
+            step={100}
+            value={radius * 100}
+            onChange={(e) => handleUpdate('radius', parseFloat(e.target.value) / 100)}
             style={S.sliderInput}
           />
-          <span style={S.sliderTooltip}>Scales both collision boundaries and the visual celestial sprite.</span>
+          <span style={S.sliderTooltip}>Scales both collision boundaries and the visual celestial sprite (1 px = 100 km).</span>
         </div>
 
         {/* Density */}
@@ -110,7 +110,7 @@ export const GravityControls: React.FC<GravityControlsProps> = ({
             onChange={(e) => handleUpdate('density', parseFloat(e.target.value) / 1000)}
             style={S.sliderInput}
           />
-          <span style={S.sliderTooltip}>Changes physical weight per pixel. Higher density increases mass without scaling size.</span>
+          <span style={S.sliderTooltip}>Changes physical mass per unit volume. Higher density increases gravitational mass without scaling spatial size.</span>
         </div>
       </div>
 
@@ -141,18 +141,18 @@ export const GravityControls: React.FC<GravityControlsProps> = ({
           <div style={S.sliderRow}>
             <div style={S.sliderMeta}>
               <span style={S.sliderLabel}>Influence Field Range</span>
-              <span style={S.sliderVal}>{influenceRadius} px</span>
+              <span style={S.sliderVal}>{(influenceRadius * 100).toLocaleString()} km</span>
             </div>
             <input
               type="range"
-              min={50}
-              max={3000}
-              step={50}
-              value={influenceRadius}
-              onChange={(e) => handleUpdate('influenceRadius', parseFloat(e.target.value))}
+              min={5000}
+              max={300000}
+              step={5000}
+              value={influenceRadius * 100}
+              onChange={(e) => handleUpdate('influenceRadius', parseFloat(e.target.value) / 100)}
               style={S.sliderInput}
             />
-            <span style={S.sliderTooltip}>Outer boundary limit. Particles outside this sphere ignore this body's gravity.</span>
+            <span style={S.sliderTooltip}>Outer boundary limit (1 px = 100 km). Particles outside this sphere ignore this body's gravity field.</span>
           </div>
         </div>
       )}
@@ -183,36 +183,36 @@ export const GravityControls: React.FC<GravityControlsProps> = ({
         <div style={S.sliderRow}>
           <div style={S.sliderMeta}>
             <span style={S.sliderLabel}>Plummer Softening</span>
-            <span style={S.sliderVal}>{softening} px²</span>
+            <span style={S.sliderVal}>{(softening * 10000).toLocaleString()} km²</span>
           </div>
           <input
             type="range"
             min={0}
-            max={1000}
-            step={25}
-            value={softening}
-            onChange={(e) => handleGlobalConfigUpdate('softeningFactor', parseFloat(e.target.value))}
+            max={10000000}
+            step={250000}
+            value={softening * 10000}
+            onChange={(e) => handleGlobalConfigUpdate('softeningFactor', parseFloat(e.target.value) / 10000)}
             style={S.sliderInput}
           />
-          <span style={S.sliderTooltip}>Minimizes gravity singularity forces at extremely close ranges, preventing numerical explosions.</span>
+          <span style={S.sliderTooltip}>Minimizes gravity singularity forces at extremely close ranges, preventing numerical explosions (1 px² = 10,000 km²).</span>
         </div>
 
         {/* Force Clamp */}
         <div style={S.sliderRow}>
           <div style={S.sliderMeta}>
             <span style={S.sliderLabel}>Max Force Clamp</span>
-            <span style={S.sliderVal}>{forceClamp.toFixed(3)} px/f²</span>
+            <span style={S.sliderVal}>{(forceClamp * 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} N</span>
           </div>
           <input
             type="range"
-            min={0.005}
-            max={0.5}
-            step={0.005}
-            value={forceClamp}
-            onChange={(e) => handleGlobalConfigUpdate('maxForceClamp', parseFloat(e.target.value))}
+            min={50}
+            max={10000}
+            step={50}
+            value={forceClamp * 100}
+            onChange={(e) => handleGlobalConfigUpdate('maxForceClamp', parseFloat(e.target.value) / 100)}
             style={S.sliderInput}
           />
-          <span style={S.sliderTooltip}>Limits maximum force on extreme close contact to guard sandbox structural stability.</span>
+          <span style={S.sliderTooltip}>Limits the maximum gravitational force on extreme close contact to guard sandbox structural stability (1 engine unit = 100 N).</span>
         </div>
       </div>
     </div>
