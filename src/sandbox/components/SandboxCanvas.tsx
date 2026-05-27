@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Sparkles, X, ChevronLeft, ChevronRight, BookOpen, Settings, Play, Info, Search } from 'lucide-react';
 import type { SandboxRuntime } from '../engine/runtime';
 import type { RuntimeObject } from '../types/RuntimeObject';
 import type { Body } from 'matter-js';
@@ -15,6 +15,9 @@ import { RuntimeObserver } from '../../ai/runtimeObserver';
 import { useExplanationEngine } from '../../ai/explanationEngine';
 import { FloatingAssetPanel } from '../../components/AssetLibrary/FloatingAssetPanel';
 import { physicsEventBus } from '../../ai/physicsEventBus';
+import { loadExample } from '../examples/loader/loadExample';
+import { getAllExamples } from '../examples/registry/exampleRegistry';
+import type { SandboxExampleConfig } from '../examples/types/example.types';
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -149,6 +152,22 @@ export const SandboxCanvas: React.FC = () => {
   const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
   const [gConstant, setGConstant] = useState(0.0012);
   const [radialDebug, setRadialDebug] = useState(true);
+
+  // Textbook Examples Panel States
+  const [activeLeftTab, setActiveLeftTab] = useState<'toolbox' | 'examples'>('toolbox');
+  const [selectedExampleId, setSelectedExampleId] = useState<string | null>(null);
+  const [exampleSearch, setExampleSearch] = useState('');
+
+  // Viewport Camera states
+  const [zoom, setZoom] = useState(1.0);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+
+  // Draggable HUD states
+  const [hudPos, setHudPos] = useState({ x: 20, y: 150 });
+  const [hudDragging, setHudDragging] = useState(false);
+  const hudDragStart = useRef({ x: 0, y: 0 });
+  const hudPosStart = useRef({ x: 0, y: 0 });
 
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -894,10 +913,21 @@ export const SandboxCanvas: React.FC = () => {
     rt.pause();
     store.reset();
 
+    // Reset camera zoom/pan states
+    setZoom(1.0);
+    setPanX(0);
+    setPanY(0);
+
     // Clear old gravity sources during system reset
     if (rt.gravitySystem) {
       rt.gravitySystem.getRadialGravity().clear();
     }
+
+    // Clean up textbook-example specific HTML overlays
+    const burnOverlay = document.getElementById('example-burn-overlay');
+    if (burnOverlay) burnOverlay.remove();
+    const energyOverlay = document.getElementById('example-energy-overlay');
+    if (energyOverlay) energyOverlay.remove();
 
     const dyn = await buildScene(rt, el, ia, creg, store);
     dynRef.current = dyn;
@@ -915,6 +945,92 @@ export const SandboxCanvas: React.FC = () => {
       store.setRuntimeState('running');
     }
   }, [ready, running, gravity, speed, gravityMode]);
+
+  const handleCameraChange = useCallback((newZoom: number, newPanX: number, newPanY: number) => {
+    setZoom(newZoom);
+    setPanX(newPanX);
+    setPanY(newPanY);
+
+    const rt = runtimeRef.current;
+    if (!rt) return;
+
+    const vp = rt.renderer.getViewport();
+    
+    // Scale viewport
+    vp.scale.set(newZoom);
+
+    // Apply translation panning
+    vp.position.set(newPanX, newPanY);
+  }, []);
+
+  const handleHudPointerDown = useCallback((e: React.PointerEvent) => {
+    // Only drag with primary mouse button
+    if (e.button !== 0) return;
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    setHudDragging(true);
+    hudDragStart.current = { x: e.clientX, y: e.clientY };
+    hudPosStart.current = { x: hudPos.x, y: hudPos.y };
+  }, [hudPos]);
+
+  const handleHudPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!hudDragging) return;
+    const dx = e.clientX - hudDragStart.current.x;
+    const dy = e.clientY - hudDragStart.current.y;
+    setHudPos({
+      x: hudPosStart.current.x + dx,
+      y: hudPosStart.current.y + dy,
+    });
+  }, [hudDragging]);
+
+  const handleHudPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!hudDragging) return;
+    const target = e.currentTarget as HTMLElement;
+    target.releasePointerCapture(e.pointerId);
+    setHudDragging(false);
+  }, [hudDragging]);
+
+  const handleSelectExample = useCallback(async (exampleId: string) => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const store = storeRef.current;
+    const propCtrl = propertyControllerRef.current;
+    const obsEngine = observableEngineRef.current;
+    if (!rt || !ia || !store || !propCtrl || !obsEngine || !ready) return;
+
+    // Clean up example-specific HTML overlays before loading the new one
+    const burnOverlay = document.getElementById('example-burn-overlay');
+    if (burnOverlay) burnOverlay.remove();
+    const energyOverlay = document.getElementById('example-energy-overlay');
+    if (energyOverlay) energyOverlay.remove();
+
+    const examples = getAllExamples();
+    const entry = examples.find(e => e.id === exampleId);
+    if (!entry) return;
+
+    setSelectedExampleId(exampleId);
+    setSelected(null);
+
+    const initialZoom = entry.config.camera?.zoom ?? 1.0;
+    setZoom(initialZoom);
+    setPanX(0);
+    setPanY(0);
+
+    // Call the generic orchestrator loader
+    await loadExample(rt, store, propCtrl, obsEngine, ia.selection, entry.config);
+
+    // Synchronize React state values from the loaded example config
+    setGravityMode(entry.config.gravityMode ?? 'radial');
+    if (entry.config.gConstant !== undefined) {
+      setGConstant(entry.config.gConstant);
+    }
+    setRunning(true);
+    
+    // Update body count state dynamically
+    const dynamicBodies = rt.physics.getWorld().bodies.filter(b => !b.isStatic);
+    setBodyCount(dynamicBodies.length);
+    dynRef.current = dynamicBodies;
+  }, [ready]);
 
   const spawnShape = useCallback(async (type: 'circle' | 'rectangle') => {
     const rt = runtimeRef.current;
@@ -1723,6 +1839,35 @@ export const SandboxCanvas: React.FC = () => {
     };
   }, [isDragging, ready, spawnConstraintAt, spawnPendulumRope, spawnAt]);
 
+  useEffect(() => {
+    const wrap = canvasWrapRef.current;
+    if (!wrap) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rt = runtimeRef.current;
+      if (!rt) return;
+
+      const zoomFactor = e.deltaY < 0 ? 1.05 : 0.95;
+      
+      // Calculate next zoom within limits
+      setZoom((prevZoom) => {
+        const nextZoom = Math.min(Math.max(prevZoom * zoomFactor, 0.25), 2.5);
+        
+        // Scale viewport directly
+        const vp = rt.renderer.getViewport();
+        vp.scale.set(nextZoom);
+        
+        return nextZoom;
+      });
+    };
+
+    wrap.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      wrap.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -1737,7 +1882,7 @@ export const SandboxCanvas: React.FC = () => {
           borderRight: leftPanelOpen ? S.panel.borderRight : 'none',
           opacity: leftPanelOpen ? 1 : 0,
           transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-          overflowY: leftPanelOpen ? 'auto' : 'hidden',
+          overflowY: leftPanelOpen ? (activeLeftTab === 'toolbox' ? 'auto' : 'hidden') : 'hidden',
           overflowX: 'hidden',
         }}
       >
@@ -1747,6 +1892,69 @@ export const SandboxCanvas: React.FC = () => {
         </div>
         <h1 style={S.title}>EduSim Sandbox</h1>
         <p style={S.subtitle}>Drag · Select · Control</p>
+
+        {/* Premium Tab Toggles */}
+        <div style={{
+          display: 'flex',
+          background: 'rgba(0, 0, 0, 0.4)',
+          borderRadius: '10px',
+          padding: '3px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          marginBottom: '14px',
+          flexShrink: 0,
+        }}>
+          <button
+            onClick={() => setActiveLeftTab('toolbox')}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '8px 0',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeLeftTab === 'toolbox' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+              color: activeLeftTab === 'toolbox' ? '#fff' : '#64748b',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.25s ease',
+              boxShadow: activeLeftTab === 'toolbox' ? '0 4px 12px rgba(79, 70, 229, 0.3)' : 'none',
+              outline: 'none',
+            }}
+          >
+            <Settings size={12} />
+            Sandbox Toolbox
+          </button>
+          <button
+            onClick={() => setActiveLeftTab('examples')}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '8px 0',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeLeftTab === 'examples' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+              color: activeLeftTab === 'examples' ? '#fff' : '#64748b',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.25s ease',
+              boxShadow: activeLeftTab === 'examples' ? '0 4px 12px rgba(79, 70, 229, 0.3)' : 'none',
+              outline: 'none',
+            }}
+          >
+            <BookOpen size={12} />
+            Textbook Examples
+          </button>
+        </div>
+
+        {activeLeftTab === 'toolbox' ? (
+          <>
 
         {/* Status */}
         <div style={S.cards}>
@@ -2134,28 +2342,186 @@ export const SandboxCanvas: React.FC = () => {
                 opacity: aiLoading ? 0.5 : 1
               }}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-              <span style={{ fontSize: 9, color: '#64748b' }}>Press Enter to send</span>
-              <button
-                onClick={handleAiQuery}
-                disabled={aiLoading || !aiPrompt.trim()}
-                style={{
-                  background: aiLoading ? '#475569' : 'linear-gradient(135deg, #a855f7, #6366f1)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '4px 12px',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: (aiLoading || !aiPrompt.trim()) ? 'default' : 'pointer',
-                  opacity: (aiLoading || !aiPrompt.trim()) ? 0.6 : 1
-                }}
-              >
-                {aiLoading ? '...' : 'Send'}
-              </button>
-            </div>
           </div>
         </div>
+        </>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, minHeight: 0 }}>
+            {/* Search Input */}
+            <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', display: 'flex', alignItems: 'center' }}>
+                <Search size={13} />
+              </span>
+              <input
+                type="text"
+                value={exampleSearch}
+                onChange={e => setExampleSearch(e.target.value)}
+                placeholder="Search examples..."
+                style={{
+                  width: '100%',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '8px',
+                  padding: '8px 10px 8px 30px',
+                  color: '#fff',
+                  fontSize: '12px',
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            {/* Clear Example mode button */}
+            {selectedExampleId && (
+              <button
+                onClick={() => {
+                  setSelectedExampleId(null);
+                  handleReset();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '8px',
+                  border: '1px dashed rgba(239, 68, 68, 0.5)',
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  color: '#f87171',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s',
+                  flexShrink: 0,
+                  outline: 'none',
+                }}
+              >
+                <span>✕ Exit Example Mode</span>
+              </button>
+            )}
+
+            {/* List of Examples */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+              {getAllExamples()
+                .filter(ex => 
+                  ex.title.toLowerCase().includes(exampleSearch.toLowerCase()) ||
+                  ex.description.toLowerCase().includes(exampleSearch.toLowerCase())
+                )
+                .map(ex => {
+                  const isSelected = selectedExampleId === ex.id;
+                  return (
+                    <div
+                      key={ex.id}
+                      onClick={() => handleSelectExample(ex.id)}
+                      style={{
+                        background: isSelected 
+                          ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(79, 70, 229, 0.05))'
+                          : 'rgba(255, 255, 255, 0.02)',
+                        border: isSelected
+                          ? '1px solid rgba(99, 102, 241, 0.45)'
+                          : '1px solid rgba(255, 255, 255, 0.06)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: isSelected ? '0 4px 16px rgba(99, 102, 241, 0.15)' : 'none',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignSelf: 'stretch', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{
+                          fontSize: '8px',
+                          fontWeight: 800,
+                          color: '#818cf8',
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                        }}>{ex.category}</span>
+                        {isSelected && (
+                          <span style={{
+                            fontSize: '9px',
+                            fontWeight: 800,
+                            color: '#10b981',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}>
+                            ● Active
+                          </span>
+                        )}
+                      </div>
+                      
+                      <h3 style={{
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: isSelected ? '#a5b4fc' : '#cbd5e1',
+                        margin: 0,
+                      }}>{ex.title}</h3>
+
+                      <p style={{
+                        fontSize: '11px',
+                        color: '#94a3b8',
+                        margin: 0,
+                        lineHeight: '1.4',
+                      }}>{ex.description}</p>
+
+                      {/* Launch / Play button inside the card */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectExample(ex.id);
+                        }}
+                        style={{
+                          marginTop: '4px',
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: isSelected
+                            ? 'linear-gradient(135deg, #10b981, #059669)'
+                            : 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                          color: '#fff',
+                          fontSize: '10.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          transition: 'all 0.2s',
+                          boxShadow: isSelected ? '0 4px 10px rgba(16, 185, 129, 0.2)' : '0 4px 10px rgba(79, 70, 229, 0.2)',
+                          outline: 'none',
+                        }}
+                      >
+                        <Play size={10} fill="#fff" />
+                        {isSelected ? 'Reset Scenario' : 'Launch Simulation'}
+                      </button>
+
+                      {/* Educational Highlights */}
+                      <div style={{
+                        marginTop: '4px',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        background: 'rgba(0, 0, 0, 0.25)',
+                        border: '1px solid rgba(255, 255, 255, 0.03)',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '6px' }}>
+                          <Info size={11} color="#818cf8" />
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Key Concepts</span>
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: '14px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          {ex.config.metadata.educationalNotes.map((note, idx) => (
+                            <li key={idx} style={{ fontSize: '10px', color: '#cbd5e1', lineHeight: '1.4' }}>{note}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* ── Canvas ─────────────────────────────────────────── */}
@@ -2169,6 +2535,197 @@ export const SandboxCanvas: React.FC = () => {
       >
         <div style={S.dotGrid} />
         <div ref={mountRef} style={S.mount} />
+
+        {/* Floating Viewport Camera & Control HUD */}
+        <div style={{
+          position: 'absolute',
+          left: `${hudPos.x}px`,
+          top: `${hudPos.y}px`,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '12px',
+          padding: '12px 14px',
+          color: '#fff',
+          width: '210px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+          zIndex: 340,
+        }}>
+          {/* Header Drag Handle */}
+          <div
+            onPointerDown={handleHudPointerDown}
+            onPointerMove={handleHudPointerMove}
+            onPointerUp={handleHudPointerUp}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '6px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              paddingBottom: '6px',
+              cursor: hudDragging ? 'grabbing' : 'grab',
+              userSelect: 'none',
+            }}
+            title="Drag to reposition panel"
+          >
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              🔭 Viewport Control
+            </span>
+            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>☰</span>
+          </div>
+
+          {/* Simulation Controls: Play/Pause and Replay */}
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={togglePlay}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: '6px',
+                border: 'none',
+                background: running
+                  ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                  : 'linear-gradient(135deg, #10b981, #059669)',
+                color: '#fff',
+                fontSize: '10.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                transition: 'transform 0.1s',
+                outline: 'none',
+              }}
+            >
+              {running ? '⏸️ Pause' : '▶️ Play'}
+            </button>
+            <button
+              onClick={() => {
+                if (selectedExampleId) {
+                  handleSelectExample(selectedExampleId);
+                } else {
+                  handleReset();
+                }
+              }}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: '6px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                color: '#fff',
+                fontSize: '10.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                transition: 'transform 0.1s',
+                outline: 'none',
+              }}
+            >
+              🔄 Replay
+            </button>
+          </div>
+
+          {/* Zoom Slider */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8' }}>
+              <span>Zoom Level</span>
+              <span style={{ fontWeight: 'bold', color: '#38bdf8' }}>{Math.round(zoom * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.25"
+              max="2.5"
+              step="0.05"
+              value={zoom}
+              onChange={(e) => handleCameraChange(parseFloat(e.target.value), panX, panY)}
+              style={{
+                width: '100%',
+                accentColor: '#38bdf8',
+                cursor: 'pointer',
+                height: '4px',
+                borderRadius: '2px',
+              }}
+            />
+          </div>
+
+          {/* Vertical Scroll/Pan Bar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8' }}>
+              <span>Vertical Scroll</span>
+              <span style={{ fontWeight: 'bold', color: '#fb7185' }}>{Math.round(panY)} px</span>
+            </div>
+            <input
+              type="range"
+              min="-1200"
+              max="1200"
+              step="10"
+              value={panY}
+              onChange={(e) => handleCameraChange(zoom, panX, parseFloat(e.target.value))}
+              style={{
+                width: '100%',
+                accentColor: '#fb7185',
+                cursor: 'pointer',
+                height: '4px',
+                borderRadius: '2px',
+              }}
+            />
+          </div>
+
+          {/* Horizontal Scroll/Pan Bar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8' }}>
+              <span>Horizontal Scroll</span>
+              <span style={{ fontWeight: 'bold', color: '#34d399' }}>{Math.round(panX)} px</span>
+            </div>
+            <input
+              type="range"
+              min="-1600"
+              max="1600"
+              step="10"
+              value={panX}
+              onChange={(e) => handleCameraChange(zoom, parseFloat(e.target.value), panY)}
+              style={{
+                width: '100%',
+                accentColor: '#34d399',
+                cursor: 'pointer',
+                height: '4px',
+                borderRadius: '2px',
+              }}
+            />
+          </div>
+
+          {/* View Reset Button */}
+          <button
+            onClick={() => handleCameraChange(1.0, 0, 0)}
+            style={{
+              width: '100%',
+              padding: '6px',
+              borderRadius: '6px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+              color: '#fff',
+              fontSize: '10.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              transition: 'transform 0.1s',
+              outline: 'none',
+            }}
+          >
+            🏠 Reset Camera
+          </button>
+        </div>
 
         {/* Floating Sidebar Toggle Buttons */}
         <button
