@@ -102,9 +102,46 @@ export const example7_1: SandboxExampleConfig = {
     aText.position.set(400, 810);
     markers.addChild(aText);
 
-    // 3. Draw a light dashed elliptical orbital axis line
+    // 3. Draw a light dashed elliptical orbital axis line (vertical major axis)
     graphics.moveTo(400, 130);
     graphics.lineTo(400, 810);
     graphics.stroke({ color: 0x475569, width: 1, alpha: 0.5 });
+
+    // 4. Point B Focus (Purple glowing beacon on the left: X = 400 - 255 = 145, Y = 300)
+    graphics.circle(145, 300, 7);
+    graphics.stroke({ color: 0xa78bfa, width: 2, alpha: 0.85 });
+    graphics.fill({ color: 0xa78bfa, alpha: 0.25 });
+
+    const bStyle = new PIXI.TextStyle({
+      fill: '#a78bfa',
+      fontSize: 10,
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontWeight: 'bold',
+    });
+    const bText = new PIXI.Text('POINT B', bStyle);
+    bText.anchor.set(1.15, 0.5);
+    bText.position.set(145, 300);
+    markers.addChild(bText);
+
+    // 5. Point C Focus (Purple glowing beacon on the right: X = 400 + 255 = 655, Y = 300)
+    graphics.circle(655, 300, 7);
+    graphics.stroke({ color: 0xa78bfa, width: 2, alpha: 0.85 });
+    graphics.fill({ color: 0xa78bfa, alpha: 0.25 });
+
+    const cStyle = new PIXI.TextStyle({
+      fill: '#a78bfa',
+      fontSize: 10,
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontWeight: 'bold',
+    });
+    const cText = new PIXI.Text('POINT C', cStyle);
+    cText.anchor.set(-0.15, 0.5);
+    cText.position.set(655, 300);
+    markers.addChild(cText);
+
+    // 6. Draw the horizontal latus rectum line through the Sun (focus) connecting B and C
+    graphics.moveTo(145, 300);
+    graphics.lineTo(655, 300);
+    graphics.stroke({ color: 0x5b21b6, width: 1, alpha: 0.45 });
   }
 };
