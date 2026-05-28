@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  Sparkles, X, ChevronLeft, ChevronRight, Minimize2, Maximize2, Pin, PinOff,
+  Zap, TrendingUp, Lightbulb, Eye, LineChart, BookOpen, Cpu, ChevronUp, ChevronDown
+} from 'lucide-react';
 import type { SandboxRuntime } from '../engine/runtime';
 import type { RuntimeObject } from '../types/RuntimeObject';
 import type { Body } from 'matter-js';
@@ -127,6 +130,147 @@ async function buildScene(
   return dynamic;
 }
 
+// ─── AI Response Parser & UI Components ───────────────────────────────────────
+
+const parseExplanationText = (text: string) => {
+  const sections: Record<string, string> = {};
+  if (!text) return sections;
+  
+  // Standard split by markdown headers
+  const parts = text.split(/(?=###\s*✦?\s*)/gi);
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    
+    // Match ### ✦ NAME or ### NAME
+    const match = trimmed.match(/^###\s*✦?\s*([^\n]+)/i);
+    if (match) {
+      const title = match[1].trim().toUpperCase();
+      const content = trimmed.substring(match[0].length).trim();
+      sections[title] = content;
+    }
+  }
+  return sections;
+};
+
+interface StepCardProps {
+  num: number;
+  title: string;
+  description: string;
+  type: 'blue' | 'green' | 'orange' | 'purple';
+}
+
+const StepCard: React.FC<StepCardProps> = ({ num, title, description, type }) => {
+  const isBlue = type === 'blue';
+  const isGreen = type === 'green';
+  const isOrange = type === 'orange';
+  
+  let glowColor = 'rgba(168, 85, 247, 0.35)';
+  let iconBg = 'rgba(168, 85, 247, 0.2)';
+  let iconColor = '#c084fc';
+  
+  if (isBlue) {
+    glowColor = 'rgba(14, 165, 233, 0.35)';
+    iconBg = 'rgba(14, 165, 233, 0.2)';
+    iconColor = '#38bdf8';
+  } else if (isGreen) {
+    glowColor = 'rgba(16, 185, 129, 0.35)';
+    iconBg = 'rgba(16, 185, 129, 0.2)';
+    iconColor = '#34d399';
+  } else if (isOrange) {
+    glowColor = 'rgba(245, 158, 11, 0.35)';
+    iconBg = 'rgba(245, 158, 11, 0.2)';
+    iconColor = '#fbbf24';
+  }
+  
+  const formattedTitle = num === 1 ? '1. What Happened' 
+                       : num === 2 ? '2. What Changed'
+                       : num === 3 ? '3. Simple Why'
+                       : '4. What to Notice';
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      style={{
+        display: 'flex',
+        gap: 16,
+        padding: '12px 0',
+        alignItems: 'flex-start',
+        borderBottom: num < 4 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+      }}
+    >
+      <div style={{
+        width: 38,
+        height: 38,
+        borderRadius: '50%',
+        background: iconBg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: `0 0 12px ${glowColor}`,
+        flexShrink: 0,
+        marginTop: 1,
+        border: `1px solid ${iconColor}33`
+      }}>
+        {isBlue && <Sparkles size={18} color={iconColor} />}
+        {isGreen && (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="2" fill={iconColor} />
+            <line x1="12" y1="12" x2="6" y2="6" />
+            <path d="M6 10V6H10" />
+            <line x1="12" y1="12" x2="18" y2="6" />
+            <path d="M14 6H18V10" />
+            <line x1="12" y1="12" x2="6" y2="18" />
+            <path d="M6 14V18H10" />
+            <line x1="12" y1="12" x2="18" y2="18" />
+            <path d="M14 18H18V14" />
+          </svg>
+        )}
+        {isOrange && <Lightbulb size={18} color={iconColor} />}
+        {type === 'purple' && <Eye size={18} color={iconColor} />}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+        <span style={{
+          fontSize: 13.5,
+          fontWeight: 700,
+          color: iconColor,
+          fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif"
+        }}>
+          {formattedTitle}
+        </span>
+        <div style={{
+          fontSize: 12,
+          color: '#cbd5e1',
+          lineHeight: 1.55,
+          fontWeight: 500
+        }}>
+          <ReactMarkdown
+            remarkPlugins={[remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+            components={{
+              p: ({node, ...props}) => <p style={{ margin: 0 }} {...props} />,
+              code: ({node, inline, ...props}: any) => (
+                <code style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  padding: '2px 4px',
+                  borderRadius: 4,
+                  fontSize: '0.85em',
+                  fontFamily: 'monospace',
+                  color: '#e9d5ff'
+                }} {...props} />
+              )
+            }}
+          >
+            {description}
+          </ReactMarkdown>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const SandboxCanvas: React.FC = () => {
@@ -149,6 +293,74 @@ export const SandboxCanvas: React.FC = () => {
   const [speed, setSpeed] = useState(1);
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
   const [tutorEnabled, setTutorEnabled] = useState(true);
+  const [dynamicExplanationEnabled, setDynamicExplanationEnabled] = useState(false);
+  const [tutorWidth, setTutorWidth] = useState(380);
+  const [tutorHeight, setTutorHeight] = useState(500);
+  const [tutorMinimized, setTutorMinimized] = useState(false);
+  const [tutorPinned, setTutorPinned] = useState(false);
+  const [tutorMaximized, setTutorMaximized] = useState(false);
+  const [activeTab, setActiveTab] = useState<'explanation' | 'effects' | 'formula'>('explanation');
+
+  const handleResizeLeft = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = tutorWidth;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const newWidth = Math.max(280, Math.min(800, startWidth + (startX - moveEvent.clientX)));
+      setTutorWidth(newWidth);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  }, [tutorWidth]);
+
+  const handleResizeBottom = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = tutorHeight;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const newHeight = Math.max(200, Math.min(900, startHeight + (moveEvent.clientY - startY)));
+      setTutorHeight(newHeight);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  }, [tutorHeight]);
+
+  const handleResizeBottomLeft = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = tutorWidth;
+    const startHeight = tutorHeight;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const newWidth = Math.max(280, Math.min(800, startWidth + (startX - moveEvent.clientX)));
+      const newHeight = Math.max(200, Math.min(900, startHeight + (moveEvent.clientY - startY)));
+      setTutorWidth(newWidth);
+      setTutorHeight(newHeight);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  }, [tutorWidth, tutorHeight]);
 
   // Modular Switchable Gravity System states
   const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
@@ -160,7 +372,7 @@ export const SandboxCanvas: React.FC = () => {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [showAiPanel, setShowAiPanel] = useState(false);
 
-  const { currentExplanation, queueCount, handleDismiss, setIsHovered, pushExplanation } = useExplanationEngine();
+  const { currentExplanation, queueCount, handleDismiss, setIsHovered, pushExplanation, handleNext, handleClear } = useExplanationEngine(dynamicExplanationEnabled, gravityMode);
 
   const handleAiQuery = async () => {
     if (!aiPrompt.trim()) return;
@@ -276,6 +488,11 @@ export const SandboxCanvas: React.FC = () => {
       }
     };
   }, [ready]);
+
+  // Synchronize pin state with tutor auto-dismiss timer by setting isHovered
+  useEffect(() => {
+    setIsHovered(tutorPinned);
+  }, [tutorPinned, setIsHovered]);
 
 
 
@@ -1879,6 +2096,68 @@ export const SandboxCanvas: React.FC = () => {
           </button>
         </div>
 
+        {/* Live LLM Explanations Toggle */}
+        {tutorEnabled && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: 4,
+            marginBottom: 6,
+            padding: '7px 10px',
+            borderRadius: 10,
+            background: dynamicExplanationEnabled
+              ? 'rgba(168, 85, 247, 0.10)'
+              : 'rgba(255,255,255,0.03)',
+            border: dynamicExplanationEnabled
+              ? '1px solid rgba(168, 85, 247, 0.30)'
+              : '1px solid rgba(255,255,255,0.07)',
+            transition: 'all 0.2s ease',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Sparkles size={14} color={dynamicExplanationEnabled ? '#c084fc' : '#64748b'} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: dynamicExplanationEnabled ? '#c084fc' : '#64748b', transition: 'color 0.2s' }}>
+                Live LLM Explanations
+              </span>
+            </div>
+            <button
+              id="dynamic-tutor-toggle-btn"
+              onClick={() => setDynamicExplanationEnabled((v) => !v)}
+              style={{
+                position: 'relative',
+                width: 38,
+                height: 20,
+                borderRadius: 10,
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                background: dynamicExplanationEnabled
+                  ? 'linear-gradient(135deg, #a855f7, #6366f1)'
+                  : 'rgba(71,85,105,0.6)',
+                boxShadow: dynamicExplanationEnabled
+                  ? '0 0 8px rgba(168, 85, 247, 0.5)'
+                  : 'none',
+                transition: 'all 0.25s ease',
+                flexShrink: 0,
+              }}
+              title={dynamicExplanationEnabled ? 'Disable live LLM explanations' : 'Enable live LLM explanations'}
+            >
+              <span style={{
+                position: 'absolute',
+                top: 3,
+                left: dynamicExplanationEnabled ? 21 : 3,
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                background: '#fff',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+                transition: 'left 0.25s ease',
+                display: 'block',
+              }} />
+            </button>
+          </div>
+        )}
+
         <Sep label="Spawn Shapes — click or drag" />
         <div
           style={S.row}
@@ -2347,128 +2626,878 @@ export const SandboxCanvas: React.FC = () => {
 
 
 
+        {/* Circular Floating AI Toggle Button */}
+        <motion.button
+          onClick={() => setTutorEnabled(!tutorEnabled)}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.95 }}
+          style={{
+            position: 'absolute',
+            top: 20,
+            right: 20,
+            zIndex: 390,
+            width: 46,
+            height: 46,
+            borderRadius: '50%',
+            background: tutorEnabled 
+              ? 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)' 
+              : 'rgba(15, 23, 42, 0.65)',
+            border: tutorEnabled 
+              ? '2px solid #5B5FFF' 
+              : '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: tutorEnabled 
+              ? '0 0 16px rgba(91, 95, 255, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3)' 
+              : '0 4px 12px rgba(0, 0, 0, 0.35)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'border 0.25s, background 0.25s, box-shadow 0.25s',
+            outline: 'none',
+          }}
+          title={tutorEnabled ? 'Close AI explanation panel' : 'Open AI explanation panel'}
+        >
+          <Sparkles 
+            size={20} 
+            color="#fbbf24" 
+            style={{ 
+              animation: tutorEnabled ? 'pulse-glow 1.8s infinite ease-in-out' : 'none',
+              transform: tutorEnabled ? 'scale(1.05)' : 'none',
+              transition: 'transform 0.2s'
+            }} 
+          />
+
+          {/* Glowing Notification Dot for queued events */}
+          {queueCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: 2,
+              right: 2,
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: '#ec4899', // Pink glow
+              border: '1.5px solid #0f172a',
+              boxShadow: '0 0 6px #ec4899',
+              display: 'block'
+            }} />
+          )}
+        </motion.button>
+
         {/* Floating AI Response Panel — hidden when tutor is off */}
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {tutorEnabled && currentExplanation && (
+            /* Expanded Full Workspace AI Inspector Panel */
             <motion.div
-              key={currentExplanation.id}
-              initial={{ opacity: 0, y: -20, x: '-50%' }}
-              animate={{ opacity: 1, y: 0, x: '-50%' }}
-              exit={{ opacity: 0, y: -20, x: '-50%' }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              key="tutor-expanded"
+              initial={{ opacity: 0, y: 15, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 15, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 200 }}
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
               style={{
                 position: 'absolute',
                 top: 20,
-                left: '50%',
-                zIndex: 100,
-                width: 370,
-                background: 'rgba(15, 23, 42, 0.94)',
+                right: 84,
+                zIndex: 380,
+                width: tutorMaximized ? 480 : tutorWidth,
+                height: tutorMinimized ? 'auto' : (tutorMaximized ? 'calc(100% - 40px)' : tutorHeight),
+                maxHeight: 'calc(100% - 40px)',
+                background: 'linear-gradient(180deg, #0B1020, #121933)',
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(168, 85, 247, 0.45)',
-                borderRadius: 14,
-                padding: 14,
-                boxShadow: '0 8px 30px -8px rgba(168, 85, 247, 0.35), 0 0 16px rgba(168, 85, 247, 0.1) inset',
+                border: '1px solid rgba(120, 120, 255, 0.15)',
+                borderRadius: 20,
+                padding: '16px 16px 18px 16px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05)',
                 color: '#f8fafc',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 10
+                gap: 12,
+                overflow: 'hidden',
+                transition: 'width 0.3s ease, height 0.3s ease',
               }}
-
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 10 }}>
+              {/* CSS Glow Animations Injector */}
+              <style dangerouslySetInnerHTML={{
+                __html: `
+                @keyframes shimmer {
+                  0% { background-position: -200% 0; }
+                  100% { background-position: 200% 0; }
+                }
+                @keyframes pulse-glow {
+                  0%, 100% { transform: scale(1); opacity: 0.6; filter: drop-shadow(0 0 1px rgba(120, 120, 255, 0.4)); }
+                  50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 6px rgba(120, 120, 255, 0.8)); }
+                }
+                .shimmer-bg {
+                  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.03) 75%);
+                  background-size: 200% 100%;
+                  animation: shimmer 1.5s infinite linear;
+                }
+                .hover-glow-left {
+                  transition: background-color 0.2s, box-shadow 0.2s;
+                }
+                .hover-glow-left:hover {
+                  background-color: rgba(120, 120, 255, 0.2);
+                  box-shadow: 2px 0 10px rgba(120, 120, 255, 0.4);
+                }
+                .hover-glow-bottom {
+                  transition: background-color 0.2s, box-shadow 0.2s;
+                }
+                .hover-glow-bottom:hover {
+                  background-color: rgba(120, 120, 255, 0.2);
+                  box-shadow: 0 -2px 10px rgba(120, 120, 255, 0.4);
+                }
+                .tutor-scroll-container::-webkit-scrollbar {
+                  width: 4px;
+                }
+                .tutor-scroll-container::-webkit-scrollbar-track {
+                  background: transparent;
+                }
+                .tutor-scroll-container::-webkit-scrollbar-thumb {
+                  background: rgba(255, 255, 255, 0.08);
+                  border-radius: 4px;
+                }
+                .tutor-scroll-container::-webkit-scrollbar-thumb:hover {
+                  background: rgba(120, 120, 255, 0.35);
+                }
+              ` }} />
+
+              {/* Resizer Handle Left Edge (Horizontal) */}
+              {!tutorMinimized && !tutorMaximized && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 6,
+                    cursor: 'w-resize',
+                    zIndex: 210,
+                  }}
+                  onPointerDown={handleResizeLeft}
+                  className="hover-glow-left"
+                  title="Drag to resize width"
+                />
+              )}
+
+              {/* Resize Handle Bottom Edge (Vertical) */}
+              {!tutorMinimized && !tutorMaximized && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 6,
+                    cursor: 's-resize',
+                    zIndex: 210,
+                  }}
+                  onPointerDown={handleResizeBottom}
+                  className="hover-glow-bottom"
+                  title="Drag to resize height"
+                />
+              )}
+
+              {/* Premium Sticky Header */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                paddingBottom: 10,
+                flexShrink: 0,
+              }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Sparkles size={18} color="#c084fc" />
-                  <span style={{ fontSize: 14, fontWeight: 800, color: '#e9d5ff', letterSpacing: '0.02em' }}>✨ AI Explanation</span>
+                  <Sparkles size={16} color="#fbbf24" className="pulse-svg" style={{ animation: 'pulse-glow 1.8s infinite ease-in-out' }} />
+                  <span style={{ fontSize: 13.5, fontWeight: 800, color: '#ffffff', letterSpacing: '0.02em', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+                    AI Explanation
+                  </span>
+                  
+                  {/* Violet Queue Badge */}
+                  <span style={{
+                    background: '#5B5FFF',
+                    color: '#ffffff',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: 12,
+                    marginLeft: 4,
+                    boxShadow: '0 0 8px rgba(91, 95, 255, 0.4)'
+                  }}>
+                    {queueCount > 0 ? `+${queueCount}` : '+1'}
+                  </span>
+
+                  {/* Next explanation navigation button */}
                   {queueCount > 0 && (
-                    <span style={{ background: '#a855f7', color: 'white', fontSize: 10, padding: '2px 6px', borderRadius: 10, fontWeight: 800 }}>
-                      +{queueCount}
-                    </span>
+                    <button
+                      onClick={handleNext}
+                      style={{
+                        background: 'rgba(91, 95, 255, 0.25)',
+                        border: '1px solid rgba(91, 95, 255, 0.45)',
+                        borderRadius: 12,
+                        padding: '2px 8.5px',
+                        color: '#ffffff',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        marginLeft: 6,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        boxShadow: '0 0 8px rgba(91, 95, 255, 0.3)',
+                        transition: 'all 0.2s',
+                        outline: 'none',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(91, 95, 255, 0.4)';
+                        e.currentTarget.style.borderColor = 'rgba(91, 95, 255, 0.6)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(91, 95, 255, 0.25)';
+                        e.currentTarget.style.borderColor = 'rgba(91, 95, 255, 0.45)';
+                      }}
+                      title="View next queued physics explanation"
+                    >
+                      <span>Next</span>
+                      <ChevronRight size={10} strokeWidth={3} />
+                    </button>
                   )}
                 </div>
-                <button
-                  onClick={handleDismiss}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
 
-              <div style={{ maxHeight: 320, overflowY: 'auto', paddingRight: 6 }} className="tutor-scroll-container">
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
-                  components={{
-                    h1: ({node, ...props}) => <h1 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '14px 0 8px', color: '#c084fc' }} {...props} />,
-                    h2: ({node, ...props}) => <h2 style={{ fontSize: '1.0rem', fontWeight: 700, margin: '12px 0 6px', color: '#e9d5ff' }} {...props} />,
-                    h3: ({node, ...props}) => <h3 style={{ fontSize: '0.9rem', fontWeight: 600, margin: '10px 0 4px', color: '#cbd5e1' }} {...props} />,
-                    p: ({node, ...props}) => <p style={{ fontSize: '0.82rem', lineHeight: 1.6, margin: '0 0 10px', color: '#cbd5e1' }} {...props} />,
-                    ul: ({node, ...props}) => <ul style={{ listStyleType: 'disc', margin: '0 0 10px 16px', fontSize: '0.82rem', color: '#cbd5e1' }} {...props} />,
-                    ol: ({node, ...props}) => <ol style={{ listStyleType: 'decimal', margin: '0 0 10px 16px', fontSize: '0.82rem', color: '#cbd5e1' }} {...props} />,
-                    li: ({node, ...props}) => <li style={{ marginBottom: 4 }} {...props} />,
-                    table: ({node, ...props}) => (
-                      <div style={{ overflowX: 'auto', margin: '12px 0', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', color: '#cbd5e1' }} {...props} />
-                      </div>
-                    ),
-                    thead: ({node, ...props}) => <thead style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.1)' }} {...props} />,
-                    th: ({node, ...props}) => <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600 }} {...props} />,
-                    td: ({node, ...props}) => <td style={{ padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)' }} {...props} />,
-                    hr: ({node, ...props}) => <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0' }} {...props} />,
-                  }}
-                >
-                  {currentExplanation.insight.explanation}
-                </ReactMarkdown>
-              </div>
-
-
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Effects:</span>
-                <ul style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {currentExplanation.insight.effects.map((effect, idx) => (
-                    <li key={idx} style={{ fontSize: 12, color: '#e2e8f0', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                      <span style={{ color: '#c084fc', marginTop: -1 }}>•</span> {effect}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Formula:</span>
-                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: 6, marginTop: 4, fontFamily: 'monospace', color: '#fde047', fontSize: 13, fontWeight: 600, border: '1px solid rgba(255,255,255,0.05)' }}>
-                  {currentExplanation.insight.formula}
+                {/* Window Controls Button Group */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {/* Pin button */}
+                  <button
+                    onClick={() => setTutorPinned(!tutorPinned)}
+                    style={{
+                      background: tutorPinned ? 'rgba(91, 95, 255, 0.2)' : 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: tutorPinned ? '#a5b4fc' : '#94a3b8',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      outline: 'none',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = tutorPinned ? '#a5b4fc' : '#94a3b8'}
+                    title={tutorPinned ? "Dock Floating (Auto-Dismiss Enabled)" : "Pin Inspector (Disable Auto-Dismiss)"}
+                  >
+                    <Pin size={13} style={{ transform: tutorPinned ? 'rotate(45deg)' : 'none' }} />
+                  </button>
+                  {/* Maximize button */}
+                  <button
+                    onClick={() => setTutorMaximized(!tutorMaximized)}
+                    style={{
+                      background: tutorMaximized ? 'rgba(91, 95, 255, 0.15)' : 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: tutorMaximized ? '#ffffff' : '#94a3b8',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      outline: 'none',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = tutorMaximized ? '#ffffff' : '#94a3b8'}
+                    title={tutorMaximized ? "Restore Layout" : "Maximize Panel"}
+                  >
+                    <Maximize2 size={13} />
+                  </button>
+                  {/* Minimize arrow (chevron down) */}
+                  <button
+                    onClick={() => setTutorMinimized(!tutorMinimized)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      outline: 'none',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                    title={tutorMinimized ? "Expand Panel" : "Minimize Panel"}
+                  >
+                    {tutorMinimized ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  </button>
+                  {/* Close button */}
+                  <button
+                    onClick={() => {
+                      handleClear();
+                      setTutorEnabled(false);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      outline: 'none',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                    title="Close and dismiss explanation panel"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                {currentExplanation.insight.suggestions.map((action, i) => (
-                  <button
-                    key={i}
-                    style={{
-                      background: 'rgba(168,85,247,0.15)',
-                      border: '1px solid rgba(168,85,247,0.3)',
-                      borderRadius: 6,
-                      padding: '6px 12px',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: '#e9d5ff',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(168,85,247,0.25)';
-                      e.currentTarget.style.borderColor = 'rgba(168,85,247,0.5)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(168,85,247,0.15)';
-                      e.currentTarget.style.borderColor = 'rgba(168,85,247,0.3)';
-                    }}
-                  >
-                    {action}
-                  </button>
-                ))}
+              {/* Animated Pill Tabs */}
+              <div style={{
+                display: 'flex',
+                background: 'rgba(0, 0, 0, 0.35)',
+                borderRadius: 30,
+                padding: 4,
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                gap: 4,
+                flexShrink: 0
+              }}>
+                {(['explanation', 'effects', 'formula'] as const).map((tab) => {
+                  const isActive = activeTab === tab;
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      style={{
+                        flex: 1,
+                        background: isActive ? 'linear-gradient(90deg, #5B5FFF, #7B61FF)' : 'transparent',
+                        color: isActive ? '#ffffff' : '#94a3b8',
+                        border: 'none',
+                        borderRadius: 20,
+                        padding: '6px 0',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        letterSpacing: '0.02em',
+                        cursor: 'pointer',
+                        boxShadow: isActive ? '0 0 12px rgba(91, 95, 255, 0.4)' : 'none',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        outline: 'none',
+                        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif"
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.color = '#cbd5e1';
+                        } else {
+                          e.currentTarget.style.filter = 'brightness(1.15)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.color = '#94a3b8';
+                        } else {
+                          e.currentTarget.style.filter = 'none';
+                        }
+                      }}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  );
+                })}
               </div>
+
+              {/* Independent Scrollable Content Area */}
+              {!tutorMinimized && (
+                <div
+                  className="tutor-scroll-container"
+                  style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    paddingRight: 4,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 12,
+                  }}
+                >
+                  {currentExplanation.loading ? (
+                    /* Sleek glassmorphic shimmering loader */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 8 }}>
+                      <div className="shimmer-bg" style={{ height: 20, width: '70%', borderRadius: 6 }} />
+                      <div className="shimmer-bg" style={{ height: 60, width: '100%', borderRadius: 8 }} />
+                      <div className="shimmer-bg" style={{ height: 60, width: '100%', borderRadius: 8 }} />
+                      <div className="shimmer-bg" style={{ height: 60, width: '100%', borderRadius: 8 }} />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Active Tab View Router */}
+                      {activeTab === 'explanation' && (() => {
+                        const sections = parseExplanationText(currentExplanation.insight.explanation);
+                        const getParsedSection = (queryKey: string) => {
+                          const keys = Object.keys(sections);
+                          const foundKey = keys.find(k => k.includes(queryKey) || queryKey.includes(k));
+                          return foundKey ? sections[foundKey] : null;
+                        };
+
+                        let step1Text = getParsedSection('EXPLANATION') || getParsedSection('LIVE') || getParsedSection('HAPPENED') || getParsedSection('STEP 1');
+                        let step2Text = getParsedSection('UNDERSTANDING') || getParsedSection('DEEPER') || getParsedSection('CHANGED') || getParsedSection('STEP 2');
+                        let step3Text = getParsedSection('WHY') || getParsedSection('STEP 3');
+                        let step4Text = getParsedSection('NOTICE') || getParsedSection('STEP 4');
+
+                        if (!step1Text && !step2Text && !step3Text && !step4Text) {
+                          // Offline fallback: split by sentences and distribute across steps
+                          const rawExp = currentExplanation.insight.explanation || '';
+                          const sentences = rawExp.split(/[.!?]+\s+/).filter(Boolean);
+                          step1Text = sentences[0] || "The Earth object is now attached to the pendulum.";
+                          step2Text = sentences[1] || "The pendulum has more mass and swings with greater weight.";
+                          step3Text = sentences[2] || "Adding the Earth increases the total mass, so gravity pulls it down more strongly.";
+                          step4Text = sentences[3] || sentences.slice(3).join('. ') || "Watch how the pendulum swings slower and with more force compared to before.";
+                        }
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <StepCard num={1} title="What Happened" description={step1Text || ''} type="blue" />
+                            <StepCard num={2} title="What Changed" description={step2Text || ''} type="green" />
+                            <StepCard num={3} title="Simple Why" description={step3Text || ''} type="orange" />
+                            <StepCard num={4} title="What to Notice" description={step4Text || ''} type="purple" />
+
+                            {/* Key Effects Section inside the Explanation tab */}
+                            <div style={{ marginTop: 14, borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: 14 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: '#7B61FF', letterSpacing: '0.02em', display: 'block', marginBottom: 8, fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+                                Key Effects
+                              </span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                {(currentExplanation.insight.effects && currentExplanation.insight.effects.length > 0
+                                  ? currentExplanation.insight.effects
+                                  : ['Greater gravitational force', 'Slower swing', 'More inertia', 'More kinetic energy at the bottom']
+                                ).map((effect, idx) => {
+                                  const cleanedEffect = effect.replace(/^[^\w\s]+/g, '').trim();
+                                  return (
+                                    <motion.span
+                                      key={idx}
+                                      whileHover={{ scale: 1.04, borderColor: '#7B61FF' }}
+                                      style={{
+                                        fontSize: 11,
+                                        padding: '5px 12px',
+                                        borderRadius: 20,
+                                        background: 'rgba(255, 255, 255, 0.03)',
+                                        border: '1px solid rgba(123, 97, 255, 0.25)',
+                                        boxShadow: '0 0 8px rgba(123, 97, 255, 0.08)',
+                                        color: '#cbd5e1',
+                                        cursor: 'default',
+                                        transition: 'all 0.2s',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                      }}
+                                    >
+                                      {cleanedEffect}
+                                    </motion.span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {activeTab === 'effects' && (() => {
+                        const hasSelected = !!selected;
+                        const body = selected?.body;
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {/* Live Telemetry Table */}
+                            <div style={{
+                              background: 'rgba(0, 0, 0, 0.25)',
+                              border: '1px solid rgba(255, 255, 255, 0.05)',
+                              borderRadius: 12,
+                              padding: 10,
+                            }}>
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>
+                                🛰️ Active Simulation Telemetry
+                              </span>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                                <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: 7.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 800 }}>Target</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: hasSelected ? '#f87171' : '#64748b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                    {hasSelected ? (body?.label || selected.id) : 'None'}
+                                  </span>
+                                </div>
+                                <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: 7.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 800 }}>Gravity Mode</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#38bdf8' }}>
+                                    {gravityMode === 'radial' ? '🌌 Radial' : '🍎 Downward'}
+                                  </span>
+                                </div>
+                                <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: 7.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 800 }}>Bodies</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399' }}>{bodyCount} shapes</span>
+                                </div>
+                                <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: 7.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 800 }}>Speed</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24' }}>{speed.toFixed(1)}x</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Live Target Telemetry if selected */}
+                            {hasSelected && body && (
+                              <div style={{
+                                background: 'rgba(99, 102, 241, 0.05)',
+                                border: '1px solid rgba(99, 102, 241, 0.15)',
+                                borderRadius: 12,
+                                padding: 10,
+                              }}>
+                                <span style={{ fontSize: 9.5, fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>
+                                  🎯 Target Telemetry: {body.label || selected.id}
+                                </span>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: 7.5, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Mass</span>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1', fontFamily: 'monospace' }}>{body.mass.toFixed(1)} kg</span>
+                                  </div>
+                                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: 7.5, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Speed (v)</span>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1', fontFamily: 'monospace' }}>
+                                      {Math.hypot(body.velocity.x, body.velocity.y).toFixed(1)} m/s
+                                    </span>
+                                  </div>
+                                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: 7.5, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Bounciness (e)</span>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1', fontFamily: 'monospace' }}>{body.restitution.toFixed(2)}</span>
+                                  </div>
+                                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: 7.5, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Friction (μ)</span>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1', fontFamily: 'monospace' }}>{body.friction.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Suggested Experiments */}
+                            <div>
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>
+                                🧪 Sandbox Experiments
+                              </span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {currentExplanation.insight.suggestions && currentExplanation.insight.suggestions.length > 0 ? (
+                                  currentExplanation.insight.suggestions.map((sug, i) => (
+                                    <motion.button
+                                      key={i}
+                                      whileHover={{ scale: 1.02, x: 4, background: 'rgba(251, 191, 36, 0.12)' }}
+                                      onClick={() => {
+                                        setAiPrompt(`Help me perform the suggested experiment: ${sug}`);
+                                        handleAiQuery();
+                                      }}
+                                      style={{
+                                        background: 'rgba(255, 255, 255, 0.02)',
+                                        border: '1px solid rgba(251, 191, 36, 0.25)',
+                                        borderRadius: 8,
+                                        padding: '8px 12px',
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        color: '#fde047',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        transition: 'all 0.2s',
+                                        outline: 'none',
+                                      }}
+                                    >
+                                      <span>👉 {sug}</span>
+                                      <span style={{ fontSize: 8, opacity: 0.6, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Launch</span>
+                                    </motion.button>
+                                  ))
+                                ) : (
+                                  <span style={{ fontSize: 10.5, color: '#64748b', fontStyle: 'italic' }}>No suggested experiments.</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {activeTab === 'formula' && (() => {
+                        const rawFormula = currentExplanation.insight.formula || '';
+                        
+                        const getFormattedFormula = (formula: string) => {
+                          if (!formula) return 'No formula identified';
+                          if (formula.includes('$')) return formula;
+                          return `$$${formula.replace(/×/g, '\\times').replace(/\*/g, '\\cdot')}$$`;
+                        };
+
+                        const getFormulaContext = (formula: string) => {
+                          const f = formula.toLowerCase();
+                          if (f.includes('hooke') || f.includes('-kx') || f.includes('spring')) {
+                            return {
+                              name: "Hooke's Law (Simple Harmonic Oscillation)",
+                              desc: "Hooke's Law states that the force exerted by a spring is directly proportional to its displacement from equilibrium, but in the opposite direction. This linear restoring force drives simple harmonic motion.",
+                              insight: "💡 Try increasing spring stiffness (k) in the left panel — watch how the bob rebounds faster!"
+                            };
+                          }
+                          if (f.includes('gravity') || f.includes('m × g') || f.includes('mg')) {
+                            return {
+                              name: "Newton's Second Law: Gravity & Weight",
+                              desc: "Gravity exerts a downward force proportional to mass. In linear mode, this results in uniform downward acceleration (g ≈ 9.8 m/s² on Earth) regardless of body weight.",
+                              insight: "💡 In free-fall, objects of different weights fall at the exact same rate because gravity's force scales directly with inertia!"
+                            };
+                          }
+                          if (f.includes('momentum') || f.includes('collision') || f.includes('m1') || f.includes('mv')) {
+                            return {
+                              name: "Conservation of Linear Momentum",
+                              desc: "During collisions, the total momentum remains constant. Any momentum lost by Object A is gained by Object B. Restitution (e) determines energy conservation.",
+                              insight: "💡 Try changing Restitution (e) to 1.0 (elastic) — bodies will bounce indefinitely without energy loss!"
+                            };
+                          }
+                          if (f.includes('pivot') || f.includes('l/g') || f.includes('pendulum')) {
+                            return {
+                              name: "Simple Pendulum Swing Cycle",
+                              desc: "A pendulum's swing period is determined strictly by its string length (L) and the gravity constant (g). Crucially, the period is independent of bob mass!",
+                              insight: "💡 Try launching a pendulum bob and changing its mass — the swing rate remains identical!"
+                            };
+                          }
+                          return {
+                            name: "Core Physics Equation",
+                            desc: "This mathematical relationship governs the active sandbox state. The simulator evaluates this equation in real-time at 60 steps per second to solve body coordinates.",
+                            insight: "💡 Select a shape and modify its mass or friction — watch how these immediately alter the live graphs!"
+                          };
+                        };
+
+                        const context = getFormulaContext(rawFormula);
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {/* Premium LaTeX FormulaCard */}
+                            <div style={{
+                              background: 'rgba(99, 102, 241, 0.03)',
+                              border: '1px solid rgba(120, 120, 255, 0.25)',
+                              borderRadius: 14,
+                              padding: '16px 12px',
+                              boxShadow: '0 4px 16px rgba(120, 120, 255, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.05)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              textAlign: 'center',
+                              gap: 12
+                            }}>
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#a5b4fc', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                {context.name}
+                              </span>
+
+                              <div style={{
+                                fontSize: 16,
+                                color: '#fde047',
+                                fontWeight: 700,
+                                margin: '8px 0',
+                                width: '100%',
+                                display: 'flex',
+                                justifyContent: 'center'
+                              }}>
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkMath]}
+                                  rehypePlugins={[rehypeKatex]}
+                                  components={{
+                                    p: ({node, ...props}) => <p style={{ margin: 0 }} {...props} />,
+                                  }}
+                                >
+                                  {getFormattedFormula(rawFormula)}
+                                </ReactMarkdown>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                                <motion.button
+                                  whileHover={{ scale: 1.02, background: 'rgba(99, 102, 241, 0.2)' }}
+                                  onClick={() => {
+                                    setAiPrompt(`Explain the mathematical equation "${rawFormula}" and its variables in detail.`);
+                                    handleAiQuery();
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    background: 'rgba(99, 102, 241, 0.1)',
+                                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                                    borderRadius: 8,
+                                    padding: '6px 0',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    color: '#cbd5e1',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    outline: 'none',
+                                  }}
+                                >
+                                  📚 Explain Formula
+                                </motion.button>
+                                <motion.button
+                                  whileHover={{ scale: 1.02, background: 'rgba(168, 85, 247, 0.2)' }}
+                                  onClick={() => {
+                                    setAiPrompt(`Give me some interactive math experiments to test Hookes/Newtons laws in this Sandbox.`);
+                                    handleAiQuery();
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    background: 'rgba(168, 85, 247, 0.1)',
+                                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                                    borderRadius: 8,
+                                    padding: '6px 0',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    color: '#cbd5e1',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    outline: 'none',
+                                  }}
+                                >
+                                  ⚙️ Open Formula Lab
+                                </motion.button>
+                              </div>
+                            </div>
+
+                            {/* Written Context */}
+                            <div style={{
+                              background: 'rgba(255, 255, 255, 0.02)',
+                              border: '1px solid rgba(255, 255, 255, 0.04)',
+                              borderRadius: 12,
+                              padding: 12,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 8
+                            }}>
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#cbd5e1', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                Theoretical Context
+                              </span>
+                              <p style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                                {context.desc}
+                              </p>
+                              <div style={{
+                                borderTop: '1px dashed rgba(255,255,255,0.06)',
+                                paddingTop: 8,
+                                fontSize: 10.5,
+                                color: '#fde047',
+                                fontWeight: 500,
+                                lineHeight: 1.45
+                              }}>
+                                {context.insight}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Bottom Row Action Buttons */}
+              {!tutorMinimized && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                  paddingTop: 12,
+                  flexShrink: 0,
+                  gap: 10
+                }}>
+                  <div style={{ display: 'flex', gap: 8, flex: 1 }}>
+                    <motion.button
+                      whileHover={{ scale: 1.03, boxShadow: '0 0 12px rgba(120, 120, 255, 0.25)' }}
+                      onClick={() => {
+                        setAiPrompt("Generate a graph analysis and explain the velocity curves of the active bodies");
+                        handleAiQuery();
+                      }}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: 10,
+                        padding: '8px 12px',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#cbd5e1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        outline: 'none',
+                      }}
+                    >
+                      <LineChart size={14} color="#7B61FF" />
+                      <span>Show Graph</span>
+                    </motion.button>
+                    
+                    <motion.button
+                      whileHover={{ scale: 1.03, boxShadow: '0 0 12px rgba(168, 85, 247, 0.25)' }}
+                      onClick={() => {
+                        setAiPrompt("Show me the step-by-step mathematical calculations for the current event");
+                        handleAiQuery();
+                      }}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: 10,
+                        padding: '8px 12px',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#cbd5e1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        outline: 'none',
+                      }}
+                    >
+                      <Cpu size={14} color="#c084fc" />
+                      <span>View Calculations</span>
+                    </motion.button>
+                  </div>
+
+                  {/* Diagonal Resize Grab Handle */}
+                  {!tutorMaximized && (
+                    <motion.div
+                      whileHover={{ scale: 1.05, borderColor: 'rgba(120, 120, 255, 0.3)' }}
+                      onPointerDown={handleResizeBottomLeft}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 8,
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: 'rgba(15, 23, 42, 0.6)',
+                        cursor: 'sw-resize',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        transition: 'all 0.2s',
+                      }}
+                      title="Drag to resize panel diagonally"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'rotate(90deg)' }}>
+                        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                      </svg>
+                    </motion.div>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
