@@ -17,8 +17,7 @@ import { FloatingAssetPanel } from '../../components/AssetLibrary/FloatingAssetP
 import { physicsEventBus } from '../../ai/physicsEventBus';
 import { loadExample } from '../examples/loader/loadExample';
 import { getAllExamples } from '../examples/registry/exampleRegistry';
-import type { SandboxExampleConfig } from '../examples/types/example.types';
-
+import { OrbitUtils } from '../orbits/orbitUtils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -261,6 +260,8 @@ export const SandboxCanvas: React.FC = () => {
   const observerRef = useRef<RuntimeObserver | null>(null);
   const [propertyVersion, setPropertyVersion] = useState(0);
   const [telemetryTick, setTelemetryTick] = useState(0);
+  const simTimeRef = useRef(0);
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
 
   // Initialize runtime observer once ready
   useEffect(() => {
@@ -715,9 +716,10 @@ export const SandboxCanvas: React.FC = () => {
         rt.addHook({
           id: 'ui-telemetry-sync',
           afterStep: () => {
-            if (store.getSelectedObject()) {
-              setTelemetryTick((t) => t + 1);
+            if (rt.getState() === 'running') {
+              simTimeRef.current += 16.67;
             }
+            setTelemetryTick((t) => t + 1);
           },
         });
 
@@ -1134,6 +1136,7 @@ export const SandboxCanvas: React.FC = () => {
     const wasRunning = running;
     rt.pause();
     store.reset();
+    simTimeRef.current = 0;
 
     // Reset camera zoom/pan states and physics mouse
     handleCameraChange(1.0, 0, 0);
@@ -1186,6 +1189,7 @@ export const SandboxCanvas: React.FC = () => {
 
     setSelectedExampleId(exampleId);
     setSelected(null);
+    simTimeRef.current = 0;
 
     const initialZoom = entry.config.camera?.zoom ?? 1.0;
     handleCameraChange(initialZoom, 0, 0);
@@ -2807,10 +2811,264 @@ export const SandboxCanvas: React.FC = () => {
           </div>
         )}
 
-        <div style={S.badge}>
+        <div style={{ ...S.badge, bottom: bottomPanelOpen ? 124 : 14, transition: 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
           <span style={{ ...S.dot, background: '#6366f1', marginRight: 6 }} />
           Drag shapes & constraints · Drop anywhere
         </div>
+
+        {/* Persistent Bottom Observables & Telemetry Dock */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: bottomPanelOpen ? '110px' : '0px',
+          background: 'rgba(15, 23, 42, 0.92)',
+          backdropFilter: 'blur(20px)',
+          borderTop: bottomPanelOpen ? '1px solid rgba(255, 255, 255, 0.08)' : '0px solid transparent',
+          display: 'flex',
+          alignItems: 'stretch',
+          zIndex: 340,
+          fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif',
+          color: '#cbd5e1',
+          userSelect: 'none',
+          overflow: 'hidden',
+          boxShadow: '0 -8px 30px rgba(0, 0, 0, 0.4)',
+          transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-top-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}>
+          {/* Collapse Button */}
+          <button
+            onClick={() => setBottomPanelOpen(false)}
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              width: 22,
+              height: 22,
+              borderRadius: 6,
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#94a3b8',
+              fontSize: 12,
+              fontWeight: 700,
+              transition: 'all 0.15s',
+              zIndex: 10,
+              outline: 'none',
+            }}
+            onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
+            onMouseOut={e  => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+            title="Hide Telemetry"
+          >
+            ▼
+          </button>
+
+          {/* Global Clock & Mode */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            padding: '0 20px',
+            borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(0, 0, 0, 0.2)',
+            minWidth: '170px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: running ? '#10b981' : '#f59e0b',
+                boxShadow: running ? '0 0 8px #10b981' : '0 0 8px #f59e0b'
+              }} />
+              <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Simulation Time</span>
+            </div>
+            <span style={{ fontSize: '18px', fontWeight: 900, color: '#818cf8', fontFamily: 'monospace', textShadow: '0 0 10px rgba(129, 140, 248, 0.3)' }}>
+              {formatTime(simTimeRef.current)}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+              <span style={{
+                fontSize: '8px',
+                fontWeight: 800,
+                padding: '2px 6px',
+                borderRadius: '4px',
+                textTransform: 'uppercase',
+                background: gravityMode === 'radial' ? 'rgba(167, 139, 250, 0.15)' : 'rgba(14, 165, 233, 0.15)',
+                color: gravityMode === 'radial' ? '#c084fc' : '#38bdf8',
+              }}>
+                {gravityMode === 'radial' ? '🌌 Orbital Gravity' : '🍎 Linear Gravity'}
+              </span>
+            </div>
+          </div>
+
+          {/* Active Bodies Telemetry Scroll View */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            padding: '12px 40px 12px 16px',
+            overflowX: 'auto',
+            flex: 1,
+            alignItems: 'center',
+            scrollbarWidth: 'thin',
+          }}>
+            {(storeRef.current?.getAllObjects().filter(o => !o.body.isStatic) ?? []).map(obj => {
+              const isSelected = selected?.id === obj.id;
+              const m = obj.body.mass;
+              const speed = Math.hypot(obj.body.velocity.x, obj.body.velocity.y);
+              const ke = 0.5 * m * speed * speed;
+              
+              const radialGravity = runtimeRef.current?.gravitySystem?.getRadialGravity();
+              const sources = radialGravity?.getSources() ?? [];
+              const G = radialGravity?.config?.gravitationalConstant ?? 0.0012;
+              const bodyPos = obj.body.position;
+
+              let centralSource: any = null;
+              let minDistance = Infinity;
+
+              for (const source of sources) {
+                if (source.id === obj.id || !source.enabled) continue;
+                const dist = Math.hypot(source.position.x - bodyPos.x, source.position.y - bodyPos.y);
+                if (dist < minDistance) {
+                  minDistance = dist;
+                  centralSource = source;
+                }
+              }
+
+              let pe = 0;
+              let totalEnergy = ke;
+              let angularMomentum = 0;
+
+              if (centralSource) {
+                const r = Math.max(0.1, Math.hypot(bodyPos.x - centralSource.position.x, bodyPos.y - centralSource.position.y));
+                const M = centralSource.mass * (centralSource.metadata?.gravityStrength ?? 1.0);
+                pe = - (G * M * m) / (r / 100);
+                totalEnergy = ke + pe;
+                angularMomentum = m * ((bodyPos.x - centralSource.position.x) * obj.body.velocity.y - (bodyPos.y - centralSource.position.y) * obj.body.velocity.x);
+              }
+
+              return (
+                <div
+                  key={obj.id}
+                  onClick={() => {
+                    setSelected(obj);
+                    storeRef.current?.setSelectedObject(obj.id);
+                  }}
+                  style={{
+                    minWidth: '220px',
+                    background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'rgba(0, 0, 0, 0.3)',
+                    border: isSelected ? '1px solid rgba(99, 102, 241, 0.6)' : '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isSelected ? '0 0 15px rgba(99, 102, 241, 0.2)' : 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
+                >
+                  {/* Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: isSelected ? '#a5b4fc' : '#cbd5e1', fontFamily: 'monospace' }}>
+                      🛰️ {obj.id.replace('example-', '').replace('orbit-', '')}
+                    </span>
+                    <span style={{
+                      fontSize: '8px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      color: isSelected ? '#6ee7b7' : '#94a3b8',
+                      background: isSelected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                      padding: '1px 4px',
+                      borderRadius: '4px'
+                    }}>
+                      {obj.body.isStatic ? 'Static' : 'Dynamic'}
+                    </span>
+                  </div>
+                  
+                  {/* Real-time stats */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginTop: '2px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '7px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Kinetic (K)</span>
+                      <span style={{ fontSize: '10px', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {formatScientific(ke * 10, 'GJ')}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '7px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Potential (U)</span>
+                      <span style={{ fontSize: '10px', color: '#fb7185', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {gravityMode === 'radial' && centralSource ? formatScientific(pe * 10, 'GJ') : '0.00 GJ'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '7px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Total (E)</span>
+                      <span style={{ fontSize: '10px', color: '#a78bfa', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {gravityMode === 'radial' && centralSource ? formatScientific(totalEnergy * 10, 'GJ') : formatScientific(ke * 10, 'GJ')}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '7px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Ang Momentum</span>
+                      <span style={{ fontSize: '10px', color: '#fde047', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {gravityMode === 'radial' && centralSource ? formatScientific(angularMomentum * 10, 'kg·m²/s') : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {(storeRef.current?.getAllObjects().filter(o => !o.body.isStatic) ?? []).length === 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, height: '100%' }}>
+                <span style={{ fontSize: '11px', color: '#475569', fontStyle: 'italic' }}>
+                  🚀 Spawn orbiting satellites or planets to view live telemetry readouts.
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Floating Expand Button when Collapsed */}
+        {!bottomPanelOpen && (
+          <button
+            onClick={() => setBottomPanelOpen(true)}
+            style={{
+              position: 'absolute',
+              bottom: 14,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '6px 16px',
+              borderRadius: '999px',
+              background: 'rgba(15, 23, 42, 0.85)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              color: '#c7d2fe',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              zIndex: 340,
+              transition: 'all 0.2s ease',
+              outline: 'none',
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.background = 'rgba(99, 102, 241, 0.85)';
+              e.currentTarget.style.color = '#ffffff';
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1.05)';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.background = 'rgba(15, 23, 42, 0.85)';
+              e.currentTarget.style.color = '#c7d2fe';
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
+            }}
+          >
+            📊 Show Telemetry
+          </button>
+        )}
 
 
 
@@ -3012,7 +3270,35 @@ export const SandboxCanvas: React.FC = () => {
   );
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const formatScientific = (val: number, unit: string) => {
+  if (isNaN(val) || !isFinite(val)) return `0.00 ${unit}`;
+  const absVal = Math.abs(val);
+  if (absVal === 0) return `0.00 ${unit}`;
+  
+  if (absVal >= 1000 || absVal < 0.01) {
+    const exp = val.toExponential(2);
+    const [base, power] = exp.split('e');
+    const superscriptMap: Record<string, string> = {
+      '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+    };
+    const formattedPower = power
+      .replace('+', '')
+      .split('')
+      .map(c => superscriptMap[c] || c)
+      .join('');
+    return `${base} × 10${formattedPower} ${unit}`;
+  }
+  return `${val.toFixed(2)} ${unit}`;
+};
+
+const formatTime = (timeMs: number) => {
+  const totalSecs = Math.floor(timeMs / 1000);
+  const secs = totalSecs % 60;
+  const mins = Math.floor(totalSecs / 60) % 60;
+  const hrs = Math.floor(totalSecs / 3600);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+};
 
 const Sep: React.FC<{ label: string }> = ({ label }) => (
   <div style={{
@@ -3027,7 +3313,7 @@ const Sep: React.FC<{ label: string }> = ({ label }) => (
 const S: Record<string, React.CSSProperties> = {
   root: {
     display: 'flex', width: '100%', height: '100%', minHeight: 560,
-    background: '#dbeafe', color: '#0f172a',
+    background: '#090d16', color: '#0f172a',
     fontFamily: '"Plus Jakarta Sans",system-ui,sans-serif',
     overflow: 'hidden', userSelect: 'none'
   },
@@ -3058,7 +3344,7 @@ const S: Record<string, React.CSSProperties> = {
     background: 'linear-gradient(135deg,#c7d2fe,#bfdbfe)',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
   },
-  subtitle: { fontSize: 11, color: '#475569', marginBottom: 16 },
+  subtitle: { fontSize: 11, color: '#cbd5e1', marginBottom: 16 },
   cards: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 },
   card: {
     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
@@ -3098,7 +3384,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 10, color: '#334155', lineHeight: 1.55, marginTop: 'auto', paddingTop: 14,
     borderTop: '1px solid rgba(255,255,255,0.04)'
   },
-  canvasWrap: { flex: 1, position: 'relative', overflow: 'hidden', background: '#bfdbfe', cursor: 'default', transition: 'outline 0.15s' },
+  canvasWrap: { flex: 1, position: 'relative', overflow: 'hidden', background: '#0b0f19', cursor: 'default', transition: 'outline 0.15s' },
   dropHint: {
     position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
     padding: '8px 18px', borderRadius: 10, background: 'rgba(99,102,241,0.2)',
@@ -3107,12 +3393,12 @@ const S: Record<string, React.CSSProperties> = {
   },
   dotGrid: {
     position: 'absolute', inset: 0, pointerEvents: 'none',
-    backgroundImage: 'radial-gradient(#1e293b 1px,transparent 1px)',
-    backgroundSize: '18px 18px', opacity: 0.55
+    backgroundImage: 'radial-gradient(rgba(99, 102, 241, 0.15) 1.5px,transparent 1.5px)',
+    backgroundSize: '18px 18px', opacity: 1
   },
   mount: { position: 'absolute', inset: 0 },
   badge: {
-    position: 'absolute', bottom: 14, right: 14, display: 'flex', alignItems: 'center',
+    position: 'absolute', bottom: 124, right: 14, display: 'flex', alignItems: 'center',
     padding: '5px 12px', borderRadius: 8, backdropFilter: 'blur(12px)',
     background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.08)',
     fontSize: 11, color: '#818cf8', pointerEvents: 'none'

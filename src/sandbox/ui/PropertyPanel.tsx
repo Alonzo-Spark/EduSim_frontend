@@ -323,14 +323,34 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
 
       {/* ── Tab Navigation ─────────────────────────────────────────────────── */}
       {isCircle && (
-        <div style={S.tabsContainer}>
+        <div style={{
+          display: 'flex',
+          background: 'rgba(0, 0, 0, 0.4)',
+          borderRadius: '10px',
+          padding: '3px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          marginBottom: '14px',
+          flexShrink: 0,
+        }}>
           <button
             onClick={() => setActiveTab('general')}
             style={{
-              ...S.tabBtn,
-              borderBottom: activeTab === 'general' ? '2px solid #818cf8' : '2px solid transparent',
-              color: activeTab === 'general' ? '#e2e8f0' : '#64748b',
-              fontWeight: activeTab === 'general' ? 700 : 500,
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '8px 0',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeTab === 'general' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+              color: activeTab === 'general' ? '#fff' : '#64748b',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.25s ease',
+              boxShadow: activeTab === 'general' ? '0 4px 12px rgba(79, 70, 229, 0.3)' : 'none',
+              outline: 'none',
             }}
           >
             🔬 General Lab
@@ -338,10 +358,22 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           <button
             onClick={() => setActiveTab('orbital')}
             style={{
-              ...S.tabBtn,
-              borderBottom: activeTab === 'orbital' ? '2px solid #a78bfa' : '2px solid transparent',
-              color: activeTab === 'orbital' ? '#e2e8f0' : '#64748b',
-              fontWeight: activeTab === 'orbital' ? 700 : 500,
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '8px 0',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeTab === 'orbital' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+              color: activeTab === 'orbital' ? '#fff' : '#64748b',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.25s ease',
+              boxShadow: activeTab === 'orbital' ? '0 4px 12px rgba(79, 70, 229, 0.3)' : 'none',
+              outline: 'none',
             }}
           >
             🪐 Orbital Mechanics
