@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   Sparkles, X, ChevronLeft, ChevronRight, BookOpen, Settings, Play, Info, Search, Minimize2, Maximize2, Pin, PinOff,
   Zap, TrendingUp, Lightbulb, Eye, LineChart, Cpu, ChevronUp, ChevronDown
 } from 'lucide-react';
@@ -137,13 +137,13 @@ async function buildScene(
 const parseExplanationText = (text: string) => {
   const sections: Record<string, string> = {};
   if (!text) return sections;
-  
+
   // Standard split by markdown headers
   const parts = text.split(/(?=###\s*✦?\s*)/gi);
   for (const part of parts) {
     const trimmed = part.trim();
     if (!trimmed) continue;
-    
+
     // Match ### ✦ NAME or ### NAME
     const match = trimmed.match(/^###\s*✦?\s*([^\n]+)/i);
     if (match) {
@@ -166,11 +166,11 @@ const StepCard: React.FC<StepCardProps> = ({ num, title, description, type }) =>
   const isBlue = type === 'blue';
   const isGreen = type === 'green';
   const isOrange = type === 'orange';
-  
+
   let glowColor = 'rgba(168, 85, 247, 0.35)';
   let iconBg = 'rgba(168, 85, 247, 0.2)';
   let iconColor = '#c084fc';
-  
+
   if (isBlue) {
     glowColor = 'rgba(14, 165, 233, 0.35)';
     iconBg = 'rgba(14, 165, 233, 0.2)';
@@ -184,12 +184,12 @@ const StepCard: React.FC<StepCardProps> = ({ num, title, description, type }) =>
     iconBg = 'rgba(245, 158, 11, 0.2)';
     iconColor = '#fbbf24';
   }
-  
-  const formattedTitle = num === 1 ? '1. What Happened' 
-                       : num === 2 ? '2. What Changed'
-                       : num === 3 ? '3. Simple Why'
-                       : '4. What to Notice';
-  
+
+  const formattedTitle = num === 1 ? '1. What Happened'
+    : num === 2 ? '2. What Changed'
+      : num === 3 ? '3. Simple Why'
+        : '4. What to Notice';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -252,8 +252,8 @@ const StepCard: React.FC<StepCardProps> = ({ num, title, description, type }) =>
             remarkPlugins={[remarkMath]}
             rehypePlugins={[rehypeKatex]}
             components={{
-              p: ({node, ...props}: any) => <p style={{ margin: 0 }} {...props} />,
-              code: ({node, inline, ...props}: any) => (
+              p: ({ node, ...props }: any) => <p style={{ margin: 0 }} {...props} />,
+              code: ({ node, inline, ...props }: any) => (
                 <code style={{
                   background: 'rgba(255,255,255,0.08)',
                   padding: '2px 4px',
@@ -420,7 +420,16 @@ export const SandboxCanvas: React.FC = () => {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [showAiPanel, setShowAiPanel] = useState(false);
 
-  const { currentExplanation, queueCount, handleDismiss, setIsHovered, pushExplanation, handleNext, handleClear } = useExplanationEngine(dynamicExplanationEnabled, gravityMode);
+  const activeExample = selectedExampleId ? getAllExamples().find(ex => ex.id === selectedExampleId) : null;
+  const activeExampleName = activeExample?.title || undefined;
+  const activeExampleDescription = activeExample?.description || undefined;
+
+  const { currentExplanation, queueCount, handleDismiss, setIsHovered, pushExplanation, handleNext, handleClear } = useExplanationEngine(
+    tutorEnabled,
+    gravityMode,
+    activeExampleName,
+    activeExampleDescription
+  );
 
   const handleAiQuery = async () => {
     if (!aiPrompt.trim()) return;
@@ -481,7 +490,7 @@ export const SandboxCanvas: React.FC = () => {
           if (sceneJson.success && sceneJson.data) {
             const scene = sceneJson.data;
             const assets: string[] = scene.recommended_assets || [];
-            const topic: string   = scene.topic || '';
+            const topic: string = scene.topic || '';
             if (assets.length > 0) {
               useAssetStore.getState().setSuggestedAssets(assets, topic);
             }
@@ -846,7 +855,7 @@ export const SandboxCanvas: React.FC = () => {
           dragStartedOnCanvas = false;
           if (isPanning) {
             isPanning = false;
-            
+
             canvas.style.cursor = spacePressedRef.current ? 'grab' : 'default';
             drag.enable();
 
@@ -2395,65 +2404,65 @@ export const SandboxCanvas: React.FC = () => {
               <button style={{ ...S.btn, ...S.btnGhost }} onClick={handleReset} disabled={!ready} title="Reset">↺</button>
             </div>
 
-        {/* Tutor Explanation Toggle */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginTop: 2,
-          marginBottom: 6,
-          padding: '7px 10px',
-          borderRadius: 10,
-          background: tutorEnabled
-            ? 'rgba(99, 102, 241, 0.10)'
-            : 'rgba(255,255,255,0.03)',
-          border: tutorEnabled
-            ? '1px solid rgba(99,102,241,0.30)'
-            : '1px solid rgba(255,255,255,0.07)',
-          transition: 'all 0.2s ease',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 14 }}>🤖</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: tutorEnabled ? '#a5b4fc' : '#64748b', transition: 'color 0.2s' }}>
-              AI Explanation
-            </span>
-          </div>
-          <button
-            id="tutor-toggle-btn"
-            onClick={() => setTutorEnabled((v) => !v)}
-            style={{
-              position: 'relative',
-              width: 38,
-              height: 20,
+            {/* Tutor Explanation Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 2,
+              marginBottom: 6,
+              padding: '7px 10px',
               borderRadius: 10,
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
               background: tutorEnabled
-                ? 'linear-gradient(135deg, #6366f1, #818cf8)'
-                : 'rgba(71,85,105,0.6)',
-              boxShadow: tutorEnabled
-                ? '0 0 8px rgba(99,102,241,0.5)'
-                : 'none',
-              transition: 'all 0.25s ease',
-              flexShrink: 0,
-            }}
-            title={tutorEnabled ? 'Disable AI explanations' : 'Enable AI explanations'}
-          >
-            <span style={{
-              position: 'absolute',
-              top: 3,
-              left: tutorEnabled ? 21 : 3,
-              width: 14,
-              height: 14,
-              borderRadius: '50%',
-              background: '#fff',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
-              transition: 'left 0.25s ease',
-              display: 'block',
-            }} />
-          </button>
-        </div>
+                ? 'rgba(99, 102, 241, 0.10)'
+                : 'rgba(255,255,255,0.03)',
+              border: tutorEnabled
+                ? '1px solid rgba(99,102,241,0.30)'
+                : '1px solid rgba(255,255,255,0.07)',
+              transition: 'all 0.2s ease',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14 }}>🤖</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: tutorEnabled ? '#a5b4fc' : '#64748b', transition: 'color 0.2s' }}>
+                  AI Explanation
+                </span>
+              </div>
+              <button
+                id="tutor-toggle-btn"
+                onClick={() => setTutorEnabled((v) => !v)}
+                style={{
+                  position: 'relative',
+                  width: 38,
+                  height: 20,
+                  borderRadius: 10,
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  background: tutorEnabled
+                    ? 'linear-gradient(135deg, #6366f1, #818cf8)'
+                    : 'rgba(71,85,105,0.6)',
+                  boxShadow: tutorEnabled
+                    ? '0 0 8px rgba(99,102,241,0.5)'
+                    : 'none',
+                  transition: 'all 0.25s ease',
+                  flexShrink: 0,
+                }}
+                title={tutorEnabled ? 'Disable AI explanations' : 'Enable AI explanations'}
+              >
+                <span style={{
+                  position: 'absolute',
+                  top: 3,
+                  left: tutorEnabled ? 21 : 3,
+                  width: 14,
+                  height: 14,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+                  transition: 'left 0.25s ease',
+                  display: 'block',
+                }} />
+              </button>
+            </div>
 
             <Sep label="Spawn Shapes — click or drag" />
             <div
@@ -3123,7 +3132,7 @@ export const SandboxCanvas: React.FC = () => {
               outline: 'none',
             }}
             onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
-            onMouseOut={e  => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+            onMouseOut={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
             title="Hide Telemetry"
           >
             ▼
@@ -3182,7 +3191,7 @@ export const SandboxCanvas: React.FC = () => {
               const m = obj.body.mass;
               const speed = Math.hypot(obj.body.velocity.x, obj.body.velocity.y);
               const ke = 0.5 * m * speed * speed;
-              
+
               const radialGravity = runtimeRef.current?.gravitySystem?.getRadialGravity();
               const sources = radialGravity?.getSources() ?? [];
               const G = radialGravity?.getConfig()?.gravitationalConstant ?? 0.0012;
@@ -3250,7 +3259,7 @@ export const SandboxCanvas: React.FC = () => {
                       {obj.body.isStatic ? 'Static' : 'Dynamic'}
                     </span>
                   </div>
-                  
+
                   {/* Real-time stats */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginTop: '2px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -3281,7 +3290,7 @@ export const SandboxCanvas: React.FC = () => {
                 </div>
               );
             })}
-            
+
             {(storeRef.current?.getAllObjects().filter(o => !o.body.isStatic) ?? []).length === 0 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, height: '100%' }}>
                 <span style={{ fontSize: '11px', color: '#475569', fontStyle: 'italic' }}>
@@ -3350,14 +3359,14 @@ export const SandboxCanvas: React.FC = () => {
             width: 46,
             height: 46,
             borderRadius: '50%',
-            background: tutorEnabled 
-              ? 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)' 
+            background: tutorEnabled
+              ? 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)'
               : 'rgba(15, 23, 42, 0.65)',
-            border: tutorEnabled 
-              ? '2px solid #5B5FFF' 
+            border: tutorEnabled
+              ? '2px solid #5B5FFF'
               : '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: tutorEnabled 
-              ? '0 0 16px rgba(91, 95, 255, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3)' 
+            boxShadow: tutorEnabled
+              ? '0 0 16px rgba(91, 95, 255, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3)'
               : '0 4px 12px rgba(0, 0, 0, 0.35)',
             backdropFilter: 'blur(12px)',
             display: 'flex',
@@ -3369,14 +3378,14 @@ export const SandboxCanvas: React.FC = () => {
           }}
           title={tutorEnabled ? 'Close AI explanation panel' : 'Open AI explanation panel'}
         >
-          <Sparkles 
-            size={20} 
-            color="#fbbf24" 
-            style={{ 
+          <Sparkles
+            size={20}
+            color="#fbbf24"
+            style={{
               animation: tutorEnabled ? 'pulse-glow 1.8s infinite ease-in-out' : 'none',
               transform: tutorEnabled ? 'scale(1.05)' : 'none',
               transition: 'transform 0.2s'
-            }} 
+            }}
           />
 
           {/* Glowing Notification Dot for queued events */}
@@ -3525,7 +3534,7 @@ export const SandboxCanvas: React.FC = () => {
                   <span style={{ fontSize: 13.5, fontWeight: 800, color: '#ffffff', letterSpacing: '0.02em', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
                     AI Explanation
                   </span>
-                  
+
                   {/* Violet Queue Badge */}
                   <span style={{
                     background: '#5B5FFF',
@@ -3944,7 +3953,7 @@ export const SandboxCanvas: React.FC = () => {
 
                       {activeTab === 'formula' && (() => {
                         const rawFormula = currentExplanation.insight.formula || '';
-                        
+
                         const getFormattedFormula = (formula: string) => {
                           if (!formula) return 'No formula identified';
                           if (formula.includes('$')) return formula;
@@ -4023,7 +4032,7 @@ export const SandboxCanvas: React.FC = () => {
                                   remarkPlugins={[remarkMath]}
                                   rehypePlugins={[rehypeKatex]}
                                   components={{
-                                    p: ({node, ...props}: any) => <p style={{ margin: 0 }} {...props} />,
+                                    p: ({ node, ...props }: any) => <p style={{ margin: 0 }} {...props} />,
                                   }}
                                 >
                                   {getFormattedFormula(rawFormula)}
@@ -4152,7 +4161,7 @@ export const SandboxCanvas: React.FC = () => {
                       <LineChart size={14} color="#7B61FF" />
                       <span>Show Graph</span>
                     </motion.button>
-                    
+
                     <motion.button
                       whileHover={{ scale: 1.03, boxShadow: '0 0 12px rgba(168, 85, 247, 0.25)' }}
                       onClick={() => {
@@ -4311,7 +4320,7 @@ const formatScientific = (val: number, unit: string) => {
   if (isNaN(val) || !isFinite(val)) return `0.00 ${unit}`;
   const absVal = Math.abs(val);
   if (absVal === 0) return `0.00 ${unit}`;
-  
+
   if (absVal >= 1000 || absVal < 0.01) {
     const exp = val.toExponential(2);
     const [base, power] = exp.split('e');

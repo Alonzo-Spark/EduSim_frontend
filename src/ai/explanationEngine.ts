@@ -15,21 +15,30 @@ function getDynamicPromptAndPlaceholder(event: PhysicsEvent, gravityMode: 'linea
 
   switch (event.type) {
     case 'OBJECT_SPAWNED': {
+      if (event.metadata?.isExample) {
+        const title = event.metadata.title || 'Textbook Example';
+        return {
+          query: `An active textbook simulation titled "${title}" has just been loaded onto the canvas. Explain the overall physical concepts, orbital mechanics, system setup, and learning goals of this laboratory scenario.`,
+          placeholderTitle: `Lesson Loaded: ${title}`,
+          placeholderEffects: ['Initializing physics environment...', 'Setting target orbital vectors...', 'Loading textbook variables...']
+        };
+      }
+
       const mass = event.metadata?.mass ? `${event.metadata.mass.toFixed(1)} kg` : 'unknown mass';
       const shape = event.metadata?.shape ?? 'object';
       const name = event.metadata?.name ?? shape;
       
       if (isRadial) {
         return {
-          query: `Explain the physics of a celestial ${shape} named "${name}" with mass ${mass} which has just been spawned in a zero-atmosphere space environment under radial gravity. Explain centripetal force, radial gravitational pull ($F = G \\frac{m_1 m_2}{r^2}$), and how orbital velocity determines whether it stays in a stable orbit or falls towards the star.`,
-          placeholderTitle: `${name} spawned in space orbit`,
+          query: `Explain the physics of the action: releasing/spawning a celestial body named "${name}" into a space orbit. How does the initial velocity vector at the moment of launch determine whether the orbit will be circular, elliptical, or decay into the star under radial gravity?`,
+          placeholderTitle: `${name} launched in space orbit`,
           placeholderEffects: ['Calculating orbital trajectory...', 'Measuring radial gravity field...', 'Checking centripetal balance...']
         };
       } else {
         const gVal = typeof event.metadata?.gravity === 'number' ? event.metadata.gravity : 1.0;
         const gMs = (gVal * 9.8).toFixed(1);
         return {
-          query: `Explain the physics of a ${shape} named "${name}" with mass ${mass} which has just been released and is in free-fall under downward Earth gravity of ${gMs} m/s². What happens to its velocity, acceleration, kinetic energy, and potential energy as it falls?`,
+          query: `Explain the physics of the action: spawning/releasing an object named "${name}" (mass ${mass}) into downward gravity. What happens immediately to its potential and kinetic energy transition at the moment of release under Earth gravity of ${gMs} m/s²?`,
           placeholderTitle: `${name} released — free-fall begins`,
           placeholderEffects: ['Calculating free-fall dynamics...', 'Simulating weight force...', 'Preparing formulas...']
         };
@@ -38,16 +47,16 @@ function getDynamicPromptAndPlaceholder(event: PhysicsEvent, gravityMode: 'linea
     case 'GRAVITY_CHANGED': {
       if (isRadial) {
         return {
-          query: `Explain what happens in a space physics simulation when the radial gravitational constant (G) changes from ${event.oldValue.toFixed(4)} to ${event.newValue.toFixed(4)}. Discuss the dynamic impact on planetary orbital velocities ($v = \\sqrt{\\frac{GM}{r}}$), centripetal acceleration, and orbit stability.`,
-          placeholderTitle: 'Radial Gravity changed (Live AI)',
+          query: `Explain the dynamic physics of the action: altering the gravitational constant (G) of the universe from ${event.oldValue.toFixed(4)} to ${event.newValue.toFixed(4)} in real-time. How does modifying gravity instantly affect the orbital velocities ($v = \\sqrt{\\frac{GM}{r}}$), centripetal acceleration, and trajectory stability of all active planets?`,
+          placeholderTitle: 'Radial Gravity adjusted (Live AI)',
           placeholderEffects: ['Recalculating orbital vectors...', 'Recalibrating radial field lines...', 'Checking trajectory stability...']
         };
       } else {
         const gOld = (event.oldValue * 9.8).toFixed(1);
         const gNew = (event.newValue * 9.8).toFixed(1);
         return {
-          query: `Explain what happens in a physics simulation when downward linear gravity is changed from ${gOld} m/s² to ${gNew} m/s². Discuss the implications on the weight of objects, how fast they fall, and how collision forces or bounciness will scale.`,
-          placeholderTitle: 'Linear Gravity changed (Live AI)',
+          query: `Explain the dynamic physics of the action: changing downward linear gravity from ${gOld} m/s² to ${gNew} m/s² in real-time. How does altering linear gravity dynamically scale the weight force, acceleration, and falling velocity of all active objects?`,
+          placeholderTitle: 'Linear Gravity adjusted (Live AI)',
           placeholderEffects: ['Recalculating weight vectors...', 'Updating acceleration values...', 'Recalibrating physics engine...']
         };
       }
@@ -59,14 +68,14 @@ function getDynamicPromptAndPlaceholder(event: PhysicsEvent, gravityMode: 'linea
       
       if (isRadial) {
         return {
-          query: `In an orbital celestial simulation, a body's mass has changed from ${mOld} kg to ${mNew} kg (a change of ${diff} kg). Explain how this change affects the gravitational attraction force ($F = G \\frac{m_1 m_2}{r^2}$) exerted on or by this body, its orbital velocity, and its resistance to orbital changes (inertia).`,
-          placeholderTitle: 'Celestial Mass updated (Live AI)',
+          query: `Explain the dynamic physics of the action: altering the mass of an active celestial body from ${mOld} kg to ${mNew} kg (a change of ${diff} kg) in real-time. How does changing mass affect its orbital inertia and its mutual gravitational attraction ($F = G \\frac{m_1 m_2}{r^2}$) with other planets?`,
+          placeholderTitle: 'Celestial Mass adjusted (Live AI)',
           placeholderEffects: ['Recalculating orbital gravitational pull...', 'Adjusting centripetal parameters...', 'Checking Keplerian variables...']
         };
       } else {
         return {
-          query: `In a ground physics simulation, an object's mass has changed from ${mOld} kg to ${mNew} kg (a change of ${diff} kg). Explain the concept of inertia and how this change in mass affects the force required to accelerate the object ($F = ma$), its weight ($W = mg$), and collision impact.`,
-          placeholderTitle: 'Object Mass updated (Live AI)',
+          query: `Explain the dynamic physics of the action: changing the mass of a physical body from ${mOld} kg to ${mNew} kg (a change of ${diff} kg) in real-time. Discuss how altering mass dynamically affects its inertia, its resistance to acceleration ($F = ma$), and its weight.`,
+          placeholderTitle: 'Object Mass adjusted (Live AI)',
           placeholderEffects: ['Recalculating inertia tensors...', 'Adjusting force requirements...', 'Recalibrating weight force...']
         };
       }
@@ -75,7 +84,7 @@ function getDynamicPromptAndPlaceholder(event: PhysicsEvent, gravityMode: 'linea
       const fOld = event.oldValue.toFixed(2);
       const fNew = event.newValue.toFixed(2);
       return {
-        query: `Explain what happens in a physics simulation when the sliding friction coefficient (μ) changes from ${fOld} to ${fNew}. Discuss the impact on sliding objects, how rate of kinetic energy loss changes, and how force opposes motion.`,
+        query: `Explain the physics of the action: adjusting the sliding friction coefficient (μ) dynamically from ${fOld} to ${fNew}. How does altering friction affect the sliding resistance, motion retardation, and rate of kinetic energy loss for active objects?`,
         placeholderTitle: 'Friction adjusted (Live AI)',
         placeholderEffects: ['Adjusting normal force vectors...', 'Recalculating sliding resistance...', 'Recalibrating energy dissipation...']
       };
@@ -84,7 +93,7 @@ function getDynamicPromptAndPlaceholder(event: PhysicsEvent, gravityMode: 'linea
       const rOld = event.oldValue.toFixed(2);
       const rNew = event.newValue.toFixed(2);
       return {
-        query: `Explain the physical meaning of restitution (bounciness) changing from ${rOld} to ${rNew} in a simulation. Discuss elastic vs inelastic collisions, kinetic energy conservation, and how high or low the object will bounce when dropped.`,
+        query: `Explain the physics of the action: altering the restitution (bounciness) of objects dynamically from ${rOld} to ${rNew} in real-time. How does this action affect collision elasticity, kinetic energy conservation, and subsequent rebound height during impacts?`,
         placeholderTitle: 'Restitution adjusted (Live AI)',
         placeholderEffects: ['Recalculating coefficient of restitution...', 'Adjusting kinetic energy retention...', 'Simulating impact dynamics...']
       };
@@ -92,21 +101,21 @@ function getDynamicPromptAndPlaceholder(event: PhysicsEvent, gravityMode: 'linea
     case 'SPRING_CREATED': {
       const k = event.metadata?.stiffness ?? 0.02;
       return {
-        query: `A spring constraint with stiffness constant k = ${k.toFixed(3)} has just been attached to an object in a physics simulation. Explain Hooke's Law (F = -kx), spring potential energy, and the resulting oscillatory motion (simple harmonic motion).`,
+        query: `Explain the physics of the action: attaching an elastic spring constraint with stiffness constant k = ${k.toFixed(3)}. Discuss Hooke's Law (F = -kx), potential energy storage, and how this action initiates simple harmonic oscillations.`,
         placeholderTitle: 'Spring attached (Live AI)',
         placeholderEffects: ['Calculating Hooke\'s Law restoring force...', 'Simulating elastic potential energy...', 'Estimating oscillation periods...']
       };
     }
     case 'ROPE_CREATED': {
       return {
-        query: `A rope constraint has been added between two bodies in a physics simulation. Explain the physics of tension force, centripetal acceleration, pendulum-like swinging motion, and how a rope goes slack when objects get closer.`,
+        query: `Explain the physics of the action: linking bodies with a flexible rope constraint. Discuss tension forces, constraint boundaries, and the transition between taut tension and slack freedom.`,
         placeholderTitle: 'Rope constraint added (Live AI)',
         placeholderEffects: ['Calculating tension vectors...', 'Determining separation thresholds...', 'Simulating pendulum arcs...']
       };
     }
     case 'PIVOT_CREATED': {
       return {
-        query: `A pivot anchor constraint has been attached to a body in a physics simulation. Explain pendulum motion, restoring forces under gravity, and how the length of the pendulum arm and gravity affect the oscillation period.`,
+        query: `Explain the physics of the action: pinning an object to a fixed pivot anchor constraint. How does this action restrict translational motion and convert linear forces into rotational pendulum swings?`,
         placeholderTitle: 'Pivot attached (Live AI)',
         placeholderEffects: ['Determining rotational coordinates...', 'Calculating centripetal forces...', 'Mapping pendulum arcs...']
       };
@@ -117,13 +126,13 @@ function getDynamicPromptAndPlaceholder(event: PhysicsEvent, gravityMode: 'linea
       
       if (isRadial) {
         return {
-          query: `A collision has occurred between celestial bodies in space at a relative speed of ${speed} with an impulse of ${impulse}. Explain the conservation of momentum in orbital mechanics, relative impact speed, and how such collisions alter orbital trajectories.`,
+          query: `Explain the physics of the action: two celestial bodies colliding in space at a relative speed of ${speed} with an impulse of ${impulse}. Discuss the transfer of momentum, Newton's Third Law (equal and opposite reaction forces), and orbital trajectory alterations during impact.`,
           placeholderTitle: 'Celestial Collision (Live AI)',
           placeholderEffects: ['Checking momentum vectors...', 'Calculating trajectory alterations...', 'Determining kinetic energy loss...']
         };
       } else {
         return {
-          query: `A collision has occurred between objects in a ground simulation at a relative speed of ${speed} with an impulse of ${impulse}. Explain the conservation of momentum, Newton's Third Law (equal and opposite forces), and how bounciness determines energy conservation.`,
+          query: `Explain the physics of the action: two physical bodies colliding in real-time at a relative speed of ${speed} with an impulse of ${impulse}. Discuss the transfer of momentum, Newton's Third Law (equal and opposite reaction forces), and kinetic energy dissipation during impact.`,
           placeholderTitle: 'Collision detected (Live AI)',
           placeholderEffects: ['Verifying momentum conservation...', 'Calculating impulse transfer...', 'Determining kinetic energy loss...']
         };
@@ -136,7 +145,7 @@ function getDynamicPromptAndPlaceholder(event: PhysicsEvent, gravityMode: 'linea
       const mass = event.metadata?.mass;
       const accStr = mass ? `resulting in an acceleration of ${((Math.hypot(fx, fy) * 1000) / mass).toFixed(1)} m/s²` : '';
       return {
-        query: `An external force of magnitude ${fMag} N has been applied to an object of mass ${mass?.toFixed(1) ?? 'unknown'} kg ${accStr}. Explain Newton's Second Law of Motion (F = ma) and how the applied force causes acceleration, changes velocity, and increases kinetic energy over time.`,
+        query: `Explain the physics of the action: applying a dynamic external force blast of magnitude ${fMag} N to an object of mass ${mass?.toFixed(1) ?? 'unknown'} kg ${accStr}. How does this impulse instantly inject kinetic energy, change momentum, and accelerate the body according to F = ma?`,
         placeholderTitle: 'Force applied (Live AI)',
         placeholderEffects: ['Summing force vectors...', 'Calculating F = ma acceleration...', 'Mapping momentum accumulation...']
       };
@@ -145,21 +154,26 @@ function getDynamicPromptAndPlaceholder(event: PhysicsEvent, gravityMode: 'linea
       const friction = event.metadata?.friction ?? 0.3;
       const rest = event.metadata?.restitution ?? 0.5;
       return {
-        query: `An object in a physics simulation has come to rest. Explain how kinetic energy was fully dissipated into other forms of energy (like heat and sound) through friction (μ = ${friction.toFixed(2)}) and low restitution (e = ${rest.toFixed(2)}), bringing the system to equilibrium under balanced forces.`,
+        query: `Explain the physics of the action: an object coming to complete rest through friction (μ = ${friction.toFixed(2)}) and low restitution (e = ${rest.toFixed(2)}). Discuss the complete dissipation of kinetic energy into thermal energy and the achievement of balanced static equilibrium.`,
         placeholderTitle: 'Object came to rest (Live AI)',
         placeholderEffects: ['Summing net forces to zero...', 'Verifying kinetic energy dissipation...', 'Confirming system static state...']
       };
     }
     default:
       return {
-        query: `Explain the physics of a simulator event: ${event.type}.`,
+        query: `Explain the physics of the action: performing simulator event ${event.type}.`,
         placeholderTitle: 'Analyzing Physics Event...',
         placeholderEffects: ['Updating state variables...', 'Calculating force equations...']
       };
   }
 }
 
-export function useExplanationEngine(dynamicEnabled: boolean = false, gravityMode: 'linear' | 'radial' = 'linear') {
+export function useExplanationEngine(
+  dynamicEnabled: boolean = false,
+  gravityMode: 'linear' | 'radial' = 'linear',
+  activeExampleName?: string,
+  activeExampleDescription?: string
+) {
   const [queue, setQueue] = useState<ExplanationQueueItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -171,7 +185,12 @@ export function useExplanationEngine(dynamicEnabled: boolean = false, gravityMod
   useEffect(() => {
     const handleEvent = async (event: PhysicsEvent) => {
       if (dynamicEnabled) {
-        const { query, placeholderTitle, placeholderEffects } = getDynamicPromptAndPlaceholder(event, gravityMode);
+        let { query, placeholderTitle, placeholderEffects } = getDynamicPromptAndPlaceholder(event, gravityMode);
+        
+        if (activeExampleName) {
+          query = `[Context: Active Sandbox Lesson - "${activeExampleName}" (${activeExampleDescription || "demonstration"})]\n${query}`;
+        }
+        
         const tempId = Math.random().toString(36).substr(2, 9);
         
         // 1. Avoid exact duplicate titles in queue
@@ -199,7 +218,7 @@ export function useExplanationEngine(dynamicEnabled: boolean = false, gravityMod
 
         // 2. Query FastAPI backend tutor endpoint
         try {
-          const resp = await fetch('/api/tutor/analyze', {
+          const resp = await fetch('/api/tutor/explain-sim', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query })
@@ -280,7 +299,7 @@ export function useExplanationEngine(dynamicEnabled: boolean = false, gravityMod
       unsub(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6(); unsub7();
       unsub8(); unsub9(); unsubA(); unsubB();
     };
-  }, [dynamicEnabled, gravityMode]);
+  }, [dynamicEnabled, gravityMode, activeExampleName, activeExampleDescription]);
 
   // Auto-dismiss logic (disabled when loading to allow reading once resolved)
   useEffect(() => {
