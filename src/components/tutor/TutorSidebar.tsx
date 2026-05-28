@@ -1,17 +1,14 @@
 import React, { useState } from "react";
-import { Home, Compass, BookOpen, Bookmark, Settings, SunMoon } from "lucide-react";
-import { useTheme } from "@/hooks/useTheme";
+import { Home, Compass, BookOpen, Settings } from "lucide-react";
 
 const items = [
   { key: "tutor", label: "AI Tutor", icon: BookOpen, to: "/tutor" },
   { key: "explore", label: "Explore", icon: Compass, to: "/explore" },
-  { key: "bookmarks", label: "Bookmarks", icon: Bookmark, to: "/favorites" },
   { key: "settings", label: "Settings", icon: Settings, to: "/settings" },
 ];
 
 export function TutorSidebar() {
   const [collapsed, setCollapsed] = useState(true);
-  const { theme, toggleTheme } = useTheme();
 
   return (
     <aside className={`flex flex-col justify-between items-center py-4 ${collapsed ? 'w-20' : 'w-64'} transition-all duration-300`}>
@@ -53,9 +50,7 @@ export function TutorSidebar() {
       </div>
 
       <div className="px-2 w-full flex justify-center">
-        <button onClick={toggleTheme} aria-label="Toggle theme" className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center hover:scale-105">
-          <SunMoon className="w-4 h-4 text-primary" />
-        </button>
+        {/* Theme toggle removed for minimalist design */}
       </div>
     </aside>
   );

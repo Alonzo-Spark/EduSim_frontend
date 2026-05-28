@@ -60,7 +60,7 @@ function ProfilePage() {
             { label: "Hours Learned", value: user.stats.hours, icon: Clock, color: "blue" },
           ].map((stat, i) => (
             <div key={i} className="glass-strong rounded-3xl p-6 flex items-center gap-6 group hover:border-primary/30 transition-all border border-border">
-              <div className={`p-4 rounded-2xl bg-secondary group-hover:scale-110 transition-transform text-[var(--neon-${stat.color})]`}>
+              <div className="p-4 rounded-2xl bg-secondary group-hover:scale-110 transition-transform text-primary">
                 <stat.icon className="w-8 h-8" />
               </div>
               <div>

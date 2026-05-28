@@ -13,12 +13,9 @@ import { Route as TutorRouteImport } from './routes/tutor'
 import { Route as SimulationGeneratorRouteImport } from './routes/simulation-generator'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as MySimulationsRouteImport } from './routes/my-simulations'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LibraryRouteImport } from './routes/library'
-import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AiAgentRouteImport } from './routes/ai-agent'
 import { Route as IndexRouteImport } from './routes/index'
@@ -51,19 +48,9 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProgressRoute = ProgressRouteImport.update({
-  id: '/progress',
-  path: '/progress',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MySimulationsRoute = MySimulationsRouteImport.update({
-  id: '/my-simulations',
-  path: '/my-simulations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -74,11 +61,6 @@ const LoginRoute = LoginRouteImport.update({
 const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
   path: '/library',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FavoritesRoute = FavoritesRouteImport.update({
-  id: '/favorites',
-  path: '/favorites',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -144,12 +126,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ai-agent': typeof AiAgentRoute
   '/dashboard': typeof DashboardRoute
-  '/favorites': typeof FavoritesRoute
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
-  '/my-simulations': typeof MySimulationsRoute
   '/profile': typeof ProfileRoute
-  '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/simulation-generator': typeof SimulationGeneratorRoute
@@ -167,12 +146,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ai-agent': typeof AiAgentRoute
   '/dashboard': typeof DashboardRoute
-  '/favorites': typeof FavoritesRoute
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
-  '/my-simulations': typeof MySimulationsRoute
   '/profile': typeof ProfileRoute
-  '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/simulation-generator': typeof SimulationGeneratorRoute
@@ -191,12 +167,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/ai-agent': typeof AiAgentRoute
   '/dashboard': typeof DashboardRoute
-  '/favorites': typeof FavoritesRoute
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
-  '/my-simulations': typeof MySimulationsRoute
   '/profile': typeof ProfileRoute
-  '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/simulation-generator': typeof SimulationGeneratorRoute
@@ -216,12 +189,9 @@ export interface FileRouteTypes {
     | '/'
     | '/ai-agent'
     | '/dashboard'
-    | '/favorites'
     | '/library'
     | '/login'
-    | '/my-simulations'
     | '/profile'
-    | '/progress'
     | '/settings'
     | '/signup'
     | '/simulation-generator'
@@ -239,12 +209,9 @@ export interface FileRouteTypes {
     | '/'
     | '/ai-agent'
     | '/dashboard'
-    | '/favorites'
     | '/library'
     | '/login'
-    | '/my-simulations'
     | '/profile'
-    | '/progress'
     | '/settings'
     | '/signup'
     | '/simulation-generator'
@@ -262,12 +229,9 @@ export interface FileRouteTypes {
     | '/'
     | '/ai-agent'
     | '/dashboard'
-    | '/favorites'
     | '/library'
     | '/login'
-    | '/my-simulations'
     | '/profile'
-    | '/progress'
     | '/settings'
     | '/signup'
     | '/simulation-generator'
@@ -286,12 +250,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AiAgentRoute: typeof AiAgentRoute
   DashboardRoute: typeof DashboardRoute
-  FavoritesRoute: typeof FavoritesRoute
   LibraryRoute: typeof LibraryRoute
   LoginRoute: typeof LoginRoute
-  MySimulationsRoute: typeof MySimulationsRoute
   ProfileRoute: typeof ProfileRoute
-  ProgressRoute: typeof ProgressRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   SimulationGeneratorRoute: typeof SimulationGeneratorRoute
@@ -335,25 +296,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/progress': {
-      id: '/progress'
-      path: '/progress'
-      fullPath: '/progress'
-      preLoaderRoute: typeof ProgressRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/profile': {
       id: '/profile'
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/my-simulations': {
-      id: '/my-simulations'
-      path: '/my-simulations'
-      fullPath: '/my-simulations'
-      preLoaderRoute: typeof MySimulationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -368,13 +315,6 @@ declare module '@tanstack/react-router' {
       path: '/library'
       fullPath: '/library'
       preLoaderRoute: typeof LibraryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/favorites': {
-      id: '/favorites'
-      path: '/favorites'
-      fullPath: '/favorites'
-      preLoaderRoute: typeof FavoritesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -476,12 +416,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AiAgentRoute: AiAgentRoute,
   DashboardRoute: DashboardRoute,
-  FavoritesRoute: FavoritesRoute,
   LibraryRoute: LibraryRoute,
   LoginRoute: LoginRoute,
-  MySimulationsRoute: MySimulationsRoute,
   ProfileRoute: ProfileRoute,
-  ProgressRoute: ProgressRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   SimulationGeneratorRoute: SimulationGeneratorRoute,

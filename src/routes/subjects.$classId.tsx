@@ -35,12 +35,12 @@ function SubjectsPage() {
               params={{ classId: String(c.id), subject: s.id }}
             >
               <Card delay={i * 0.05}>
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--neon-purple)]/40 to-[var(--neon-blue)]/30 flex items-center justify-center mb-4 group-hover:glow-purple transition-shadow">
-                  <Icon className="w-7 h-7 text-[var(--neon-cyan)]" />
+                <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center mb-4 transition-all">
+                  <Icon className="w-7 h-7 text-primary" />
                 </div>
                 <h3 className="text-xl font-bold mb-1">{s.name}</h3>
                 <p className="text-sm text-muted-foreground mb-4">{s.description}</p>
-                <div className="text-xs font-mono text-[var(--neon-cyan)]">
+                <div className="text-xs font-mono font-bold text-primary">
                   {chapterCount} CHAPTERS
                 </div>
               </Card>

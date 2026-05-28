@@ -118,8 +118,8 @@ export function ChatWorkspace({
           {messages.length === 0 && !loading && (
             <div className="flex flex-col items-center justify-center w-full space-y-10 mt-[-5vh]">
               <div className="text-center space-y-3">
-                <div className="inline-block rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 px-4 py-1.5 mb-2">
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-violet-300">
+                <div className="inline-block rounded-2xl bg-secondary px-4 py-1.5 mb-2 border border-border/30">
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
                     AI Tutor
                   </span>
                 </div>
@@ -136,7 +136,7 @@ export function ChatWorkspace({
                     onClick={() => {
                       send(`Explain ${t}`);
                     }}
-                    className="pointer-events-auto relative z-50 rounded-full border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-white/10 hover:border-white/20 hover:scale-105 active:scale-95 cursor-pointer"
+                    className="pointer-events-auto relative z-50 rounded-full border border-border bg-card px-6 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-secondary hover:border-primary hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
                   >
                     {t}
                   </button>
@@ -159,7 +159,7 @@ export function ChatWorkspace({
 
           {loading && (
             <div className="flex w-full items-start gap-4">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-[var(--neon-purple)] to-[var(--neon-blue)] glow-purple">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-primary text-white shadow-sm">
                 <span className="text-white text-xs font-bold">AI</span>
               </div>
               <div className="pt-2">

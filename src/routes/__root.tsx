@@ -11,7 +11,6 @@ import "katex/dist/katex.min.css";
 import appCss from "../styles.css?url";
 
 const PUBLIC_ROUTE_ALLOWLIST = new Set([
-  "/",
   "/login",
   "/signup",
   "/forgot-password",
@@ -118,7 +117,8 @@ function RootComponent() {
   }, [checkAuth]);
 
   const pathname = normalizePathname(routerState.location.pathname);
-  const isLandingOrAuthPage = pathname === "/" || pathname === "/login" || pathname === "/signup";
+  const isRootRoute = pathname === "/";
+  const isLandingOrAuthPage = pathname === "/login" || pathname === "/signup";
   const isAuthPage = pathname === "/login" || pathname === "/signup" || pathname === "/forgot-password" || pathname === "/reset-password";
   const requiresAuth = !isPublicRoute(pathname);
 
@@ -127,16 +127,24 @@ function RootComponent() {
       return;
     }
 
+    if (isRootRoute) {
+      navigate({
+        to: isAuthenticated ? "/dashboard" : "/login",
+        search: isAuthenticated ? undefined : EMPTY_LOGIN_SEARCH,
+      });
+      return;
+    }
+
     if (!isAuthenticated && requiresAuth) {
       navigate({ to: "/login", search: EMPTY_LOGIN_SEARCH });
     } else if (isAuthenticated && isAuthPage) {
       navigate({ to: "/dashboard" });
     }
-  }, [isAuthenticated, requiresAuth, navigate, isAuthPage, authChecked]);
+  }, [isAuthenticated, requiresAuth, navigate, isAuthPage, authChecked, isRootRoute, pathname]);
 
   if (isLandingOrAuthPage) {
     return (
-      <div className="min-h-screen w-full relative bg-[#09080F] text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar">
+      <div className="min-h-screen w-full relative bg-background text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar">
         <AnimatePresence mode="popLayout">
           <motion.div
             key={routerState.location.pathname}

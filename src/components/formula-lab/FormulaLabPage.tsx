@@ -7,25 +7,25 @@ import FormulaGraph from "./FormulaGraph";
 import { motion, AnimatePresence } from "framer-motion";
 import QASection from "../tutor/QASection";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { 
-  ChevronRight, 
-  ChevronLeft, 
-  CheckCircle2, 
-  Sparkles, 
-  Search, 
-  BookOpen, 
-  Calculator, 
-  LineChart, 
-  HelpCircle, 
-  Star, 
-  History, 
-  Compass, 
+import {
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle2,
+  Sparkles,
+  Search,
+  BookOpen,
+  Calculator,
+  LineChart,
+  HelpCircle,
+  Star,
+  History,
+  Compass,
   Bookmark,
   ArrowRight,
   GraduationCap
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { BlockMath } from "react-katex";
+import { BlockMath } from "@/components/math/Katex";
 import "katex/dist/katex.min.css";
 
 interface Props {
@@ -60,10 +60,10 @@ const FormulaLabPage: React.FC<Props> = ({
   formulas: directFormulas,
 }) => {
   const { formulas, selectedFormula, selectFormula, loadForTopic } = useFormulaLab();
-  
+
   const activeFormulas = directFormulas || formulas;
   const activeCount = activeFormulas ? activeFormulas.length : 0;
-  
+
   const activeSelectedFormula =
     directFormulas && directFormulas.length > 0 ? directFormulas[0] : selectedFormula;
 
@@ -152,8 +152,8 @@ const FormulaLabPage: React.FC<Props> = ({
       const cat = getFormulaCategory(f);
       const matchesCategory = selectedCategory === "All" || cat === selectedCategory;
       const text = (
-        (f.title || "") + " " + 
-        (f.description || "") + " " + 
+        (f.title || "") + " " +
+        (f.description || "") + " " +
         (f.displayFormula || f.formula || f.raw)
       ).toLowerCase();
       const matchesSearch = text.includes(searchQuery.toLowerCase());
@@ -213,7 +213,7 @@ const FormulaLabPage: React.FC<Props> = ({
 
   const renderTabContent = () => {
     if (!activeSelectedFormula) return null;
-    switch(activeTabId) {
+    switch (activeTabId) {
       case "anatomy":
         return <FormulaAnatomy formula={activeSelectedFormula} mode="variables" />;
       case "solve":
@@ -222,12 +222,12 @@ const FormulaLabPage: React.FC<Props> = ({
         return <FormulaGraph formula={activeSelectedFormula} values={values} />;
       case "practice":
         return (
-          <QASection 
-            topic={topic} 
-            chapter={chapter} 
-            subject={subject} 
-            formulas={activeFormulas} 
-            ragContent={ragContent} 
+          <QASection
+            topic={topic}
+            chapter={chapter}
+            subject={subject}
+            formulas={activeFormulas}
+            ragContent={ragContent}
           />
         );
       default:
@@ -258,7 +258,7 @@ const FormulaLabPage: React.FC<Props> = ({
 
       <ErrorBoundary fallback={fallbackCard}>
         <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
-          
+
           {/* LEFT COLUMN: Directory Sidebar */}
           <aside className="rounded-3xl border border-white/10 bg-slate-900/15 p-5 backdrop-blur-md space-y-5">
             {/* Search Input */}
@@ -277,33 +277,30 @@ const FormulaLabPage: React.FC<Props> = ({
             <div className="flex border-b border-slate-800 pb-2 gap-4">
               <button
                 onClick={() => { setActiveListTab("all"); setSelectedCategory("All"); }}
-                className={`text-xs font-bold pb-1 border-b-2 transition-all flex items-center gap-1.5 ${
-                  activeListTab === "all"
+                className={`text-xs font-bold pb-1 border-b-2 transition-all flex items-center gap-1.5 ${activeListTab === "all"
                     ? "border-violet-500 text-violet-300"
                     : "border-transparent text-slate-500 hover:text-slate-300"
-                }`}
+                  }`}
               >
                 <Compass className="w-3.5 h-3.5" />
                 All Formulas
               </button>
               <button
                 onClick={() => setActiveListTab("recent")}
-                className={`text-xs font-bold pb-1 border-b-2 transition-all flex items-center gap-1.5 ${
-                  activeListTab === "recent"
+                className={`text-xs font-bold pb-1 border-b-2 transition-all flex items-center gap-1.5 ${activeListTab === "recent"
                     ? "border-violet-500 text-violet-300"
                     : "border-transparent text-slate-500 hover:text-slate-300"
-                }`}
+                  }`}
               >
                 <History className="w-3.5 h-3.5" />
                 Recent
               </button>
               <button
                 onClick={() => setActiveListTab("saved")}
-                className={`text-xs font-bold pb-1 border-b-2 transition-all flex items-center gap-1.5 ${
-                  activeListTab === "saved"
+                className={`text-xs font-bold pb-1 border-b-2 transition-all flex items-center gap-1.5 ${activeListTab === "saved"
                     ? "border-violet-500 text-violet-300"
                     : "border-transparent text-slate-500 hover:text-slate-300"
-                }`}
+                  }`}
               >
                 <Bookmark className="w-3.5 h-3.5" />
                 Saved
@@ -317,11 +314,10 @@ const FormulaLabPage: React.FC<Props> = ({
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wide transition-all border ${
-                      selectedCategory === cat
+                    className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wide transition-all border ${selectedCategory === cat
                         ? "bg-violet-500/10 border-violet-500/30 text-violet-300"
                         : "bg-slate-950/20 border-slate-900 text-slate-400 hover:border-slate-800"
-                    }`}
+                      }`}
                   >
                     {cat}
                   </button>
@@ -343,11 +339,10 @@ const FormulaLabPage: React.FC<Props> = ({
                       onClick={() => {
                         selectFormula(f.id || f.raw);
                       }}
-                      className={`w-full rounded-2xl border p-4 text-left cursor-pointer transition-all duration-200 flex flex-col gap-3 relative overflow-hidden group ${
-                        isSelected
+                      className={`w-full rounded-2xl border p-4 text-left cursor-pointer transition-all duration-200 flex flex-col gap-3 relative overflow-hidden group ${isSelected
                           ? "border-violet-500 bg-violet-600/[0.03] shadow-[0_0_20px_rgba(139,92,246,0.06)]"
                           : "border-slate-900 bg-slate-950/20 hover:bg-slate-900/30 hover:border-slate-800"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
@@ -361,9 +356,8 @@ const FormulaLabPage: React.FC<Props> = ({
                             e.stopPropagation();
                             toggleSaveFormula(f.id || f.raw);
                           }}
-                          className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors ${
-                            savedIds.includes(f.id || f.raw) ? "text-yellow-400" : "text-slate-500 hover:text-yellow-400"
-                          }`}
+                          className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors ${savedIds.includes(f.id || f.raw) ? "text-yellow-400" : "text-slate-500 hover:text-yellow-400"
+                            }`}
                         >
                           <Star className={`w-3.5 h-3.5 ${savedIds.includes(f.id || f.raw) ? "fill-yellow-400" : ""}`} />
                         </button>
@@ -383,9 +377,8 @@ const FormulaLabPage: React.FC<Props> = ({
                           {f.description || "Interactive dynamic equation analysis."}
                         </p>
                         <button
-                          className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors shrink-0 ${
-                            isSelected ? "text-violet-400" : "text-slate-500 group-hover:text-slate-300"
-                          }`}
+                          className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors shrink-0 ${isSelected ? "text-violet-400" : "text-slate-500 group-hover:text-slate-300"
+                            }`}
                         >
                           <span>Open</span>
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -406,7 +399,7 @@ const FormulaLabPage: React.FC<Props> = ({
           <main className="space-y-6">
             {activeSelectedFormula ? (
               <div className="space-y-6">
-                
+
                 {/* Active Selected Formula Details Header */}
                 <div className="rounded-3xl border border-white/10 bg-slate-900/10 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 blur-3xl -z-10" />
@@ -430,11 +423,10 @@ const FormulaLabPage: React.FC<Props> = ({
                   </div>
                   <button
                     onClick={() => toggleSaveFormula(activeSelectedFormula.id || activeSelectedFormula.raw)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border transition-all text-xs font-bold ${
-                      savedIds.includes(activeSelectedFormula.id || activeSelectedFormula.raw)
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border transition-all text-xs font-bold ${savedIds.includes(activeSelectedFormula.id || activeSelectedFormula.raw)
                         ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-300"
                         : "bg-slate-950/40 border-slate-900 text-slate-400 hover:border-slate-800 hover:text-slate-300"
-                    }`}
+                      }`}
                   >
                     <Star className={`w-3.5 h-3.5 ${savedIds.includes(activeSelectedFormula.id || activeSelectedFormula.raw) ? "fill-yellow-400 text-yellow-400" : ""}`} />
                     <span>
@@ -452,11 +444,10 @@ const FormulaLabPage: React.FC<Props> = ({
                         <button
                           key={tab.id}
                           onClick={() => setActiveTabId(tab.id)}
-                          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
-                            isActive
+                          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${isActive
                               ? "bg-violet-600 text-white shadow-lg shadow-violet-700/25 scale-[1.02]"
                               : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-200"
-                          }`}
+                            }`}
                         >
                           <tab.icon className="w-3.5 h-3.5" />
                           <span>{tab.label}</span>
@@ -464,7 +455,7 @@ const FormulaLabPage: React.FC<Props> = ({
                       );
                     })}
                   </div>
-                  
+
                   <div className="hidden sm:block text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3">
                     Step {activeTabIndex + 1} of 4
                   </div>
@@ -493,9 +484,10 @@ const FormulaLabPage: React.FC<Props> = ({
                   >
                     <ChevronLeft className="w-4 h-4" /> Previous
                   </button>
-                  
+
                   <Link
-                    to="/sandbox/default"
+                    to="/sandbox/$simulationId"
+                    params={{ simulationId: "default" }}
                     className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:brightness-110 active:scale-95 text-xs font-bold text-white shadow-lg shadow-purple-500/10 transition-all cursor-pointer"
                   >
                     <Sparkles className="w-3.5 h-3.5" /> Create Simulation

@@ -20,7 +20,7 @@ export function Card({
       whileHover={{ scale: 1.03, y: -4 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`glass rounded-3xl p-6 cursor-pointer transition-shadow hover:neon-border group ${className}`}
+      className={`bg-card border border-border rounded-3xl p-6 cursor-pointer shadow-sm hover:shadow-md hover:border-primary/50 transition-all duration-300 group ${className}`}
     >
       {children}
     </motion.div>

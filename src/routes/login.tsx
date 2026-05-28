@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
-import { motion, AnimatePresence } from "framer-motion";
 import { 
   Mail, 
   Lock, 
@@ -35,9 +34,11 @@ export const Route = createFileRoute("/login")({
 function Login() {
   const { verify_token, reset_token } = Route.useSearch();
   const navigate = useNavigate();
+  const CLEAR_LOGIN_SEARCH = { verify_token: undefined, reset_token: undefined };
   
   const { 
     login, 
+    register,
     sendOtp, 
     verifyOtp, 
     forgotPassword, 
@@ -88,7 +89,7 @@ function Login() {
         const success = await verifyEmail(verify_token);
         if (success) {
           toast.success("Account activated successfully! You can now log in.");
-          navigate({ to: "/login", replace: true });
+          navigate({ to: "/login", replace: true, search: CLEAR_LOGIN_SEARCH });
         }
       };
       runVerify();
@@ -106,11 +107,12 @@ function Login() {
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) {
       toast.warning("Please enter your email and password");
       return;
     }
-    const success = await login({ email, password });
+    const success = await login({ email: normalizedEmail, password });
     if (success) {
       navigate({ to: "/dashboard" });
     }
@@ -171,11 +173,12 @@ function Login() {
 
   const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
       toast.warning("Please enter your email address");
       return;
     }
-    const success = await forgotPassword(email);
+    const success = await forgotPassword(normalizedEmail);
     if (success) {
       setShowForgotForm(false);
     }
@@ -193,7 +196,7 @@ function Login() {
     }
     const success = await resetPassword(reset_token!, newPassword);
     if (success) {
-      navigate({ to: "/login", replace: true });
+      navigate({ to: "/login", replace: true, search: CLEAR_LOGIN_SEARCH });
     }
   };
 
@@ -201,8 +204,27 @@ function Login() {
   const handleGoogleLogin = async () => {
     toast.info("Simulating Google OAuth connection...");
     await new Promise(resolve => setTimeout(resolve, 1200));
-    
-    const success = await login({ email: "student@edusim.local", password: "Password123!" });
+
+    const demoAccount = {
+      name: "Demo Student",
+      email: "student@edusim.local",
+      password: "Password123!",
+    };
+
+    let success = await login({ email: demoAccount.email, password: demoAccount.password });
+
+    if (!success) {
+      const registered = await register({
+        name: demoAccount.name,
+        email: demoAccount.email,
+        password: demoAccount.password,
+      });
+
+      if (registered) {
+        success = await login({ email: demoAccount.email, password: demoAccount.password });
+      }
+    }
+
     if (success) {
       toast.success("Welcome back! Signed in with Google.");
       navigate({ to: "/dashboard" });
@@ -210,81 +232,50 @@ function Login() {
   };
 
   return (
-    <div className="relative min-h-[100svh] overflow-hidden bg-[#050816] text-foreground font-sans">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-blue-600/30 rounded-full blur-[120px] animate-pulse"></div>
-        <div className="absolute bottom-[-10%] right-[15%] w-[500px] h-[500px] bg-purple-600/30 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-[40%] left-[50%] w-[400px] h-[400px] bg-indigo-500/15 rounded-full blur-[100px]"></div>
-      </div>
+    <div className="relative min-h-[100svh] overflow-hidden bg-background text-foreground font-sans">
+      {/* Soft Ambient Background Gradient */}
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-[#FAFCFF] via-[#F4F9FF] to-[#E6F2FF]" />
 
-      <div className="absolute inset-0 pointer-events-none">
-        {particles.map((particle) => (
-          <div
-            key={particle.id}
-            className="absolute w-[2px] h-[2px] bg-blue-400 rounded-full opacity-60"
-            style={{
-              left: `${particle.left}%`,
-              top: `${particle.top}%`,
-              animation: `float ${particle.duration}s infinite`,
-              animationDelay: `${particle.delay}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      <div className="relative z-10 grid min-h-[100svh] w-full max-w-[1280px] grid-cols-1 lg:grid-cols-[minmax(0,45%)_minmax(0,14%)_minmax(0,41%)] items-center gap-6 px-4 py-4 sm:px-6 md:px-8 lg:px-10 lg:py-6 mx-auto">
+      <div className="relative z-10 grid min-h-[100svh] w-full max-w-[1100px] grid-cols-1 lg:grid-cols-2 items-center gap-12 px-6 py-8 mx-auto">
         
+        {/* Left Hero Panel */}
         <div className="hidden lg:flex flex-col justify-center gap-8 h-full">
           <Link to="/" className="flex items-center gap-2.5 group relative z-10 w-fit">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#8B5CF6] to-[#3B82F6] flex items-center justify-center glow-purple hover:rotate-12 transition-transform duration-300">
+            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm hover:rotate-12 transition-transform duration-300">
               <Compass className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold tracking-wider font-mono text-white">
-              Edu<span className="text-gradient bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6]">Sim</span>
+            <span className="text-lg font-bold tracking-wider font-mono text-foreground">
+              Edu<span className="text-primary">Sim</span>
             </span>
           </Link>
 
           <div className="space-y-4">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#18182d] border border-white/10 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider"
-            >
-              <Sparkles className="w-3 h-3 text-[#8B5CF6]" /> Next Generation Learning
-            </motion.div>
-            
-            <motion.h1 
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="text-4xl xl:text-5xl font-extrabold tracking-tight text-white leading-tight"
-            >
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary border border-border/40 text-[10px] text-primary font-semibold uppercase tracking-wider">
+              <Sparkles className="w-3 h-3 text-primary" /> Next Generation Learning
+            </div>
+
+            <h1 className="text-4xl xl:text-5xl font-extrabold tracking-tight text-foreground leading-tight">
               Explore Science Through <br />
-              <span className="text-gradient bg-gradient-to-r from-[#8B5CF6] via-[#3b82f6] to-[#60a5fa]">Immersive Simulations</span>
-            </motion.h1>
-            
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="text-muted-foreground text-[13px] leading-relaxed max-w-lg"
-            >
+              <span className="text-primary">Immersive Simulations</span>
+            </h1>
+
+            <p className="text-muted-foreground text-[13px] leading-relaxed max-w-lg">
               Step into a new era of interactive learning with AI tutors, smart simulations, and powerful formula labs.
-            </motion.p>
+            </p>
           </div>
 
           <div className="space-y-4">
             {[
-              { label: "AI-Powered Tutor", desc: "Get instant answers and explanations", icon: Brain, color: "#8B5CF6" },
-              { label: "Interactive Simulations", desc: "High-fidelity physics engine", icon: Play, color: "#3B82F6" },
-              { label: "Formula Lab Explorer", desc: "Track variables and master formulas", icon: Atom, color: "#06B6D4" },
-              { label: "Progress Tracking", desc: "Detailed mastery dashboards", icon: TrendingUp, color: "#10B981" },
+              { label: "AI-Powered Tutor", desc: "Get instant answers and explanations", icon: Brain, color: "#70B5FF" },
+              { label: "Interactive Simulations", desc: "High-fidelity physics engine", icon: Play, color: "#70B5FF" },
+              { label: "Formula Lab Explorer", desc: "Track variables and master formulas", icon: Atom, color: "#70B5FF" },
+              { label: "Progress Tracking", desc: "Detailed mastery dashboards", icon: TrendingUp, color: "#70B5FF" },
             ].map((f, idx) => {
               const Icon = f.icon;
               return (
                 <div
                   key={idx}
-                  className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-4 hover:border-purple-500/50 hover:bg-white/10 transition-all duration-300 cursor-pointer shadow-[0_10px_30px_rgba(0,0,0,0.12)]"
+                  className="group bg-card border border-border rounded-2xl p-4 hover:border-primary/60 hover:bg-secondary/40 transition-all duration-300 cursor-pointer shadow-sm"
                   style={{
                     animation: `slideInLeft 0.6s ease-out ${idx * 0.1}s both`,
                   }}
@@ -297,10 +288,10 @@ function Login() {
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white group-hover:text-purple-300 transition-colors text-sm">
+                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors text-sm">
                         {f.label}
                       </h3>
-                      <p className="text-xs text-gray-400">{f.desc}</p>
+                      <p className="text-xs text-muted-foreground">{f.desc}</p>
                     </div>
                   </div>
                 </div>
@@ -309,179 +300,125 @@ function Login() {
           </div>
         </div>
 
-        <div className="hidden lg:flex items-center justify-center relative h-full min-h-[560px]">
-          <div className="relative w-80 h-80">
-            {/* Bright background blur core */}
-            <div className="absolute -inset-10 rounded-full bg-gradient-to-tr from-[#8B5CF6] via-[#EC4899] to-[#3B82F6] opacity-50 blur-[80px] animate-pulse"></div>
-
-            {/* Orbit 1: Diagonal Right-Leaning Ellipse */}
-            <div className="absolute inset-0 pointer-events-none" style={{ transform: 'rotateX(72deg) rotateY(24deg)', transformStyle: 'preserve-3d' }}>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full border-2 border-purple-500/50 shadow-[0_0_20px_rgba(139,92,246,0.4)]" />
-              <div 
-                className="absolute w-4.5 h-4.5 bg-cyan-300 rounded-full shadow-[0_0_20px_#00ffff,0_0_35px_#00ffff] z-20"
-                style={{
-                  top: '50%',
-                  left: '50%',
-                  animation: `orbit 8s linear infinite`,
-                }}
-              />
-            </div>
-
-            {/* Orbit 2: Diagonal Left-Leaning Ellipse */}
-            <div className="absolute inset-0 pointer-events-none" style={{ transform: 'rotateX(72deg) rotateY(-24deg)', transformStyle: 'preserve-3d' }}>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full border-2 border-pink-500/50 shadow-[0_0_20px_rgba(236,72,153,0.4)]" />
-              <div 
-                className="absolute w-4.5 h-4.5 bg-cyan-300 rounded-full shadow-[0_0_20px_#00ffff,0_0_35px_#00ffff] z-20"
-                style={{
-                  top: '50%',
-                  left: '50%',
-                  animation: `orbit 8s linear infinite`,
-                  animationDelay: '-2.66s',
-                }}
-              />
-            </div>
-
-            {/* Orbit 3: Flatter Horizontal/Tilt Ellipse */}
-            <div className="absolute inset-0 pointer-events-none" style={{ transform: 'rotateX(36deg) rotateY(48deg)', transformStyle: 'preserve-3d' }}>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full border-2 border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.4)]" />
-              <div 
-                className="absolute w-4.5 h-4.5 bg-cyan-300 rounded-full shadow-[0_0_20px_#00ffff,0_0_35px_#00ffff] z-20"
-                style={{
-                  top: '50%',
-                  left: '50%',
-                  animation: `orbit 8s linear infinite`,
-                  animationDelay: '-5.33s',
-                }}
-              />
-            </div>
-
-            {/* Bright nuclear fusion center core */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-7 h-7 bg-white rounded-full shadow-[0_0_20px_#ffffff,0_0_40px_#3b82f6,0_0_60px_#8b5cf6] blur-[0.8px] z-30"></div>
-            </div>
-          </div>
-
-          {/* Floating physics equations (Enlarged and Glowing neon tags) */}
-          <div className="absolute inset-0 pointer-events-none">
-            {[
-              { text: 'E = mc²', theme: 'text-cyan-300 border-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.35)]', style: { top: '12%', left: '72%' } },
-              { text: 'F = ma', theme: 'text-purple-300 border-purple-500/60 shadow-[0_0_20px_rgba(168,85,247,0.35)]', style: { bottom: '22%', left: '2%' } },
-              { text: 'λ = h/p', theme: 'text-blue-300 border-blue-500/60 shadow-[0_0_20px_rgba(59,130,246,0.35)]', style: { bottom: '12%', right: '8%' } },
-            ].map((eq, idx) => (
-              <div
-                key={idx}
-                className={`absolute font-mono text-sm font-bold border px-4 py-2.5 rounded-xl bg-slate-950/80 backdrop-blur-md select-none transition-all duration-300 hover:scale-105 ${eq.theme}`}
-                style={eq.style}
-              >
-                {eq.text}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="w-full max-w-[470px] mx-auto rounded-[32px] p-8 md:p-10 border border-white/[0.12] shadow-[0_24px_80px_-24px_rgba(139,92,246,0.3)] relative bg-[#0c1130]/80 backdrop-blur-3xl overflow-hidden group">
-          <div className="absolute top-[-10%] right-[-10%] w-56 h-56 rounded-full bg-[rgba(139,92,246,0.22)] blur-3xl pointer-events-none" />
-          <div className="absolute bottom-[-10%] left-[-10%] w-40 h-40 rounded-full bg-[rgba(59,130,246,0.15)] blur-3xl pointer-events-none" />
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-purple-400/30 to-transparent" />
-          
-          <AnimatePresence mode="wait">
+        {/* Right Auth Card */}
+        <div className="w-full max-w-[420px] mx-auto rounded-[24px] p-8 md:p-10 border border-border shadow-[0_8px_30px_rgba(112,181,255,0.06)] relative bg-card overflow-hidden group">
             {reset_token ? (
-              <motion.div key="reset" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <div>
                 <div className="text-center mb-6">
-                  <div className="w-12 h-12 rounded-2xl bg-[#3B82F6]/15 border border-[#3B82F6]/30 flex items-center justify-center mx-auto mb-4 glow-blue">
-                    <KeyRound className="w-6 h-6 text-[#3B82F6]" />
+                  <div className="w-12 h-12 rounded-2xl bg-secondary border border-border flex items-center justify-center mx-auto mb-4">
+                    <KeyRound className="w-6 h-6 text-primary" />
                   </div>
-                  <h3 className="text-2xl font-black text-white">New Password</h3>
+                  <h3 className="text-2xl font-black text-foreground">New Password</h3>
                 </div>
                 <form onSubmit={handleResetPassword} className="space-y-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground font-mono">NEW PASSWORD</label>
-                    <div className="relative"><Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" /><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#090d22] border border-white/10 text-sm text-white focus:border-[#3B82F6] outline-none" /></div>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                      <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground font-mono">CONFIRM PASSWORD</label>
-                    <div className="relative"><Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" /><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#090d22] border border-white/10 text-sm text-white focus:border-[#3B82F6] outline-none" /></div>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                      <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
+                    </div>
                   </div>
-                  <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white font-bold text-sm">
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Password"}
+                  <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 duration-200">
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Save Password"}
                   </button>
                 </form>
-              </motion.div>
+              </div>
             ) : showForgotForm ? (
-              <motion.div key="forgot" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                <button onClick={() => setShowForgotForm(false)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white mb-6"><ArrowLeft className="w-3.5 h-3.5" /> Back</button>
-                <div className="mb-6"><h3 className="text-2xl font-black text-white">Reset Password</h3></div>
+              <div>
+                <button onClick={() => setShowForgotForm(false)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6"><ArrowLeft className="w-3.5 h-3.5" /> Back</button>
+                <div className="mb-6"><h3 className="text-2xl font-black text-foreground">Reset Password</h3></div>
                 <form onSubmit={handleForgotSubmit} className="space-y-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground font-mono">EMAIL</label>
-                    <div className="relative"><Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" /><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#090d22] border border-white/10 text-sm text-white focus:border-[#8B5CF6] outline-none" /></div>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
+                    </div>
                   </div>
-                  <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white font-bold text-sm">
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Reset Link"}
+                  <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 duration-200">
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Send Reset Link"}
                   </button>
                 </form>
-              </motion.div>
+              </div>
             ) : (
-              <motion.div key="signin" className="space-y-6">
-                <div className="space-y-1"><h3 className="text-2xl font-black text-white">Access EduSim</h3><p className="text-xs text-muted-foreground">Sign in to continue your learning journey</p></div>
-                <button onClick={handleGoogleLogin} className="w-full py-3.5 rounded-2xl bg-white text-gray-900 font-bold text-sm flex items-center justify-center gap-3"><Chrome className="w-4 h-4" /> Continue with Google</button>
-                <div className="flex items-center gap-3"><div className="flex-1 h-[1px] bg-white/5" /><span className="text-[10px] text-muted-foreground font-mono">OR</span><div className="flex-1 h-[1px] bg-white/5" /></div>
-                <div className="grid grid-cols-2 p-1 rounded-2xl bg-[#0a0f28] border border-white/10">
-                  <button onClick={() => { setActiveTab("email"); setOtpSent(false); }} className={`py-3 rounded-xl text-xs font-semibold ${activeTab === "email" ? "bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white" : "text-muted-foreground"}`}>Email</button>
-                  <button onClick={() => setActiveTab("otp")} className={`py-3 rounded-xl text-xs font-semibold ${activeTab === "otp" ? "bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white" : "text-muted-foreground"}`}>OTP</button>
+              <div className="space-y-6">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-black text-foreground">Access EduSim</h3>
+                  <p className="text-xs text-muted-foreground">Sign in to continue your learning journey</p>
+                </div>
+                <button onClick={handleGoogleLogin} className="w-full py-3.5 rounded-2xl bg-card border border-border text-foreground font-bold text-sm flex items-center justify-center gap-3 hover:bg-secondary transition-all hover:scale-[1.01] active:scale-[0.99] duration-200">
+                  <Chrome className="w-4 h-4 text-primary" /> Continue with Google
+                </button>
+                <div className="flex items-center gap-3"><div className="flex-1 h-[1px] bg-border" /><span className="text-[10px] text-muted-foreground font-mono">OR</span><div className="flex-1 h-[1px] bg-border" /></div>
+                <div className="grid grid-cols-2 p-1 rounded-2xl bg-secondary border border-border/40">
+                  <button onClick={() => { setActiveTab("email"); setOtpSent(false); }} className={`py-3 rounded-xl text-xs font-semibold transition-all ${activeTab === "email" ? "bg-primary text-white shadow-sm" : "text-muted-foreground"}`}>Email</button>
+                  <button onClick={() => setActiveTab("otp")} className={`py-3 rounded-xl text-xs font-semibold transition-all ${activeTab === "otp" ? "bg-primary text-white shadow-sm" : "text-muted-foreground"}`}>OTP</button>
                 </div>
                 {activeTab === "email" ? (
                   <form onSubmit={handleEmailLogin} className="space-y-4">
-                    <div className="relative"><Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" /><input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#0a0f28] border border-white/15 text-sm text-white focus:border-[#8B5CF6] outline-none placeholder:text-gray-500" /></div>
-                    <div className="relative"><Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" /><input type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-10 py-3 rounded-2xl bg-[#0a0f28] border border-white/15 text-sm text-white focus:border-[#8B5CF6] outline-none placeholder:text-gray-500" /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-3.5 text-muted-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                      <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                      <input type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-10 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+                    </div>
                     <div className="flex items-center justify-between gap-3 text-xs">
                       <label className="flex items-center gap-2 text-muted-foreground select-none cursor-pointer">
-                        <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-white/20 bg-[#0a0f28] text-[#8B5CF6] focus:ring-[#8B5CF6]" />
+                        <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-border bg-background text-primary focus:ring-primary" />
                         Remember me
                       </label>
-                      <button type="button" onClick={() => setShowForgotForm(true)} className="text-[#8B5CF6] hover:text-[#3B82F6] transition-colors font-medium">Forgot password?</button>
+                      <button type="button" onClick={() => setShowForgotForm(true)} className="text-primary hover:underline transition-colors font-medium">Forgot password?</button>
                     </div>
-                    <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white font-bold text-sm">{isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign In"}</button>
+                    <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 duration-200">{isLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Sign In"}</button>
                   </form>
                 ) : (
                   <div className="space-y-4">
                     {!otpSent ? (
                       <form onSubmit={handleSendOtp} className="space-y-4">
-                        <div className="flex gap-2"><input type="text" value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="w-16 text-center rounded-2xl bg-[#0a0f28] border border-white/15 text-sm text-white outline-none" /><div className="relative flex-1"><Smartphone className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" /><input type="tel" placeholder="Mobile Number" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#0a0f28] border border-white/15 text-sm text-white outline-none placeholder:text-gray-500" /></div></div>
-                        <button type="submit" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white font-bold text-sm">Send OTP</button>
+                        <div className="flex gap-2">
+                          <input type="text" value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="w-16 text-center rounded-2xl bg-background border border-border text-sm text-foreground outline-none" />
+                          <div className="relative flex-1">
+                            <Smartphone className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                            <input type="tel" placeholder="Mobile Number" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground outline-none placeholder:text-muted-foreground/60" />
+                          </div>
+                        </div>
+                        <button type="submit" className="w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 duration-200">Send OTP</button>
                       </form>
                     ) : (
                       <div className="space-y-4">
                         <div className="flex justify-center gap-2">
-                          {otpCode.map((data, index) => <input key={index} maxLength={1} ref={(el) => { if (el) otpInputs.current[index] = el; }} value={data} onChange={(e) => handleOtpChange(e.target, index)} className="w-11 h-12 text-center rounded-xl bg-white/5 border border-white/10 text-lg font-bold text-white outline-none" />)}
+                          {otpCode.map((data, index) => <input key={index} maxLength={1} ref={(el) => { if (el) otpInputs.current[index] = el; }} value={data} onChange={(e) => handleOtpChange(e.target, index)} className="w-11 h-12 text-center rounded-xl bg-background border border-border text-lg font-bold text-foreground outline-none focus:border-primary" />)}
                         </div>
-                        <button onClick={handleResendOtp} disabled={countdown > 0} className="text-xs text-[#3B82F6] disabled:text-gray-600">Resend Code ({countdown}s)</button>
+                        <button onClick={handleResendOtp} disabled={countdown > 0} className="text-xs text-primary disabled:text-muted-foreground">Resend Code ({countdown}s)</button>
                       </div>
                     )}
                   </div>
                 )}
                 <div className="text-center pt-2 text-xs font-medium">
                   <span className="text-muted-foreground">New to EduSim? </span>
-                  <Link to="/signup" className="text-[#3B82F6] hover:text-[#8B5CF6] transition-colors font-bold">
+                  <Link to="/signup" className="text-primary hover:underline transition-colors font-bold">
                     Create an account
                   </Link>
                 </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
+          
         </div>
       </div>
 
 
       <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) translateX(0px); opacity: 0; }
-          10% { opacity: 0.6; }
-          90% { opacity: 0.6; }
-          100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
-        }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes orbit { from { transform: rotate(0deg) translateY(-100px) translateX(-50%); } to { transform: rotate(360deg) translateY(-100px) translateX(-50%); } }
         @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
       `}</style>
     </div>

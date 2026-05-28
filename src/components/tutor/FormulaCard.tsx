@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BlockMath } from "react-katex";
+import { BlockMath } from "@/components/math/Katex";
 import "katex/dist/katex.min.css";
 import { cn } from "@/lib/utils";
 import { useTutorStore } from "@/store/tutorStore";
@@ -176,21 +176,21 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
   return (
     <div
       className={cn(
-        "rounded-2xl border border-violet-500/10 bg-gradient-to-br from-slate-900/60 to-slate-950/80 p-5 sm:p-6 shadow-[0_0_30px_rgba(139,92,246,0.06)] hover:shadow-[0_0_40px_rgba(139,92,246,0.12)] hover:border-violet-500/20 transition-all duration-300 w-full min-w-0 max-w-full relative overflow-hidden",
+        "rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 w-full min-w-0 max-w-full relative overflow-hidden",
         className,
       )}
     >
       {/* Subtle background glow */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 blur-2xl -z-10" />
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-2xl -z-10" />
 
       {/* ── Formula — centered, responsive size, subtle inner shadow and glow ──────────────── */}
-      <div className="text-xl sm:text-2xl md:text-3xl font-semibold text-center text-foreground overflow-x-auto custom-scrollbar py-4 bg-slate-950/40 rounded-xl border border-white/5 shadow-inner">
+      <div className="text-xl sm:text-2xl md:text-3xl font-semibold text-center text-foreground overflow-x-auto custom-scrollbar py-4 bg-secondary/30 rounded-xl border border-border shadow-inner">
         {renderFormula()}
       </div>
 
       {/* ── Short explanation (if exists) ────────────────── */}
       {hasExplanation && (
-        <p className="mt-4 text-xs sm:text-[13.5px] text-slate-400 leading-relaxed font-light">
+        <p className="mt-4 text-xs sm:text-[13.5px] text-muted-foreground leading-relaxed font-light">
           {data.explanation}
         </p>
       )}
@@ -198,20 +198,20 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
       {/* ── Variables responsive grid ────────────────── */}
       {hasVariables && (
         <div className="space-y-2.5 mt-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             Variables
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {data.variables.map((v, idx) => (
               <div
                 key={idx}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-slate-950/20 border border-slate-900/40 hover:border-slate-800 transition-colors"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-secondary/20 border border-border hover:bg-secondary/40 transition-colors"
               >
-                <span className="font-mono text-sm font-bold text-violet-400 shrink-0">
+                <span className="font-mono text-sm font-bold text-primary shrink-0">
                   {v.symbol}
                 </span>
-                <span className="text-slate-600 text-xs">→</span>
-                <span className="text-xs text-slate-300 truncate" title={v.meaning}>
+                <span className="text-muted-foreground text-xs">→</span>
+                <span className="text-xs text-foreground truncate" title={v.meaning}>
                   {v.meaning}
                 </span>
               </div>
@@ -221,13 +221,13 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
       )}
 
       {/* ── Action Buttons ────────────────── */}
-      <div className="mt-5 pt-4 border-t border-white/5 flex flex-wrap gap-2 justify-end">
+      <div className="mt-5 pt-4 border-t border-border flex flex-wrap gap-2 justify-end">
         <button
           onClick={() => {
             setInlineRagContent(parentContent || body);
             setShowInlineFormulaLab(true);
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/80 hover:bg-violet-600 border border-violet-500/20 hover:border-violet-400 text-[11px] font-bold text-white transition-all active:scale-95 shadow-sm shadow-violet-900/20"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
         >
           <Activity className="w-3.5 h-3.5" />
           <span>Open Formula Lab</span>
@@ -235,11 +235,11 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
 
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-[11px] font-bold text-slate-300 hover:text-white transition-all active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border text-[11px] font-bold text-foreground transition-all active:scale-95"
         >
           {copied ? (
             <>
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
               <span>Copied!</span>
             </>
           ) : (
@@ -254,7 +254,7 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
           onClick={() => {
             setActiveFormulaId(data.formula);
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-[11px] font-bold text-slate-300 hover:text-white transition-all active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border text-[11px] font-bold text-foreground transition-all active:scale-95"
         >
           <Eye className="w-3.5 h-3.5" />
           <span>Visualize</span>
@@ -264,7 +264,7 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
           onClick={() => {
             setActiveFormulaId(data.formula);
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-[11px] font-bold text-slate-300 hover:text-white transition-all active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border text-[11px] font-bold text-foreground transition-all active:scale-95"
         >
           <HelpCircle className="w-3.5 h-3.5" />
           <span>Practice</span>

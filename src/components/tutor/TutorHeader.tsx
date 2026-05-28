@@ -13,7 +13,7 @@ interface TutorHeaderProps {
 
 export function TutorHeader({ onNewChat, topicTitle, topicContext }: TutorHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex w-full items-center justify-between px-4 sm:px-6 py-4 border-b border-white/5 bg-background/80 backdrop-blur-2xl">
+    <header className="sticky top-0 z-30 flex w-full items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-background/80 backdrop-blur-2xl">
       <div className="flex items-center gap-4 sm:gap-6">
         <div>
           <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">AI Tutor</h1>
@@ -23,11 +23,11 @@ export function TutorHeader({ onNewChat, topicTitle, topicContext }: TutorHeader
         </div>
 
         {topicTitle && (
-          <div className="hidden md:flex flex-col border-l border-white/10 pl-6">
+          <div className="hidden md:flex flex-col border-l border-border pl-6">
             <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70">
               Currently Learning
             </span>
-            <span className="text-sm font-semibold text-violet-300">{topicTitle}</span>
+            <span className="text-sm font-semibold text-primary">{topicTitle}</span>
             {topicContext &&
               (topicContext.subject || topicContext.className || topicContext.chapter) && (
                 <span className="mt-1 text-[11px] font-medium text-muted-foreground">
@@ -46,7 +46,7 @@ export function TutorHeader({ onNewChat, topicTitle, topicContext }: TutorHeader
 
       <button
         onClick={onNewChat}
-        className="flex items-center gap-1.5 rounded-xl border border-white/10 hover:border-violet-500/30 bg-white/5 hover:bg-violet-500/10 px-3 py-2 text-xs font-semibold text-foreground hover:text-violet-200 transition-all cursor-pointer"
+        className="flex items-center gap-1.5 rounded-xl border border-border bg-card hover:bg-secondary px-3 py-2 text-xs font-semibold text-foreground transition-all cursor-pointer"
       >
         <Plus className="w-3.5 h-3.5" />
         <span>New Chat</span>

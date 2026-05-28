@@ -2,12 +2,9 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home,
-  Heart,
-  BarChart3,
   User,
   Settings,
   Sparkles,
-  Rocket,
   GraduationCap,
   ChevronLeft,
   Menu,
@@ -25,9 +22,6 @@ interface SidebarItem {
 const items: SidebarItem[] = [
   { to: "/", label: "Home", icon: Home },
   { to: "/tutor", label: "Tutor", icon: GraduationCap },
-  { to: "/my-simulations", label: "My Simulations", icon: Rocket },
-  { to: "/favorites", label: "Favorites", icon: Heart },
-  { to: "/progress", label: "Progress", icon: BarChart3 },
   { to: "/profile", label: "Profile", icon: User },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
