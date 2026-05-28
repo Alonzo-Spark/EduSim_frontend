@@ -2922,7 +2922,7 @@ export const SandboxCanvas: React.FC = () => {
               
               const radialGravity = runtimeRef.current?.gravitySystem?.getRadialGravity();
               const sources = radialGravity?.getSources() ?? [];
-              const G = radialGravity?.config?.gravitationalConstant ?? 0.0012;
+              const G = radialGravity?.getConfig()?.gravitationalConstant ?? 0.0012;
               const bodyPos = obj.body.position;
 
               let centralSource: any = null;
