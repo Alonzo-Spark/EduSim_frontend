@@ -7,10 +7,22 @@ interface AssetCategoryProps {
   name: string;
   assets: AssetDefinition[];
   onDragStart: (e: React.DragEvent, asset: AssetDefinition) => void;
+  /** Set of asset IDs that the AI suggested for the current query */
+  suggestedIds?: Set<string>;
 }
 
-export const AssetCategory = memo(function AssetCategory({ name, assets, onDragStart }: AssetCategoryProps) {
+export const AssetCategory = memo(function AssetCategory({
+  name,
+  assets,
+  onDragStart,
+  suggestedIds,
+}: AssetCategoryProps) {
   const [collapsed, setCollapsed] = useState(false);
+
+  // Count how many suggested assets are in this category
+  const suggestedCount = suggestedIds
+    ? assets.filter((a) => suggestedIds.has(a.id)).length
+    : 0;
 
   return (
     <div style={{ marginBottom: 8 }}>
@@ -40,6 +52,20 @@ export const AssetCategory = memo(function AssetCategory({ name, assets, onDragS
           {name}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* AI suggested count badge for this category */}
+          {suggestedCount > 0 && (
+            <span style={{
+              fontSize: 9,
+              background: 'linear-gradient(135deg, rgba(124,58,237,0.35), rgba(168,85,247,0.35))',
+              color: '#c4b5fd',
+              borderRadius: 4,
+              padding: '1px 5px',
+              fontWeight: 700,
+              border: '1px solid rgba(139,92,246,0.4)',
+            }}>
+              ✨ {suggestedCount}
+            </span>
+          )}
           <span style={{
             fontSize: 9,
             background: 'rgba(120,140,255,0.2)',
@@ -84,6 +110,7 @@ export const AssetCategory = memo(function AssetCategory({ name, assets, onDragS
                   key={asset.id}
                   asset={asset}
                   onDragStart={onDragStart}
+                  isSuggested={suggestedIds ? suggestedIds.has(asset.id) : false}
                 />
               ))}
             </div>

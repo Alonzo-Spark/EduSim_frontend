@@ -16,7 +16,7 @@ export const example7_7: SandboxExampleConfig = {
   },
   objects: [
     {
-      assetId: 'sun_1',
+      assetId: 'sun',
       id: 'example-sun',
       x: 400,
       y: 300,

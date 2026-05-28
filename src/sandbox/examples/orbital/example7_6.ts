@@ -16,7 +16,7 @@ export const example7_6: SandboxExampleConfig = {
   },
   objects: [
     {
-      assetId: 'earth_1',
+      assetId: 'earth',
       id: 'example-earth-body',
       x: 400,
       y: 300,

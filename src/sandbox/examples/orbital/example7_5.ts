@@ -17,7 +17,7 @@ export const example7_5: SandboxExampleConfig = {
   },
   objects: [
     {
-      assetId: 'sun_1',
+      assetId: 'sun',
       id: 'example-sun',
       x: 400,
       y: 300,
@@ -26,7 +26,7 @@ export const example7_5: SandboxExampleConfig = {
       radius: 50
     },
     {
-      assetId: 'earth_1',
+      assetId: 'earth',
       id: 'example-earth',
       x: 400,
       y: 100, // 200 px above Sun
