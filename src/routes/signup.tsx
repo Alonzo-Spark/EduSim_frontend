@@ -153,12 +153,11 @@ function Signup() {
   const strength = strengthScore <= 2 ? { label: "Weak", width: "33%", color: "bg-red-500" } : strengthScore <= 4 ? { label: "Medium", width: "66%", color: "bg-amber-400" } : { label: "Strong", width: "100%", color: "bg-green-500" };
 
   const fieldClass = (valid: boolean, error: boolean) =>
-    `w-full rounded-2xl bg-background text-sm text-foreground outline-none placeholder:text-muted-foreground/60 transition-all duration-300 ${
-      error
-        ? "border border-red-500/70 focus:border-red-500 focus:ring-2 focus:ring-red-500/30"
-        : valid
-          ? "border border-green-500/60 focus:border-green-500 focus:ring-2 focus:ring-green-500/25"
-          : "border border-border focus:border-primary focus:ring-2 focus:ring-primary/20"
+    `w-full rounded-2xl bg-background text-sm text-foreground outline-none placeholder:text-muted-foreground/60 transition-all duration-300 ${error
+      ? "border border-red-500/70 focus:border-red-500 focus:ring-2 focus:ring-red-500/30"
+      : valid
+        ? "border border-green-500/60 focus:border-green-500 focus:ring-2 focus:ring-green-500/25"
+        : "border border-border focus:border-primary focus:ring-2 focus:ring-primary/20"
     }`;
 
   return (
@@ -167,7 +166,7 @@ function Signup() {
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-[#FAFCFF] via-[#F4F9FF] to-[#E6F2FF]" />
 
       <div className="relative z-10 grid min-h-[100svh] w-full max-w-[1100px] grid-cols-1 lg:grid-cols-2 items-center gap-12 px-6 py-8 mx-auto">
-        
+
         {/* Left Hero Panel */}
         <div className="hidden lg:flex flex-col justify-center gap-8 h-full">
           <Link to="/" className="flex items-center gap-2.5 group relative z-10 w-fit">
@@ -219,7 +218,7 @@ function Signup() {
 
         {/* Right Auth Card */}
         <div className="w-full max-w-[420px] mx-auto rounded-[24px] p-8 border border-border shadow-[0_8px_30px_rgba(112,181,255,0.06)] relative bg-card overflow-hidden group">
-          
+
           <div className="mb-6 space-y-1 text-left">
             <h3 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
               Create Your Account

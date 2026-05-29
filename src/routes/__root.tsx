@@ -1,8 +1,9 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts, useRouterState, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -93,6 +94,8 @@ function RootComponent() {
   const navigate = useNavigate();
   const [isDesktop, setIsDesktop] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const authScrollRef = useRef<HTMLDivElement>(null);
+  const appScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateDesktop = () => setIsDesktop(window.innerWidth >= 1024);
@@ -119,7 +122,11 @@ function RootComponent() {
   const pathname = normalizePathname(routerState.location.pathname);
   const isRootRoute = pathname === "/";
   const isLandingOrAuthPage = pathname === "/login" || pathname === "/signup";
-  const isAuthPage = pathname === "/login" || pathname === "/signup" || pathname === "/forgot-password" || pathname === "/reset-password";
+  const isAuthPage =
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password";
   const requiresAuth = !isPublicRoute(pathname);
 
   useEffect(() => {
@@ -142,9 +149,18 @@ function RootComponent() {
     }
   }, [isAuthenticated, requiresAuth, navigate, isAuthPage, authChecked, isRootRoute, pathname]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && "scrollRestoration" in history) {
+      history.scrollRestoration = "manual";
+    }
+  }, []);
+
+  const routeScrollKey = `${pathname}::${JSON.stringify(routerState.location.search ?? {})}`;
+  useScrollRestoration(isLandingOrAuthPage ? authScrollRef : appScrollRef, routeScrollKey);
+
   if (isLandingOrAuthPage) {
     return (
-      <div className="min-h-screen w-full relative bg-background text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar">
+      <div ref={authScrollRef} className="min-h-screen w-full relative bg-background text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar">
         <AnimatePresence mode="popLayout">
           <motion.div
             key={routerState.location.pathname}
@@ -160,28 +176,67 @@ function RootComponent() {
       </div>
     );
   }
-  
+
+  // Fixed-layout routes (Tutor, Sandbox) own their internal layout.
+  // All other routes share the viewport-bounded content scroll container below.
+  const isFixedLayout =
+    routerState.location.pathname.startsWith("/tutor") ||
+    routerState.location.pathname.startsWith("/sandbox");
+
   return (
-    <div className="flex min-h-screen w-full relative bg-background text-foreground overflow-hidden">
+    /*
+     * LAYOUT ARCHITECTURE
+     * ─────────────────────────────────────────────────────────────────
+     * h-screen overflow-hidden on the outermost div locks the entire shell
+     * to exactly viewport height. Nothing overflows out to the window.
+     * The sidebar is `position: fixed` so it does NOT participate in flex.
+     *
+     * motion.main (flex-1, no explicit height) fills the full viewport
+     * height via align-items:stretch on the parent h-screen flex-row.
+     *
+     * The content div (flex-1 overflow-y-auto) fills the remaining height
+     * after the Navbar. Because its height is bounded by the viewport-
+     * constrained parent chain, overflow-y-auto actually activates and
+     * this div becomes the sole scroll surface.
+     *
+     * Pages that fit the viewport → no scrollbars (curriculum pages ✓)
+     * Pages with more content     → only the content area scrolls (dashboard ✓)
+     * Tutor / Sandbox             → overflow-hidden, page controls own layout ✓
+     */
+    <div className="flex h-screen w-full overflow-hidden relative bg-background text-foreground">
       <Sidebar />
-      
-      <motion.main 
+
+      <motion.main
         initial={false}
-        animate={{ 
-          paddingLeft: isDesktop ? (isCollapsed ? 72 : 240) : 0
+        animate={{
+          paddingLeft: isDesktop ? (isCollapsed ? 72 : 240) : 0,
         }}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
-        className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden relative w-full"
+        className="flex-1 min-w-0 flex flex-col relative w-full"
       >
         <Navbar />
-        
-        {/* Main Content Scroll Container */}
-        { /* When on tutor route we must avoid page scrolling and let the Tutor page manage its own fixed layout */ }
-        <div className={`flex-1 overflow-x-hidden ${routerState.location.pathname.startsWith('/tutor') || routerState.location.pathname.startsWith('/sandbox') ? 'overflow-hidden p-0' : 'overflow-y-auto pt-28 pb-12 px-4 md:px-10 custom-scrollbar scroll-smooth'}`}>
-          <div className={`mx-auto w-full h-full ${routerState.location.pathname.startsWith('/tutor') || routerState.location.pathname.startsWith('/sandbox') ? 'max-w-none' : 'max-w-[1500px]'}`}>
-            {/* 
-              Directly rendering Outlet here fixes the "manual refresh" bug. 
-              PageTransition was causing component unmounting/remounting issues 
+
+        {/*
+          Standard routes: flex-1 overflow-y-auto — bounded by the h-screen parent,
+          so this div scrolls when content exceeds the available area.
+          Fixed routes: overflow-hidden — Tutor/Sandbox control their own layout.
+        */}
+        <div
+          ref={isFixedLayout ? undefined : appScrollRef}
+          className={`flex-1 overflow-x-hidden ${
+            isFixedLayout
+              ? "overflow-hidden p-0"
+              : "overflow-y-auto pt-28 pb-12 px-4 md:px-10 custom-scrollbar"
+          }`}
+        >
+          <div
+            className={`mx-auto w-full ${
+              isFixedLayout ? "h-full max-w-none" : "max-w-[1500px]"
+            }`}
+          >
+            {/*
+              Directly rendering Outlet here fixes the "manual refresh" bug.
+              PageTransition was causing component unmounting/remounting issues
               that interfered with TanStack Router's internal state.
             */}
             <AnimatePresence mode="popLayout">
@@ -191,7 +246,7 @@ function RootComponent() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
-                className="w-full h-full"
+                className={`w-full ${isFixedLayout ? "h-full" : ""}`}
               >
                 <Outlet />
               </motion.div>

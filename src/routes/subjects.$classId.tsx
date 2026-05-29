@@ -19,7 +19,7 @@ function SubjectsPage() {
   const c = Route.useLoaderData() as ClassInfo;
   return (
     <PageWrapper>
-      <Crumbs items={[{ label: "Home", to: "/" }, { label: c.name }]} />
+      <Crumbs items={[{ label: "Home", to: "/dashboard" }, { label: c.name }]} />
       <h1 className="text-3xl font-bold mb-2">
         {c.name} <span className="text-muted-foreground text-lg font-normal">— Subjects</span>
       </h1>

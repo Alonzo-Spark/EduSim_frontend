@@ -20,7 +20,7 @@ interface SidebarItem {
 }
 
 const items: SidebarItem[] = [
-  { to: "/", label: "Home", icon: Home },
+  { to: "/dashboard", label: "Home", icon: Home },
   { to: "/tutor", label: "Tutor", icon: GraduationCap },
   { to: "/sandbox/default", label: "Sandbox", icon: Atom },
   { to: "/profile", label: "Profile", icon: User },
@@ -55,9 +55,8 @@ export function Sidebar() {
         animate={isCollapsed ? "collapsed" : "expanded"}
         variants={sidebarVariants}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-background/80 backdrop-blur-2xl border-r border-border/20 shadow-2xl overflow-hidden transition-colors duration-300 ${
-          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-background/80 backdrop-blur-2xl border-r border-border/20 shadow-2xl overflow-hidden transition-colors duration-300 ${isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
       >
         <div className="flex items-center h-20 px-5 mb-4 shrink-0">
           <Link to="/" className="flex items-center gap-3 overflow-hidden">
@@ -65,7 +64,7 @@ export function Sidebar() {
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             {!isCollapsed && (
-              <motion.span 
+              <motion.span
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="text-xl font-bold tracking-tight text-gradient whitespace-nowrap"
@@ -78,7 +77,7 @@ export function Sidebar() {
 
         <nav className="flex flex-col gap-2 flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4">
           {items.map((it) => {
-            const active = it.to === "/" ? (path === "/" || path === "/dashboard") : path.startsWith(it.to);
+            const active = path.startsWith(it.to);
             const Icon = it.icon;
 
             const NavLink = (
@@ -86,16 +85,15 @@ export function Sidebar() {
                 key={it.to}
                 to={it.to}
                 onClick={() => setMobileOpen(false)}
-                className={`group relative flex items-center h-12 rounded-2xl transition-all duration-300 ${
-                  active
+                className={`group relative flex items-center h-12 rounded-2xl transition-all duration-300 ${active
                     ? "bg-secondary text-primary font-semibold shadow-sm"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                }`}
+                  }`}
               >
                 <div className="w-12 h-12 shrink-0 flex items-center justify-center">
-                   <Icon className={`w-5 h-5 transition-all duration-300 ${active ? "text-primary scale-110 drop-shadow-[0_0_8px_var(--primary)]" : "group-hover:scale-110"}`} />
+                  <Icon className={`w-5 h-5 transition-all duration-300 ${active ? "text-primary scale-110 drop-shadow-[0_0_8px_var(--primary)]" : "group-hover:scale-110"}`} />
                 </div>
-                
+
                 {!isCollapsed && (
                   <motion.span
                     initial={{ opacity: 0 }}
@@ -107,7 +105,7 @@ export function Sidebar() {
                 )}
 
                 {active && (
-                  <motion.div 
+                  <motion.div
                     layoutId="active-nav-indicator"
                     className="absolute right-2 w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_10px_var(--primary)]"
                   />
@@ -133,24 +131,24 @@ export function Sidebar() {
         </nav>
 
         <div className="p-4 mt-auto space-y-2 border-t border-border/10">
-           <button 
-             onClick={toggleSidebar}
-             className="w-full flex items-center h-12 rounded-2xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-300 group"
-           >
-             <div className="w-12 h-12 shrink-0 flex items-center justify-center">
-               <ChevronLeft className={`w-5 h-5 transition-transform duration-500 ${isCollapsed ? "rotate-180" : ""}`} />
-             </div>
-             {!isCollapsed && <span className="text-[15px] font-medium">Collapse</span>}
-           </button>
+          <button
+            onClick={toggleSidebar}
+            className="w-full flex items-center h-12 rounded-2xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-300 group"
+          >
+            <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+              <ChevronLeft className={`w-5 h-5 transition-transform duration-500 ${isCollapsed ? "rotate-180" : ""}`} />
+            </div>
+            {!isCollapsed && <span className="text-[15px] font-medium">Collapse</span>}
+          </button>
 
-           <button 
-             className="w-full flex items-center h-12 rounded-2xl text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 group"
-           >
-             <div className="w-12 h-12 shrink-0 flex items-center justify-center">
-               <LogOut className="w-5 h-5" />
-             </div>
-             {!isCollapsed && <span className="text-[15px] font-medium">Logout</span>}
-           </button>
+          <button
+            className="w-full flex items-center h-12 rounded-2xl text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 group"
+          >
+            <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+              <LogOut className="w-5 h-5" />
+            </div>
+            {!isCollapsed && <span className="text-[15px] font-medium">Logout</span>}
+          </button>
         </div>
       </motion.aside>
     </TooltipProvider>

@@ -58,7 +58,10 @@ export const getRouter = () => {
   const router = createRouter({
     routeTree,
     context: {},
-    scrollRestoration: true,
+    // Scroll restoration is handled manually in __root.tsx using a ref to the
+    // inner overflow-y-auto div. TanStack's built-in scrollRestoration targets
+    // window which has no scroll when using a custom scroll container.
+    scrollRestoration: false,
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultErrorComponent,
   });

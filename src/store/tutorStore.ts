@@ -14,6 +14,8 @@ interface TutorState {
   setShowInlineFormulaLab: (v: boolean) => void;
   inlineRagContent: string | null;
   setInlineRagContent: (c: string | null) => void;
+  inlineFormulaLabTab: "anatomy" | "solve" | "visualize" | "practice";
+  setInlineFormulaLabTab: (tab: "anatomy" | "solve" | "visualize" | "practice") => void;
 }
 
 export const useTutorStore = create<TutorState>((set) => ({
@@ -26,4 +28,6 @@ export const useTutorStore = create<TutorState>((set) => ({
   setShowInlineFormulaLab: (v) => set({ showInlineFormulaLab: v }),
   inlineRagContent: null,
   setInlineRagContent: (c) => set({ inlineRagContent: c }),
+  inlineFormulaLabTab: "anatomy",
+  setInlineFormulaLabTab: (tab) => set({ inlineFormulaLabTab: tab }),
 }));

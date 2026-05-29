@@ -24,11 +24,12 @@ export function ChatBubble({ content, role, timestamp, topicTitle, onCopy, onReg
   const mounted = useMounted();
   const {
     activeFormulaId,
-    setActiveFormulaId,
     showInlineFormulaLab,
     setShowInlineFormulaLab,
     inlineRagContent,
     setInlineRagContent,
+    inlineFormulaLabTab,
+    setInlineFormulaLabTab,
   } = useTutorStore();
 
   const formulas = useMemo(() => {
@@ -36,13 +37,15 @@ export function ChatBubble({ content, role, timestamp, topicTitle, onCopy, onReg
     return extractFormulas(content);
   }, [content, isAi]);
 
+  let mainContent = content;
+
   const shouldShowFormulaLab = isAi && showInlineFormulaLab && inlineRagContent === content;
 
-  if (isAi) {
-    console.log("[TutorOutputPanel] showFormulaLab", formulas.length);
-  }
-
-  let mainContent = content;
+  const openFormulaLab = (tab: "anatomy" | "solve" | "visualize" | "practice" = "anatomy") => {
+    setInlineRagContent(content);
+    setShowInlineFormulaLab(true);
+    setInlineFormulaLabTab(tab);
+  };
 
   return (
     <motion.div
@@ -82,10 +85,8 @@ export function ChatBubble({ content, role, timestamp, topicTitle, onCopy, onReg
             {isAi && formulas.length > 0 && (
               <div className="mt-6 pt-6 border-t border-border flex justify-center w-full">
                 <button
-                  onClick={() => {
-                    setInlineRagContent(content);
-                    setShowInlineFormulaLab(true);
-                  }}
+                  type="button"
+                  onClick={openFormulaLab}
                   className="group relative flex items-center gap-3 rounded-[2rem] bg-primary hover:bg-primary/90 px-8 py-3.5 text-sm font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95 shadow-[0_4px_12px_rgba(112,181,255,0.25)] hover:shadow-[0_6px_20px_rgba(112,181,255,0.35)]"
                 >
                   <Activity className="h-5 w-5 text-white/80" />
@@ -126,7 +127,6 @@ export function ChatBubble({ content, role, timestamp, topicTitle, onCopy, onReg
         )}
 
         <AnimatePresence>
-          {isAi && console.log("[TutorOutputPanel] showFormulaLab", formulas.length)}
           {isAi && formulas.some((f) => (f.rawFormula || f.raw) === activeFormulaId) && (
             <motion.div
               initial={{ opacity: 0, height: 0, marginTop: 0 }}
@@ -152,10 +152,15 @@ export function ChatBubble({ content, role, timestamp, topicTitle, onCopy, onReg
               <React.Suspense
                 fallback={<div className="h-48 w-full animate-pulse rounded-2xl bg-white/5" />}
               >
-                <FormulaLabPageLazy topic={topicTitle || "General"} ragContent={mainContent} />
+                <FormulaLabPageLazy
+                  topic={topicTitle || "General"}
+                  ragContent={inlineRagContent || mainContent}
+                  initialTab={inlineFormulaLabTab}
+                />
               </React.Suspense>
             </motion.div>
           )}
+
         </AnimatePresence>
 
 

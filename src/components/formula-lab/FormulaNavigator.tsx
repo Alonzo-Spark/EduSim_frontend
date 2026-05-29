@@ -11,7 +11,7 @@ interface Props {
 const FormulaNavigator: React.FC<Props> = ({ formulas, selected, onSelect }) => {
   if (!Array.isArray(formulas)) {
     return (
-      <div className="w-full rounded-[2rem] border border-white/10 bg-white/5 p-6 text-sm text-muted-foreground">
+      <div className="w-full rounded-3xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm">
         Loading formulas...
       </div>
     );
@@ -29,7 +29,7 @@ const FormulaNavigator: React.FC<Props> = ({ formulas, selected, onSelect }) => 
 
   if (validFormulas.length === 0) {
     return (
-      <div className="w-full rounded-[2rem] border border-white/10 bg-white/5 p-6 text-sm text-muted-foreground">
+      <div className="w-full rounded-3xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm">
         No formulas detected for this topic.
       </div>
     );
@@ -53,7 +53,7 @@ const FormulaNavigator: React.FC<Props> = ({ formulas, selected, onSelect }) => 
             <li key={f.id || f.raw} className="min-w-[360px]">
               <button
                 onClick={() => onSelect(f.id || f.raw)}
-                className={`w-full h-[220px] rounded-[1.75rem] border p-5 text-left glass-card transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl ${isSelected ? "ring-2 ring-indigo-400/80 border-indigo-300/40 shadow-[0_20px_60px_rgba(99,102,241,0.25)]" : "border-white/10 bg-white/6"}`}
+                className={`w-full h-[220px] rounded-3xl border p-5 text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${isSelected ? "ring-2 ring-primary/50 border-primary/40 bg-primary/5 shadow-sm" : "border-border bg-card hover:border-primary/30 hover:bg-secondary/50"}`}
               >
                 <div className="flex h-full flex-col justify-between gap-4">
                   <div className="flex items-start justify-between gap-3">
@@ -65,12 +65,12 @@ const FormulaNavigator: React.FC<Props> = ({ formulas, selected, onSelect }) => 
                       <h3 className="text-xl font-bold tracking-tight text-foreground">{title}</h3>
                     </div>
                     {isSelected && (
-                      <span className="rounded-full border border-indigo-300/40 bg-indigo-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-indigo-200">
+                      <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-primary">
                         Selected
                       </span>
                     )}
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-4 text-center shadow-inner">
+                  <div className="rounded-2xl border border-border bg-secondary px-4 py-4 text-center">
                     <div className="overflow-x-auto">
                       {latex ? (
                         <BlockMath math={latex} />
@@ -87,7 +87,7 @@ const FormulaNavigator: React.FC<Props> = ({ formulas, selected, onSelect }) => 
                       {anatomy.slice(0, 3).map((row) => (
                         <span
                           key={row.symbol}
-                          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-foreground/90"
+                          className="rounded-full border border-border bg-secondary px-3 py-1 text-[11px] font-semibold text-foreground"
                         >
                           {row.symbol} · {row.meaning}
                         </span>

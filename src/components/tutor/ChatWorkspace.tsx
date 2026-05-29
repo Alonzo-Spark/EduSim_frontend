@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { ChatBubble, TypingAnimation } from "./ChatBubble";
 import ChatInput from "./ChatInput";
 import { TutorHeader } from "./TutorHeader";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 
 interface Props {
   onSend: (text: string) => void;
@@ -40,7 +42,11 @@ export function ChatWorkspace({
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const mainScrollRef = useRef<HTMLElement | null>(null);
   const lastAiResponseRef = useRef<string | null>(null);
+  const routeState = useRouterState({ select: (state) => state.location });
+
+  useScrollRestoration(mainScrollRef, `${routeState.pathname}::${JSON.stringify(routeState.search ?? {})}`);
 
   const send = (text: string) => {
     setMessages((current) => [
@@ -111,7 +117,7 @@ export function ChatWorkspace({
     <div className="flex-1 flex flex-col h-full min-h-0 w-full relative bg-transparent">
       <TutorHeader onNewChat={handleNewChat} topicTitle={topicTitle} topicContext={topicContext} />
 
-      <main className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+      <main ref={mainScrollRef} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
         <div
           className={`mx-auto w-full max-w-[1600px] min-h-full flex flex-col px-4 sm:px-6 md:px-8 pb-40 pt-6 ${messages.length === 0 ? "justify-center" : "justify-start"} space-y-6`}
         >

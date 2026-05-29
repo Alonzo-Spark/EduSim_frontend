@@ -148,7 +148,11 @@ interface FormulaCardProps {
 export function FormulaCard({ body, sectionTitle, className, parentContent }: FormulaCardProps) {
   const data = parseFormulaBody(body, sectionTitle);
   const [copied, setCopied] = useState(false);
-  const { setActiveFormulaId, setShowInlineFormulaLab, setInlineRagContent } = useTutorStore();
+  const {
+    setShowInlineFormulaLab,
+    setInlineRagContent,
+    setInlineFormulaLabTab,
+  } = useTutorStore();
 
   if (!data.formula) return null;
 
@@ -171,6 +175,12 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
     navigator.clipboard.writeText(data.formula);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const openFormulaLab = (tab: "anatomy" | "solve" | "visualize" | "practice" = "anatomy") => {
+    setInlineRagContent(parentContent || body);
+    setInlineFormulaLabTab(tab);
+    setShowInlineFormulaLab(true);
   };
 
   return (
@@ -223,10 +233,8 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
       {/* ── Action Buttons ────────────────── */}
       <div className="mt-5 pt-4 border-t border-border flex flex-wrap gap-2 justify-end">
         <button
-          onClick={() => {
-            setInlineRagContent(parentContent || body);
-            setShowInlineFormulaLab(true);
-          }}
+          type="button"
+          onClick={() => openFormulaLab()}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
         >
           <Activity className="w-3.5 h-3.5" />
@@ -251,9 +259,8 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
         </button>
 
         <button
-          onClick={() => {
-            setActiveFormulaId(data.formula);
-          }}
+          type="button"
+          onClick={() => openFormulaLab("visualize")}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border text-[11px] font-bold text-foreground transition-all active:scale-95"
         >
           <Eye className="w-3.5 h-3.5" />
@@ -261,9 +268,8 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
         </button>
 
         <button
-          onClick={() => {
-            setActiveFormulaId(data.formula);
-          }}
+          type="button"
+          onClick={() => openFormulaLab("practice")}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border text-[11px] font-bold text-foreground transition-all active:scale-95"
         >
           <HelpCircle className="w-3.5 h-3.5" />

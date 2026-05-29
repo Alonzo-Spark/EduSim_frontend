@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, GraduationCap, Loader } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "@tanstack/react-router";
+import { CLASSES } from "@/data/curriculum";
 import { getApiUrl } from "@/config/api";
 import { joinUrl } from "@/utils/urlUtils";
 
 interface SearchResult {
   type: "topic" | "chapter" | "subject" | "class";
+  class_id?: number | string;
   class_name?: string;
   subject?: string;
   chapter?: string;
@@ -49,6 +51,60 @@ const TYPE_META: Record<SearchResult["type"], { label: string; singular: string;
 };
 
 const API_BASE = getApiUrl("");
+
+const resolveClassId = (item: SearchResult) => {
+  if (typeof item.class_id === "number" && Number.isFinite(item.class_id)) {
+    return String(item.class_id);
+  }
+
+  if (typeof item.class_id === "string" && item.class_id.trim()) {
+    const parsed = Number(item.class_id);
+    if (Number.isFinite(parsed)) {
+      return String(parsed);
+    }
+  }
+
+  if (!item.class_name) {
+    return null;
+  }
+
+  const directMatch = CLASSES.find((c) => c.name.toLowerCase() === item.class_name.trim().toLowerCase());
+  if (directMatch) {
+    return String(directMatch.id);
+  }
+
+  const numericMatch = item.class_name.match(/\d+/);
+  return numericMatch ? numericMatch[0] : null;
+};
+
+const resolveCurriculumDestination = (item: SearchResult) => {
+  const classId = resolveClassId(item);
+
+  if (!classId) {
+    return null;
+  }
+
+  if (item.type === "class") {
+    return { to: "/subjects/$classId", params: { classId } };
+  }
+
+  if (!item.subject) {
+    return null;
+  }
+
+  if (item.type === "subject" || item.type === "chapter") {
+    return { to: "/chapters/$classId/$subject", params: { classId, subject: item.subject } };
+  }
+
+  if (item.type === "topic" && item.chapter && item.topic) {
+    return {
+      to: "/topics/$classId/$subject/$chapter",
+      params: { classId, subject: item.subject, chapter: item.chapter },
+    };
+  }
+
+  return null;
+};
 
 export function GlobalSearch() {
   const [query, setQuery] = useState("");
@@ -202,15 +258,51 @@ export function GlobalSearch() {
     setIsOpen(false);
     setQuery("");
 
-    // Navigate to tutor page with selected topic
+    // First, try to resolve a direct curriculum route
+    const destination = resolveCurriculumDestination(item);
+    if (destination) {
+      router.navigate(destination as any);
+      return;
+    }
+
+    // If resolveCurriculumDestination returned null but the item IS a curriculum
+    // entity (class/subject/chapter/topic), attempt a graceful fallback within
+    // the curriculum hierarchy instead of redirecting to /tutor.
+    const classId = resolveClassId(item);
+    if (classId) {
+      // We have at least a classId — navigate to the subjects page for this class
+      if (!item.subject) {
+        router.navigate({ to: "/subjects/$classId", params: { classId } } as any);
+        return;
+      }
+      // We have a classId + subject but no chapter — go to the chapters listing
+      if (!item.chapter) {
+        router.navigate({
+          to: "/chapters/$classId/$subject",
+          params: { classId, subject: item.subject },
+        } as any);
+        return;
+      }
+      // We have classId + subject + chapter — go to topics listing for that chapter
+      router.navigate({
+        to: "/topics/$classId/$subject/$chapter",
+        params: { classId, subject: item.subject, chapter: item.chapter },
+      } as any);
+      return;
+    }
+
+    // No curriculum data at all — this is a free-text AI query, send to tutor
     const params: any = {};
     if (item.subject) params.subject = item.subject;
     if (item.class_name) params.class_name = item.class_name;
     if (item.chapter) params.chapter = item.chapter;
     if (item.topic) params.topic = item.topic;
 
-    // Also include a helpful prompt when possible
-    const prompt = item.topic ? `Explain ${item.topic}` : undefined;
+    const prompt = item.topic
+      ? `Explain ${item.topic}`
+      : item.chapter
+        ? `Explain ${item.chapter}`
+        : undefined;
     router.navigate({ to: "/tutor", search: params, state: prompt ? { prompt } : undefined });
   };
 

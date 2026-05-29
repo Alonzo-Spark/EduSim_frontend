@@ -22,7 +22,7 @@ function ChaptersPage() {
     <PageWrapper>
       <Crumbs
         items={[
-          { label: "Home", to: "/" },
+          { label: "Home", to: "/dashboard" },
           { label: c.name, to: "/subjects/$classId", params: { classId: String(c.id) } },
           { label: s.name },
         ]}

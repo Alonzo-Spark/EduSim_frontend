@@ -33,7 +33,7 @@ function LawsOfMotionLab() {
     <PageWrapper>
       <Crumbs
         items={[
-          { label: "Home", to: "/" },
+          { label: "Home", to: "/dashboard" },
           { label: "Class 9", to: "/subjects/$classId", params: { classId: "9" } },
           {
             label: "Physics",

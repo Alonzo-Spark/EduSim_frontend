@@ -6,7 +6,7 @@ import { BlockMath, InlineMath } from "@/components/math/Katex";
 import {
   AlertTriangle, CheckCircle2, Lightbulb, ListChecks, Sparkles,
   Copy, BookOpen, Calculator, Beaker, Check, FunctionSquare,
-  Zap, Info, Flag, Target, ShieldAlert, Variable, FlagTriangleRight, FileQuestion
+  Zap, Info, Flag, Target, ShieldAlert, Variable, FlagTriangleRight, FileQuestion, ChevronDown
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,7 @@ import { FormulaCard } from "./FormulaCard";
 type Density = "compact" | "regular" | "spacious";
 type SectionKind =
   | "default" | "concept" | "definition" | "formula" | "given_values" | "example"
-  | "solution" | "final_answer" | "note" | "takeaway" | "warning" | "tip";
+  | "solution" | "final_answer" | "takeaway" | "warning" | "tip";
 
 type SectionBlock = {
   id: string;
@@ -40,7 +40,6 @@ const SECTION_KIND_MATCHERS: Array<{ kind: SectionKind; patterns: RegExp[] }> = 
   { kind: "final_answer", patterns: [/final answers?/i, /answers?/i, /results?/i, /conclusion/i] },
   { kind: "example", patterns: [/examples?/i, /illustrations?/i, /case studies?/i, /worked examples?/i] },
   { kind: "warning", patterns: [/common mistakes?/i, /mistakes?/i, /pitfalls?/i, /warnings?/i, /caution/i, /watch out/i] },
-  { kind: "note", patterns: [/important notes?/i, /notes?/i] },
   { kind: "tip", patterns: [/tips?/i, /pro[- ]?tips?/i, /tricks?/i, /shortcuts?/i] },
   { kind: "takeaway", patterns: [/key takeaways?/i, /takeaways?/i, /tl;dr/i, /bottom line/i, /important points?/i, /summary/i] },
 ];
@@ -257,7 +256,7 @@ function SectionContent({ section, isDark, isLast, index }: { section: SectionBl
   } else if (section.kind === "takeaway") {
     iconColor = "text-rose-400";
     Icon = Zap;
-  } else if (section.kind === "note" || section.kind === "tip") {
+  } else if (section.kind === "tip") {
     iconColor = "text-sky-400";
     Icon = Info;
   } else if (section.kind === "warning") {
@@ -326,8 +325,8 @@ function SectionContent({ section, isDark, isLast, index }: { section: SectionBl
     );
   }
 
-  // EDUCATIONAL CALLOUTS (Notes, Tips, Warnings)
-  if (section.kind === "note" || section.kind === "tip" || section.kind === "warning") {
+  // EDUCATIONAL CALLOUTS (Tips, Warnings)
+  if (section.kind === "tip" || section.kind === "warning") {
     const isWarn = section.kind === "warning";
     return (
       <div className="w-full relative animate-in fade-in slide-in-from-bottom-2 duration-500 my-2.5">
@@ -380,6 +379,232 @@ function SectionContent({ section, isDark, isLast, index }: { section: SectionBl
   );
 }
 
+function getGroupKey(item: SectionBlock) {
+  const kind = item.kind;
+  if (kind === "concept" || kind === "definition") {
+    return "group1";
+  }
+  if (kind === "given_values") {
+    return "group4";
+  }
+  if (kind === "formula") {
+    return "group3";
+  }
+  if (kind === "solution" || kind === "final_answer") {
+    return "group4";
+  }
+  if (kind === "example") {
+    return "group4";
+  }
+  if (kind === "takeaway" || kind === "tip" || kind === "warning") {
+    return "group6";
+  }
+  
+  if (item.title) {
+    const t = item.title.toLowerCase();
+    if (t.includes("intro")) return "group1";
+    if (t.includes("char") || t.includes("prop")) return "group2";
+    if (t.includes("form") || t.includes("eq")) return "group3";
+    if (t.includes("examp") || t.includes("solve")) return "group4";
+    if (t.includes("app")) return "group5";
+    if (t.includes("summ") || t.includes("take")) return "group6";
+    if (t.includes("quest") || t.includes("q&a")) return "questions";
+  }
+  return "group1";
+}
+
+function getGroupForKey(key: string) {
+  switch (key) {
+    case "group1":
+      return {
+        title: "Introduction",
+        icon: <BookOpen className="w-5 h-5 text-sky-400" />,
+        border: "border-l-sky-500/50",
+        text: "text-sky-300",
+        isStandalone: false,
+      };
+    case "group2":
+      return {
+        title: "Characteristics",
+        icon: <ListChecks className="w-5 h-5 text-pink-400" />,
+        border: "border-l-pink-500/50",
+        text: "text-pink-300",
+        isStandalone: false,
+      };
+    case "group3":
+      return {
+        title: "Formula",
+        icon: <FunctionSquare className="w-5 h-5 text-emerald-400" />,
+        border: "border-l-emerald-500/50",
+        text: "text-emerald-300",
+        isStandalone: false,
+      };
+    case "group4":
+      return {
+        title: "Example",
+        icon: <Calculator className="w-5 h-5 text-orange-400" />,
+        border: "border-l-orange-500/50",
+        text: "text-orange-300",
+        isStandalone: false,
+      };
+    case "group5":
+      return {
+        title: "Applications",
+        icon: <Sparkles className="w-5 h-5 text-purple-400" />,
+        border: "border-l-purple-500/50",
+        text: "text-purple-300",
+        isStandalone: false,
+      };
+    case "group6":
+      return {
+        title: "Summary",
+        icon: <Target className="w-5 h-5 text-amber-400" />,
+        border: "border-l-amber-500/50",
+        text: "text-amber-300",
+        isStandalone: false,
+      };
+    case "questions":
+      return {
+        title: "Suggested Questions",
+        icon: <FileQuestion className="w-5 h-5 text-teal-400" />,
+        border: "border-l-teal-500/50",
+        text: "text-teal-300",
+        isStandalone: true,
+      };
+    default:
+      return {
+        title: "Introduction",
+        icon: <BookOpen className="w-5 h-5 text-sky-400" />,
+        border: "border-l-sky-500/50",
+        text: "text-sky-300",
+        isStandalone: false,
+      };
+  }
+}
+
+function AccordionGroup({
+  groupKey,
+  title,
+  icon,
+  borderClass,
+  textClass,
+  items,
+  isExpanded,
+  onToggle,
+  isDark,
+}: {
+  groupKey: string;
+  title: string;
+  icon: React.ReactNode;
+  borderClass: string;
+  textClass: string;
+  items: SectionBlock[];
+  isExpanded: boolean;
+  onToggle: () => void;
+  isDark: boolean;
+}) {
+  return (
+    <div className={cn(
+      "w-full rounded-[20px] border border-white/5 bg-white/[0.01] overflow-hidden transition-all duration-300 border-l-4 mb-4",
+      borderClass,
+      isExpanded ? "bg-white/[0.02]" : ""
+    )}>
+      {/* Accordion Header */}
+      <div 
+        onClick={onToggle}
+        className="flex items-center justify-between p-4 sm:p-5 cursor-pointer select-none hover:bg-white/[0.03] transition-colors"
+      >
+        <div className="flex items-center gap-3.5">
+          <div className="p-2 rounded-xl bg-white/[0.02] border border-white/10 flex items-center justify-center">
+            {icon}
+          </div>
+          <h2 className={cn("text-base font-extrabold tracking-tight", textClass)}>
+            {title}
+          </h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-violet-300/80 uppercase tracking-widest bg-violet-500/10 px-2.5 py-1 rounded-lg border border-violet-500/20">
+            {items.length} {items.length === 1 ? "Section" : "Sections"}
+          </span>
+          <ChevronDown className={cn(
+            "w-5 h-5 text-foreground/65 transition-transform duration-300",
+            isExpanded ? "rotate-180" : ""
+          )} />
+        </div>
+      </div>
+
+      {/* Accordion Content */}
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+          >
+            <div className="border-t border-white/5 p-4 sm:p-5 space-y-4 bg-white/[0.005]">
+              {items.map((item, idx) => (
+                <SectionContent
+                  key={item.id}
+                  section={item}
+                  isDark={isDark}
+                  isLast={idx === items.length - 1}
+                  index={idx}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function StandaloneCard({
+  groupKey,
+  title,
+  icon,
+  borderClass,
+  textClass,
+  items,
+  isDark,
+}: {
+  groupKey: string;
+  title: string;
+  icon: React.ReactNode;
+  borderClass: string;
+  textClass: string;
+  items: SectionBlock[];
+  isDark: boolean;
+}) {
+  return (
+    <div className={cn(
+      "w-full rounded-[20px] border border-white/5 bg-white/[0.01] p-4 sm:p-5 border-l-4 transition-all duration-300 hover:bg-white/[0.02] mb-4",
+      borderClass
+    )}>
+      <div className="mb-4 flex items-center gap-3.5">
+        <div className="p-2 rounded-xl bg-white/[0.02] border border-white/10 flex items-center justify-center">
+          {icon}
+        </div>
+        <h2 className={cn("text-base font-extrabold tracking-tight", textClass)}>
+          {title}
+        </h2>
+      </div>
+      <div className="space-y-4">
+        {items.map((item, idx) => (
+          <SectionContent
+            key={item.id}
+            section={item}
+            isDark={isDark}
+            isLast={idx === items.length - 1}
+            index={idx}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function PremiumTutorMarkdownRenderer({ content, className }: PremiumTutorMarkdownRendererProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -391,7 +616,39 @@ export function PremiumTutorMarkdownRenderer({ content, className }: PremiumTuto
 
   const sections = useMemo(() => splitIntoSections(normalizedStr), [normalizedStr]);
 
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ group1: true });
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const groupedData = useMemo(() => {
+    const buckets: Record<string, SectionBlock[]> = {
+      group1: [],
+      group2: [],
+      group3: [],
+      group4: [],
+      group5: [],
+      group6: [],
+      questions: [],
+    };
+
+    sections.forEach((item) => {
+      const key = getGroupKey(item);
+      if (buckets[key]) {
+        buckets[key].push(item);
+      }
+    });
+
+    return buckets;
+  }, [sections]);
+
   if (!normalizedStr.trim()) return null;
+
+  const groupKeys = ["group1", "group2", "group3", "group4", "group5", "group6", "questions"];
 
   return (
     <article className={cn(
@@ -484,7 +741,7 @@ export function PremiumTutorMarkdownRenderer({ content, className }: PremiumTuto
         }
       `}} />
 
-      <div className="flex items-center gap-3 mb-2 pb-1.5 border-b border-white/5 w-full">
+      <div className="flex items-center gap-3 mb-4 pb-2 border-b border-white/5 w-full">
         <div className="w-10 h-10 rounded-[14px] flex items-center justify-center shrink-0 bg-gradient-to-br from-[var(--neon-purple)] to-[var(--neon-blue)] shadow-lg shadow-violet-500/30">
           <span className="text-white text-sm font-bold tracking-wider">AI</span>
         </div>
@@ -492,15 +749,44 @@ export function PremiumTutorMarkdownRenderer({ content, className }: PremiumTuto
       </div>
 
       <div className="flex flex-col w-full">
-        {sections.map((section, index) => (
-          <SectionContent
-            key={section.id}
-            section={section}
-            isDark={isDark}
-            isLast={index === sections.length - 1}
-            index={index}
-          />
-        ))}
+        {groupKeys.map((key) => {
+          const items = groupedData[key] || [];
+          const validItems = items.filter(item => item.body?.trim()?.length > 0);
+
+          if (validItems.length === 0) return null;
+
+          const groupMeta = getGroupForKey(key);
+
+          if (groupMeta.isStandalone) {
+            return (
+              <StandaloneCard
+                key={key}
+                groupKey={key}
+                title={groupMeta.title}
+                icon={groupMeta.icon}
+                borderClass={groupMeta.border}
+                textClass={groupMeta.text}
+                items={validItems}
+                isDark={isDark}
+              />
+            );
+          }
+
+          return (
+            <AccordionGroup
+              key={key}
+              groupKey={key}
+              title={groupMeta.title}
+              icon={groupMeta.icon}
+              borderClass={groupMeta.border}
+              textClass={groupMeta.text}
+              items={validItems}
+              isExpanded={!!expandedGroups[key]}
+              onToggle={() => toggleGroup(key)}
+              isDark={isDark}
+            />
+          );
+        })}
       </div>
     </article>
   );
