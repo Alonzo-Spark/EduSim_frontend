@@ -38,23 +38,26 @@ export function AIExplanationCard({ content, isLoading }: AIExplanationCardProps
   }
 
   return (
-    <section className="glass-strong rounded-3xl p-6 relative overflow-hidden flex flex-col max-h-[600px] border border-border shadow-xl transition-all">
-      <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-3xl -z-10" />
+    <section className="glass-strong rounded-[2rem] p-8 relative overflow-hidden border border-border shadow-xl transition-all">
+      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 blur-3xl -z-10 pointer-events-none" />
       
-      <div className="flex items-center justify-between mb-6 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-primary/10 text-primary">
-            <Zap className="w-5 h-5" />
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-sm">
+            <Zap className="w-6 h-6 animate-pulse" />
           </div>
-          <h3 className="text-xl font-bold text-foreground">AI Analysis & Explanation</h3>
+          <div>
+            <h3 className="text-xl font-bold text-foreground">AI Analysis & Explanation</h3>
+            <p className="text-xs text-muted-foreground">Detailed conceptual walkthrough and derivations</p>
+          </div>
         </div>
-        <div className="px-3 py-1 rounded-full bg-secondary/80 border border-border text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          Powered by GPT-4
+        <div className="px-4 py-1.5 rounded-full bg-secondary/60 border border-border/40 text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
+          AI Assistant
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar">
-        <TutorMarkdownRenderer content={content} density="spacious" />
+      <div className="w-full">
+        <TutorMarkdownRenderer content={content} density="regular" />
       </div>
     </section>
   );

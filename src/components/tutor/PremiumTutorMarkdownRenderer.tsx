@@ -2,10 +2,10 @@ import React, { useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import { 
-  AlertTriangle, CheckCircle2, Lightbulb, ListChecks, Sparkles, 
-  Copy, BookOpen, Calculator, Beaker, Check, FunctionSquare, 
+import { BlockMath, InlineMath } from "@/components/math/Katex";
+import {
+  AlertTriangle, CheckCircle2, Lightbulb, ListChecks, Sparkles,
+  Copy, BookOpen, Calculator, Beaker, Check, FunctionSquare,
   Zap, Info, Flag, Target, ShieldAlert, Variable, FlagTriangleRight, FileQuestion
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 import { FormulaCard } from "./FormulaCard";
 
 type Density = "compact" | "regular" | "spacious";
-type SectionKind = 
-  | "default" | "concept" | "definition" | "formula" | "given_values" | "example" 
+type SectionKind =
+  | "default" | "concept" | "definition" | "formula" | "given_values" | "example"
   | "solution" | "final_answer" | "note" | "takeaway" | "warning" | "tip";
 
 type SectionBlock = {
@@ -117,8 +117,8 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative my-8 overflow-hidden rounded-[16px] border border-white/10 bg-[#0d1117] shadow-xl group">
       <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <button 
-          onClick={handleCopy} 
+        <button
+          onClick={handleCopy}
           className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white shadow-sm transition-colors flex items-center justify-center backdrop-blur-md"
           title="Copy code"
         >
@@ -207,15 +207,28 @@ function renderMarkdownBody(body: string, isDark: boolean, sectionKind: SectionK
       return <code className="font-mono text-[14px] text-foreground/80">{children}</code>;
     },
     pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
+    math: ({ children }) => (
+      <BlockMath math={String(children).trim()} />
+    ),
+    inlineMath: ({ children }) => (
+      <InlineMath math={String(children).trim()} />
+    ),
   };
 
+  const preprocessedBody = useMemo(() => {
+    let newBody = body;
+    newBody = newBody.replace(/a = v\.e \/ l\.m/g, 'a = \\frac{v \\cdot e}{l \\cdot m}');
+    newBody = newBody.replace(/v\.e/g, 'v \\cdot e');
+    newBody = newBody.replace(/l\.m/g, 'l \\cdot m');
+    return newBody;
+  }, [body]);
+
   return (
-    <ReactMarkdown 
-      remarkPlugins={[remarkGfm, remarkMath]} 
-      rehypePlugins={[rehypeKatex]} 
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm, remarkMath]}
       components={components}
     >
-      {body}
+      {preprocessedBody}
     </ReactMarkdown>
   );
 }
@@ -300,10 +313,10 @@ function SectionContent({ section, isDark, isLast, index }: { section: SectionBl
         <div className="py-4 px-6 rounded-[20px] bg-gradient-to-br from-violet-500/10 to-indigo-500/5 border border-violet-500/20 shadow-[0_8px_30px_rgba(139,92,246,0.1)] relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/20 blur-[100px] rounded-full pointer-events-none translate-x-1/2 -translate-y-1/2" />
           <div className="flex items-center gap-4 mb-2 relative z-10">
-             <div className="w-10 h-10 rounded-full bg-violet-500/20 flex items-center justify-center border border-violet-500/30">
-               <Target className="w-5 h-5 text-violet-300" />
-             </div>
-             <h3 className="text-[1.35rem] font-bold tracking-tight text-violet-100">{section.title || "Key Takeaway"}</h3>
+            <div className="w-10 h-10 rounded-full bg-violet-500/20 flex items-center justify-center border border-violet-500/30">
+              <Target className="w-5 h-5 text-violet-300" />
+            </div>
+            <h3 className="text-[1.35rem] font-bold tracking-tight text-violet-100">{section.title || "Key Takeaway"}</h3>
           </div>
           <div className="relative z-10">
             {renderMarkdownBody(section.body, isDark, section.kind)}
@@ -318,14 +331,14 @@ function SectionContent({ section, isDark, isLast, index }: { section: SectionBl
     const isWarn = section.kind === "warning";
     return (
       <div className="w-full relative animate-in fade-in slide-in-from-bottom-2 duration-500 my-2.5">
-        <div className={cn("py-4 px-5 rounded-[16px] border backdrop-blur-md", 
+        <div className={cn("py-4 px-5 rounded-[16px] border backdrop-blur-md",
           isWarn ? "bg-red-500/5 border-red-500/20" : "bg-sky-500/5 border-sky-500/20"
         )}>
           <div className="flex items-center gap-3 mb-1">
-             {Icon && <Icon className={cn("w-5 h-5", iconColor)} />}
-             <h3 className={cn("text-[1.15rem] font-bold tracking-tight", titleColor)}>
-               {section.title || (isWarn ? 'Warning' : 'Quick Insight')}
-             </h3>
+            {Icon && <Icon className={cn("w-5 h-5", iconColor)} />}
+            <h3 className={cn("text-[1.15rem] font-bold tracking-tight", titleColor)}>
+              {section.title || (isWarn ? 'Warning' : 'Quick Insight')}
+            </h3>
           </div>
           <div className="w-full">
             {renderMarkdownBody(section.body, isDark, section.kind)}
@@ -349,7 +362,7 @@ function SectionContent({ section, isDark, isLast, index }: { section: SectionBl
           </div>
         </div>
       )}
-      
+
       {!section.title && Icon && section.kind !== "default" && (
         <div className="mb-1.5">
           <Icon className={cn("w-5 h-5", iconColor)} />
@@ -371,20 +384,26 @@ export function PremiumTutorMarkdownRenderer({ content, className }: PremiumTuto
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  const sections = useMemo(() => splitIntoSections(content), [content]);
+  const normalizedStr = useMemo(() => {
+    if (content == null) return "";
+    return String(content);
+  }, [content]);
 
-  if (!content.trim()) return null;
+  const sections = useMemo(() => splitIntoSections(normalizedStr), [normalizedStr]);
+
+  if (!normalizedStr.trim()) return null;
 
   return (
     <article className={cn(
-      "w-full md:w-[95%] lg:w-[90%] max-w-[1500px] mx-auto premium-tutor-markdown relative", 
+      "w-full md:w-[95%] lg:w-[90%] max-w-[1500px] mx-auto premium-tutor-markdown relative",
       "bg-[#0a0f1c]/90 backdrop-blur-2xl border border-white/5",
       "rounded-[24px] shadow-[0_8px_40px_rgba(0,0,0,0.2)]",
       "pt-3 pb-4 px-4 sm:pt-4 sm:pb-5 sm:px-5 md:pt-4 md:pb-5 md:px-8",
       className
     )}>
 
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .premium-tutor-markdown .katex-display {
           margin: 1.2rem 0;
           padding: 1.25rem 1rem;
@@ -474,10 +493,10 @@ export function PremiumTutorMarkdownRenderer({ content, className }: PremiumTuto
 
       <div className="flex flex-col w-full">
         {sections.map((section, index) => (
-          <SectionContent 
-            key={section.id} 
-            section={section} 
-            isDark={isDark} 
+          <SectionContent
+            key={section.id}
+            section={section}
+            isDark={isDark}
             isLast={index === sections.length - 1}
             index={index}
           />

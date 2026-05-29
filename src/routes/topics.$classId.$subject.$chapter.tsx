@@ -82,10 +82,10 @@ function TopicsPage() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.04 }}
-            className="glass rounded-2xl p-5 flex items-center justify-between gap-4 hover:neon-border transition-shadow"
+            className="bg-card border border-border rounded-2xl p-5 flex items-center justify-between gap-4 hover:border-primary/50 transition-all shadow-sm hover:shadow-md"
           >
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--neon-purple)]/40 to-[var(--neon-cyan)]/30 flex items-center justify-center font-mono text-sm">
+              <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center font-mono text-sm text-primary font-bold">
                 {String(i + 1).padStart(2, "0")}
               </div>
 
@@ -108,9 +108,9 @@ function TopicsPage() {
                       to: topic.simulationRoute,
                     })
                   }
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 text-white text-sm font-medium border border-white/5 hover:bg-slate-700 transition-shadow"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-secondary text-foreground text-sm font-bold border border-border hover:bg-secondary/80 transition-all"
                 >
-                  <Play className="w-4 h-4" /> Lab
+                  <Play className="w-4 h-4 text-primary" /> Lab
                 </motion.button>
               ) : null}
 
@@ -118,7 +118,7 @@ function TopicsPage() {
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={() => handleGenerateSimulation(topic)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white text-sm font-medium hover:glow-purple transition-shadow shadow-lg shadow-indigo-500/20"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-sm hover:scale-105 transition-all"
               >
                 <Sparkles className="w-4 h-4" /> Generate Simulation
               </motion.button>
