@@ -9,6 +9,7 @@ export interface AssetDefinition {
   category: string;
   tags: string[];
   spawnType: 'circle' | 'rectangle' | 'triangle';
+  texture?: string;         // Optional SVG/image asset texture path
   spawnConfig: {
     radius?: number;
     width?: number;
@@ -21,9 +22,84 @@ export interface AssetDefinition {
     isStatic?: boolean;
     cornerRadius?: number;
   };
+  celestialConfig?: {
+    type?: 'star' | 'planet' | 'moon' | 'satellite' | 'asteroid';
+
+    isGravitySource?: boolean;
+    affectedByGravity?: boolean;
+
+    mass?: number;
+    radius?: number;
+
+    gravityStrength?: number;
+    influenceRadius?: number;
+
+    density?: number;
+
+    orbitalDefaults?: {
+      autoOrbit?: boolean;
+      preferredOrbitRadius?: number;
+      preferredDirection?: 'clockwise' | 'counterclockwise';
+      initialVelocityMultiplier?: number;
+    };
+
+    rendering?: {
+      glow?: boolean;
+      atmosphere?: boolean;
+      orbitTrail?: boolean;
+    };
+  };
 }
 
-export const assetsRegistry: Record<string, AssetDefinition[]> = {
+export const STAR_PROFILE = {
+  type: 'star' as const,
+  isGravitySource: true,
+  affectedByGravity: false,
+  mass: 5000,
+  gravityStrength: 1.2,
+  influenceRadius: 3000,
+  rendering: { glow: true, atmosphere: true, orbitTrail: false }
+};
+
+export const PLANET_PROFILE = {
+  type: 'planet' as const,
+  isGravitySource: true,
+  affectedByGravity: true,
+  mass: 1000,
+  gravityStrength: 0.8,
+  rendering: { glow: false, atmosphere: true, orbitTrail: true }
+};
+
+export const MOON_PROFILE = {
+  type: 'moon' as const,
+  isGravitySource: true,
+  affectedByGravity: true,
+  mass: 150,
+  gravityStrength: 0.4,
+  orbitalDefaults: { autoOrbit: true },
+  rendering: { glow: false, atmosphere: false, orbitTrail: true }
+};
+
+export const SATELLITE_PROFILE = {
+  type: 'satellite' as const,
+  affectedByGravity: true,
+  isGravitySource: false,
+  mass: 10,
+  orbitalDefaults: { autoOrbit: true },
+  rendering: { glow: false, atmosphere: false, orbitTrail: true }
+};
+
+export const ASTEROID_PROFILE = {
+  type: 'asteroid' as const,
+  affectedByGravity: true,
+  isGravitySource: false,
+  mass: 5,
+  orbitalDefaults: { autoOrbit: true },
+  rendering: { glow: false, atmosphere: false, orbitTrail: true }
+};
+
+
+const baseRegistry: Record<string, AssetDefinition[]> = {
   Shapes: [
     {
       id: 'ball-small',
@@ -205,5 +281,173 @@ export const assetsRegistry: Record<string, AssetDefinition[]> = {
       spawnType: 'circle',
       spawnConfig: { radius: 16, density: 0.001, restitution: 0.6, friction: 0.1, fillColor: 0xeab308, strokeColor: 0xfde047 },
     },
-  ],
+  ]
 };
+
+// Dynamically load SVGs from root svgs/ folder
+const svgModules = import.meta.glob('../svgs/**/*.svg', { eager: true, import: 'default' }) as Record<string, string>;
+
+// Helper to capitalize words
+function capitalize(str: string): string {
+  return str.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+// Copy baseRegistry to exportable assetsRegistry
+export const assetsRegistry: Record<string, AssetDefinition[]> = { ...baseRegistry };
+
+// Process the glob files and dynamically populate categories
+Object.entries(svgModules).forEach(([filePath, url]) => {
+  // Extract category and name from path: "../../svgs/planets/earth.svg"
+  const match = filePath.match(/\/svgs\/([^/]+)\/([^/]+)\.svg$/);
+  if (!match) return;
+
+  const rawCategory = match[1];
+  const rawName = match[2];
+
+  // Capitalize category name (e.g. "planets" -> "Planets")
+  const category = capitalize(rawCategory);
+
+  // Strip common trailing "_svg" or "-svg" suffixes and format clean item name
+  const cleanName = rawName.replace(/[_-]svg$/i, '');
+  const name = capitalize(cleanName.replace(/[_-]+/g, ' '));
+  const id = cleanName.toLowerCase();
+
+  // Map appropriate premium emojis based on category or name
+  let emoji = '📦';
+  const nameLower = name.toLowerCase();
+  const catLower = category.toLowerCase();
+
+  if (catLower.includes('planet')) {
+    if (nameLower.includes('earth')) emoji = '🌍';
+    else if (nameLower.includes('mars')) emoji = '🔴';
+    else if (nameLower.includes('jupiter')) emoji = '🪐';
+    else if (nameLower.includes('saturn')) emoji = '🪐';
+    else if (nameLower.includes('mercury')) emoji = '🌑';
+    else if (nameLower.includes('venus')) emoji = '🟡';
+    else if (nameLower.includes('neptune')) emoji = '🔵';
+    else if (nameLower.includes('uranus')) emoji = '💎';
+    else if (nameLower.includes('sun')) emoji = '☀️';
+    else if (nameLower.includes('moon')) emoji = '🌙';
+    else emoji = '🪐';
+  } else if (catLower.includes('vehicle')) {
+    if (nameLower.includes('car')) emoji = '🏎️';
+    else if (nameLower.includes('bus')) emoji = '🚌';
+    else if (nameLower.includes('truck')) emoji = '🚚';
+    else if (nameLower.includes('train')) emoji = '🚊';
+    else if (nameLower.includes('rocket')) emoji = '🚀';
+    else emoji = '🚗';
+  } else if (catLower.includes('animal')) {
+    if (nameLower.includes('tiger') || nameLower.includes('lion')) emoji = '🦁';
+    else if (nameLower.includes('bear')) emoji = '🐻';
+    else if (nameLower.includes('cat')) emoji = '🐱';
+    else if (nameLower.includes('dog')) emoji = '🐶';
+    else if (nameLower.includes('bird')) emoji = '🐦';
+    else if (nameLower.includes('frog')) emoji = '🐸';
+    else emoji = '🦁';
+  } else if (catLower.includes('food')) {
+    emoji = '🍎';
+  } else if (catLower.includes('instrument') || catLower.includes('music')) {
+    emoji = '🎸';
+  } else if (catLower.includes('weapon')) {
+    emoji = '⚔️';
+  } else {
+    emoji = '🎨';
+  }
+
+  // Smart shape matching based on naming conventions and category
+  const isCelestial = catLower.includes('planet') ||
+    nameLower.includes('planet') ||
+    nameLower.includes('earth') ||
+    nameLower.includes('mars') ||
+    nameLower.includes('jupiter') ||
+    nameLower.includes('saturn') ||
+    nameLower.includes('mercury') ||
+    nameLower.includes('venus') ||
+    nameLower.includes('neptune') ||
+    nameLower.includes('uranus') ||
+    nameLower.includes('sun') ||
+    nameLower.includes('star') ||
+    nameLower.includes('moon') ||
+    nameLower.includes('luna') ||
+    nameLower.includes('satellite') ||
+    nameLower.includes('probe') ||
+    nameLower.includes('iss') ||
+    nameLower.includes('sputnik') ||
+    nameLower.includes('hubble') ||
+    nameLower.includes('voyager') ||
+    nameLower.includes('asteroid') ||
+    nameLower.includes('meteor') ||
+    nameLower.includes('comet') ||
+    nameLower.includes('rocket');
+
+  const isCircle = isCelestial ||
+    catLower.includes('planet') ||
+    nameLower.includes('ball') ||
+    nameLower.includes('wheel') ||
+    nameLower.includes('disk') ||
+    nameLower.includes('circle');
+
+  const spawnType = isCircle ? 'circle' : 'rectangle';
+
+  // Config parameters with fine-tuned premium defaults
+  const spawnConfig: any = {
+    density: 0.002,
+    restitution: 0.6,
+    friction: 0.1,
+    fillColor: 0x818cf8,
+    strokeColor: 0xc7d2fe,
+  };
+
+  if (isCircle) {
+    spawnConfig.radius = catLower.includes('planet') || isCelestial
+      ? (nameLower.includes('sun') ? 65 : nameLower.includes('jupiter') ? 55 : nameLower.includes('moon') ? 16 : nameLower.includes('satellite') || nameLower.includes('probe') || nameLower.includes('iss') || nameLower.includes('rocket') ? 14 : 35)
+      : 24;
+  } else {
+    spawnConfig.width = 60;
+    spawnConfig.height = 40;
+    spawnConfig.cornerRadius = 6;
+  }
+
+  let celestialConfig: any = undefined;
+  if (isCelestial) {
+    if (nameLower.includes('sun') || nameLower.includes('star') || nameLower.includes('sol')) {
+      celestialConfig = { ...STAR_PROFILE };
+    } else if (nameLower.includes('moon') || nameLower.includes('luna')) {
+      celestialConfig = { ...MOON_PROFILE };
+    } else if (nameLower.includes('satellite') || nameLower.includes('probe') || nameLower.includes('iss') || nameLower.includes('sputnik') || nameLower.includes('hubble') || nameLower.includes('voyager') || nameLower.includes('rocket')) {
+      celestialConfig = { ...SATELLITE_PROFILE };
+    } else if (nameLower.includes('asteroid') || nameLower.includes('meteor') || nameLower.includes('comet')) {
+      celestialConfig = { ...ASTEROID_PROFILE };
+    } else {
+      celestialConfig = { ...PLANET_PROFILE };
+    }
+
+    celestialConfig = {
+      ...celestialConfig,
+      radius: spawnConfig.radius,
+    };
+  }
+
+  const asset: AssetDefinition = {
+    id,
+    name,
+    emoji,
+    category,
+    tags: [catLower, rawName.toLowerCase(), ...rawName.split(/[_-]/).map((t) => t.toLowerCase())],
+    spawnType,
+    texture: url,
+    spawnConfig,
+    celestialConfig,
+  };
+
+  if (!assetsRegistry[category]) {
+    assetsRegistry[category] = [];
+  }
+
+  // Prevent duplicate definitions to preserve static custom/fine-tuned physics properties
+  const exists = assetsRegistry[category].some((a) => a.id === id);
+  if (!exists) {
+    assetsRegistry[category].push(asset);
+  }
+});
+

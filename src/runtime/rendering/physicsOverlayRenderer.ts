@@ -57,7 +57,7 @@ export function renderPhysicsOverlays(
 
   const vectors: any[] = [];
   const centerOfMass = objects.reduce(
-    (acc, object) => {
+    (acc: { x: number; y: number; mass: number }, object: any) => {
       const mass = Number(object?.physics?.mass ?? 1) || 1;
       const pos = safeVec(object?.physics?.position || object?.position);
       acc.mass += mass;

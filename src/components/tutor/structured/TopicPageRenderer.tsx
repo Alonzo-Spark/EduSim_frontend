@@ -12,10 +12,25 @@ import {
   SuggestedQuestionsSection
 } from "./StructuredSections";
 import { FormulaLabCard } from "./FormulaLabCard";
-import { TutorAnalysisResponse } from "@/services/TutorService";
+interface StructuredTopicData {
+  introduction?: string;
+  definition?: string;
+  keyConcepts?: string[];
+  properties?: string[];
+  formula?: {
+    expression?: string;
+    meaning?: string;
+    variables?: Record<string, string>;
+  };
+  derivation?: string;
+  solvedExample?: string;
+  applications?: string[];
+  summary?: string;
+  suggestedQuestions?: string[];
+}
 
 interface Props {
-  structured: NonNullable<TutorAnalysisResponse["data"]["structured"]>;
+  structured: StructuredTopicData;
 }
 
 export function TopicPageRenderer({ structured }: Props) {

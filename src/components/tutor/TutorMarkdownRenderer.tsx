@@ -3,7 +3,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { BlockMath } from "@/components/math/Katex";
+import { BlockMath, InlineMath } from "@/components/math/Katex";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 import { FormulaCard, parseFormulaBody } from "./FormulaCard";
@@ -526,7 +526,7 @@ function getSectionColorClasses(kind: SectionKind): { border: string; bg: string
 }
 
 function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Density, isDark: boolean) {
-  const components: Components = {
+  const components: Components & { math?: any; inlineMath?: any } = {
     h1: ({ children }) => (
       <h1
         id={slugify(flattenText(children))}
@@ -739,9 +739,9 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
         </code>
       );
     },
-    math: (props: any) => <BlockMath math={props.value || props.children} />,
-    inlineMath: (props: any) => <InlineMath math={props.value || props.children} />,
-    pre: ({ children }) => <div className="my-4 overflow-hidden rounded-2xl border border-border bg-secondary/40 shadow-md">{children}</div>,
+    math: (props: any) => <BlockMath math={String(props.value || props.children || "").trim()} />,
+    inlineMath: (props: any) => <InlineMath math={String(props.value || props.children || "").trim()} />,
+    pre: ({ children }: any) => <div className="my-4 overflow-hidden rounded-2xl border border-border bg-secondary/40 shadow-md">{children}</div>,
   };
 
   let preprocessedBody = body;

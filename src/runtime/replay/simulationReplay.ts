@@ -140,12 +140,12 @@ export class SimulationReplay {
       };
     });
 
-    const kinetic = entities.reduce((total, entity) => {
+    const kinetic = entities.reduce((total: number, entity: any) => {
       const speed = Math.hypot(entity.velocity.x, entity.velocity.y);
       return total + 0.5 * entity.mass! * speed * speed;
     }, 0);
 
-    const potential = entities.reduce((total, entity) => {
+    const potential = entities.reduce((total: number, entity: any) => {
       return total + entity.mass! * 9.81 * Math.max(0, 10 - entity.position.y);
     }, 0);
 

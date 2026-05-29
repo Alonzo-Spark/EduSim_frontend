@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip 
 } from "recharts";
+import { simulationGenerator } from "@/services/simulationGenerator";
 
 // ============================================================================
 // ROUTE REGISTRATION
@@ -221,7 +222,7 @@ export function FuturisticWorkspaceContent({ initialTitle }: { initialTitle?: st
       }
     } catch (error) {
       setIsGenerating(false);
-      toast.error(`Generation failed: ${error.message}`, { id: "sim-load" });
+      toast.error(`Generation failed: ${(error as any).message}`, { id: "sim-load" });
     }
   };
 

@@ -61,7 +61,7 @@ function useImageStatus(url?: string) {
 }
 
 function getResolvedAssetPath(obj: any) {
-  const match = resolveBestAsset(obj?.asset?.id || obj?.type || obj?.name || obj?.id, obj?.asset?.category || obj?.type);
+  const match = resolveBestAsset(obj?.asset?.id || obj?.type || obj?.name || obj?.id, obj?.asset?.category || obj?.type) as any;
   return match?.path || obj?.asset?.filePath || obj?.props?.assetUrl || obj?.assetUrl || obj?.asset?.path || "";
 }
 
@@ -351,7 +351,7 @@ export const DynamicSimulationRenderer: React.FC<DynamicSimulationRendererProps>
 
         controller.transitionTo(RuntimeState.INITIALIZING_RUNTIME);
 
-        const engine = new PhysicsEngine(runtimeDsl);
+        const engine = new PhysicsEngine(runtimeDsl as any);
         const renderer = new SimulationRenderer(canvasRef.current!);
 
         engineRef.current = engine;

@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
+
+const ResizablePanelGroup = PanelGroup as any;
+const ResizablePanel = Panel as any;
+const ResizablePanelResizeHandle = PanelResizeHandle as any;
 import {
   ArrowUpRight,
   BadgeInfo,
@@ -109,8 +113,8 @@ export function PhysicsOverlay({ runtime, snapshot, dsl, onPresetSelect, onAddOb
 
   return (
     <div className={`absolute inset-0 pointer-events-none ${className}`}>
-      <PanelGroup direction="horizontal" className="h-full w-full">
-        <Panel defaultSize={70} minSize={52} className="pointer-events-none">
+      <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+        <ResizablePanel defaultSize={70} minSize={52} className="pointer-events-none">
           <div className="absolute left-4 top-4 z-20 flex max-w-[calc(100%-1rem)] flex-wrap gap-2 pointer-events-auto">
             <StatChip label="Speed" value={`${speed}x`} accent="violet" />
             <StatChip label="Time" value={`${snapshot?.time?.toFixed?.(2) ?? "0.00"}s`} accent="cyan" />
@@ -161,11 +165,11 @@ export function PhysicsOverlay({ runtime, snapshot, dsl, onPresetSelect, onAddOb
               </div>
             </div>
           </div>
-        </Panel>
+        </ResizablePanel>
 
-        <PanelResizeHandle className="pointer-events-auto relative w-2 bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-white/10 hover:after:bg-cyan-300/50" />
+        <ResizablePanelResizeHandle className="pointer-events-auto relative w-2 bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-white/10 hover:after:bg-cyan-300/50" />
 
-        <Panel defaultSize={30} minSize={22} className="pointer-events-none">
+        <ResizablePanel defaultSize={30} minSize={22} className="pointer-events-none">
           <AnimatePresence>
             {showInspector && (
               <motion.div
@@ -249,8 +253,8 @@ export function PhysicsOverlay({ runtime, snapshot, dsl, onPresetSelect, onAddOb
           >
             {showInspector ? <span className="inline-flex items-center gap-2"><Minus className="h-3.5 w-3.5" /> Collapse</span> : <span className="inline-flex items-center gap-2"><Box className="h-3.5 w-3.5" /> Open Inspector</span>}
           </button>
-        </Panel>
-      </PanelGroup>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       <AnimatePresence>
         {showTimeline && (

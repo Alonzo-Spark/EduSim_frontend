@@ -142,7 +142,7 @@ export function GlobalSearch() {
             setIsOpen(false);
             const topic = query.trim();
             setQuery("");
-            router.navigate({ to: "/tutor", search: { topic }, state: { prompt: `Explain ${topic}` } });
+            (router as any).navigate({ to: "/tutor", search: { topic }, state: { prompt: `Explain ${topic}` } });
           }
           break;
         case "Escape":
@@ -211,7 +211,7 @@ export function GlobalSearch() {
 
     // Also include a helpful prompt when possible
     const prompt = item.topic ? `Explain ${item.topic}` : undefined;
-    router.navigate({ to: "/tutor", search: params, state: prompt ? { prompt } : undefined });
+    (router as any).navigate({ to: "/tutor", search: params, state: prompt ? { prompt } : undefined });
   };
 
   const groupedSuggestions = TYPE_ORDER.map((type) => ({

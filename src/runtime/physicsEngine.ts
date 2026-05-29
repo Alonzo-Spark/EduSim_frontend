@@ -40,11 +40,11 @@ function getShapeRadius(object: SimulationObject) {
 }
 
 function getObjectPosition(object: SimulationObject) {
-  return normalizeVector(object.physics?.position, object.position || { x: 0, y: 0 });
+  return normalizeVector(object.physics?.position, (object as any).position || { x: 0, y: 0 });
 }
 
 function getObjectVelocity(object: SimulationObject) {
-  return normalizeVector(object.physics?.velocity, object.velocity || { x: 0, y: 0 });
+  return normalizeVector(object.physics?.velocity, (object as any).velocity || { x: 0, y: 0 });
 }
 
 function getObjectMass(object: SimulationObject) {

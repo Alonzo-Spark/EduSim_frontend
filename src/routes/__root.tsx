@@ -130,13 +130,13 @@ function RootComponent() {
     if (isRootRoute) {
       navigate({
         to: isAuthenticated ? "/dashboard" : "/login",
-        search: isAuthenticated ? undefined : EMPTY_LOGIN_SEARCH,
+        search: (isAuthenticated ? undefined : EMPTY_LOGIN_SEARCH) as any,
       });
       return;
     }
 
     if (!isAuthenticated && requiresAuth) {
-      navigate({ to: "/login", search: EMPTY_LOGIN_SEARCH });
+      navigate({ to: "/login", search: EMPTY_LOGIN_SEARCH as any });
     } else if (isAuthenticated && isAuthPage) {
       navigate({ to: "/dashboard" });
     }

@@ -101,7 +101,7 @@ function Signup() {
     };
   }, [confirmPassword, email, mobileNumber, name, password, termsAccepted]);
 
-  const isPasswordValid = passwordChecks.length && passwordChecks.uppercase && passwordChecks.lowercase && passwordChecks.number && passwordChecks.special;
+  const isPasswordValid = (passwordChecks as any).length && passwordChecks.uppercase && passwordChecks.lowercase && passwordChecks.number && passwordChecks.special;
   const isFormValid = passwordChecks.name && passwordChecks.email && passwordChecks.mobile && isPasswordValid && passwordChecks.confirm && passwordChecks.terms;
 
   const showError = (field: FieldName, valid: boolean) => (touched[field] || submitted) && !valid;
@@ -142,14 +142,14 @@ function Signup() {
 
       if (success) {
         toast.success("Account created successfully");
-        window.setTimeout(() => navigate({ to: "/login" }), 2000);
+        window.setTimeout(() => navigate({ to: "/login" } as any), 2000);
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const strengthScore = [passwordChecks.length, passwordChecks.uppercase, passwordChecks.lowercase, passwordChecks.number, passwordChecks.special].filter(Boolean).length;
+  const strengthScore = [(passwordChecks as any).length, passwordChecks.uppercase, passwordChecks.lowercase, passwordChecks.number, passwordChecks.special].filter(Boolean).length;
   const strength = strengthScore <= 2 ? { label: "Weak", width: "33%", color: "bg-red-500" } : strengthScore <= 4 ? { label: "Medium", width: "66%", color: "bg-amber-400" } : { label: "Strong", width: "100%", color: "bg-green-500" };
 
   const fieldClass = (valid: boolean, error: boolean) =>
@@ -318,7 +318,7 @@ function Signup() {
 
           <div className="text-center pt-4 text-xs font-medium">
             <span className="text-muted-foreground">Already have an account? </span>
-            <Link to="/login" className="text-primary hover:underline transition-colors font-bold">Log in</Link>
+            <Link to="/login" search={{ verify_token: undefined, reset_token: undefined }} className="text-primary hover:underline transition-colors font-bold">Log in</Link>
           </div>
         </div>
       </div>

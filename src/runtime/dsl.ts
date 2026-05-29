@@ -31,6 +31,8 @@ export interface ObjectVisual {
   color: string;
   opacity: number;
   trail: boolean;
+  showVelocity?: boolean;
+  showForces?: boolean;
 }
 
 export interface ObjectShape {
@@ -54,6 +56,7 @@ export interface SimulationObject {
   shape: ObjectShape;
   material: ObjectMaterial;
   trail?: Vector2[];
+  interactions?: any[];
 }
 
 export interface SimulationInteraction {

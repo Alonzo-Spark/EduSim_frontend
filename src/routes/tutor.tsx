@@ -116,7 +116,7 @@ function TutorPage() {
         <div className="flex w-full items-stretch flex-1 min-w-0">
           <ChatWorkspace
             onSend={handleAnalyze}
-            aiResponse={tutorData?.explanation || tutorData?.ai_explanation || null}
+            aiResponse={(tutorData as any)?.explanation || (tutorData as any)?.ai_explanation || null}
             loading={isLoading || topicLoading}
             initialPrompt={
               searchParams.prompt ||

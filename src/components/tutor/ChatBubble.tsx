@@ -72,7 +72,7 @@ export function ChatBubble({ content, role, timestamp, topicTitle, onCopy, onReg
             {isAi ? (
               <TutorMarkdownRenderer
                 content={mainContent}
-                density="comfortable"
+                density={"regular" as const}
                 className={mounted ? "" : ""}
               />
             ) : (
@@ -126,7 +126,6 @@ export function ChatBubble({ content, role, timestamp, topicTitle, onCopy, onReg
         )}
 
         <AnimatePresence>
-          {isAi && console.log("[TutorOutputPanel] showFormulaLab", formulas.length)}
           {isAi && formulas.some((f) => (f.rawFormula || f.raw) === activeFormulaId) && (
             <motion.div
               initial={{ opacity: 0, height: 0, marginTop: 0 }}

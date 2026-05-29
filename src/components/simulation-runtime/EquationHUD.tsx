@@ -83,7 +83,7 @@ export function EquationHUD({ snapshot, visible = true }: EquationHUDProps) {
   const rows = useMemo<EquationRow[]>(() => {
     const objects = Array.isArray(snapshot?.dsl?.objects) ? snapshot.dsl.objects : [];
     const first = objects[0] || {};
-    const entityRows = objects.slice(0, 4).map((object, index) => {
+    const entityRows = objects.slice(0, 4).map((object: any, index: number) => {
       const physics = getEntityPhysics(object);
       const speed = Math.hypot(safeNum(physics.velocity.x, 0), safeNum(physics.velocity.y, 0));
       const ke = 0.5 * physics.mass * speed * speed;
@@ -104,9 +104,9 @@ export function EquationHUD({ snapshot, visible = true }: EquationHUDProps) {
     const totalMomentum = getTotalMomentum(objects);
     const totalKineticEnergy = getTotalKineticEnergy(objects);
     const centerOfMass = getCenterOfMass(objects);
-    const totalMass = objects.reduce((total, object) => total + getEntityPhysics(object).mass, 0);
+    const totalMass = objects.reduce((total: number, object: any) => total + getEntityPhysics(object).mass, 0);
     const momentumVector = objects.reduce(
-      (acc, object) => {
+      (acc: { x: number; y: number }, object: any) => {
         const physics = getEntityPhysics(object);
         acc.x += physics.mass * safeNum(physics.velocity.x, 0);
         acc.y += physics.mass * safeNum(physics.velocity.y, 0);
@@ -121,7 +121,7 @@ export function EquationHUD({ snapshot, visible = true }: EquationHUDProps) {
         title: "Total Momentum",
         formula: "p_total = Σ(mv)",
         substitution: objects.length > 0
-          ? `p_x = ${objects.slice(0, 4).map((object, index) => {
+          ? `p_x = ${objects.slice(0, 4).map((object: any, index: number) => {
               const physics = getEntityPhysics(object);
               const vx = safeNum(physics.velocity.x, 0);
               return `(${physics.mass.toFixed(0)})(${vx.toFixed(0)})${index < Math.min(objects.length, 4) - 1 ? " + " : ""}`;

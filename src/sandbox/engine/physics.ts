@@ -16,7 +16,9 @@ export class PhysicsEngine {
 
   constructor() {
     this.engine = Matter.Engine.create({
-      gravity: { x: 0, y: 1, scale: 0.001 },
+      // gravity scale is 0: GravitySystem owns all gravity — prevents world gravity
+      // from leaking into orbital mode and disrupting circular orbits
+      gravity: { x: 0, y: 1, scale: 0 },
     });
   }
 
@@ -98,6 +100,7 @@ export class PhysicsEngine {
 
   reset(): void {
     this.clear(false);
-    this.setGravity(1, 0);
+    // NOTE: Do NOT restore gravity here — GravitySystem owns gravity state
+    // and will apply the correct mode (linear or radial) on the next step.
   }
 }

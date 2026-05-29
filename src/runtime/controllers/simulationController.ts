@@ -6,6 +6,7 @@ type RuntimeLike = {
   setSpeed?: (s: number) => void;
   getState?: () => any;
   destroy?: () => void;
+  setTime?: (t: number) => void;
 };
 
 import runtimeEvents from "@/runtime/events/runtimeEvents";

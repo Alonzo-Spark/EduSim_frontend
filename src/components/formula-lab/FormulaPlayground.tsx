@@ -103,10 +103,10 @@ const FormulaPlayground: React.FC<{
       <div className="rounded-[1.5rem] border border-white/10 bg-gradient-to-br from-violet-500/10 via-white/5 to-cyan-500/10 p-5 shadow-inner">
         <div className="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">Result</div>
         <div className="mt-2 text-2xl font-bold text-foreground">
-          {result?.status === "ok" ? `${Number(result.value).toFixed(2)} ${resultUnit}` : result?.message || "Missing variable"}
+          {(result as any)?.status === "ok" ? `${Number((result as any).value).toFixed(2)} ${resultUnit}` : (result as any)?.message || "Missing variable"}
         </div>
         <div className="mt-1 text-sm text-muted-foreground">
-          {result?.status === "ok" ? `${resultSymbol} = ${anatomy.find((row) => row.symbol === resultSymbol)?.meaning || title}` : "Adjust the controls to calculate the formula."}
+          {(result as any)?.status === "ok" ? `${resultSymbol} = ${anatomy.find((row) => row.symbol === resultSymbol)?.meaning || title}` : "Adjust the controls to calculate the formula."}
         </div>
       </div>
     </div>

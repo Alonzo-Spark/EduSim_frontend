@@ -45,7 +45,7 @@ function Login() {
     resetPassword, 
     verifyEmail,
     isLoading 
-  } = useAuthStore();
+  } = (useAuthStore as any)();
 
   // Tab State: "email" | "otp"
   const [activeTab, setActiveTab] = useState<"email" | "otp">("email");

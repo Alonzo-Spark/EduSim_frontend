@@ -1,11 +1,22 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X } from 'lucide-react';
+import {
+  Sparkles, X, ChevronLeft, ChevronRight, BookOpen, Settings, Play, Info, Search, Minimize2, Maximize2, Pin, PinOff,
+  Zap, TrendingUp, Lightbulb, Eye, LineChart, Cpu, ChevronUp, ChevronDown
+} from 'lucide-react';
+import { useAssetStore } from '../../store/assetStore';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import { getAllExamples } from '../examples/registry/exampleRegistry';
+import { loadExample } from '../examples/loader/loadExample';
 import type { SandboxRuntime } from '../engine/runtime';
 import type { RuntimeObject } from '../types/RuntimeObject';
 import type { Body } from 'matter-js';
 import { ConstraintRegistry } from '../constraints/constraintRegistry';
 import type { ConstraintRenderer } from '../constraints/constraintRenderer';
+import type { GravityRenderer } from '../gravity/gravityRenderer';
 import { ObservableEngine } from '../observables/observableEngine';
 import { RuntimeStore } from '../state/runtimeStore';
 import { PropertyController } from '../properties/propertyController';
@@ -14,6 +25,7 @@ import { RuntimeObserver } from '../../ai/runtimeObserver';
 import { useExplanationEngine } from '../../ai/explanationEngine';
 import { FloatingAssetPanel } from '../../components/AssetLibrary/FloatingAssetPanel';
 import { physicsEventBus } from '../../ai/physicsEventBus';
+import { getApiUrl } from '../../config/api';
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -70,8 +82,8 @@ async function buildScene(
   // Remove non-graphics children, while preserving constraint and observable overlays.
   for (let i = vp.children.length - 1; i >= 0; i--) {
     const child = vp.children[i];
-    const meta = child as { _isConstraintOverlay?: boolean; _isObservableOverlay?: boolean };
-    if (meta._isConstraintOverlay || meta._isObservableOverlay) continue;
+    const meta = child as { _isConstraintOverlay?: boolean; _isObservableOverlay?: boolean; _isGravityOverlay?: boolean };
+    if (meta._isConstraintOverlay || meta._isObservableOverlay || meta._isGravityOverlay) continue;
     vp.removeChildAt(i);
   }
 
@@ -85,6 +97,7 @@ async function buildScene(
     vp.addChild(obj.display);
     rt.physics.addBodies(obj.body);
     rt.sync.register(obj.id, obj.body, obj.display);
+    store.addObject(obj);
   };
 
   const addDynamic = (obj: RuntimeObject) => {
@@ -103,22 +116,163 @@ async function buildScene(
   // ── Static boundaries ─────────────────────────────────────────────────────
   addStatic(createObject({
     id: 'ground', type: 'rectangle',
-    x: W / 2, y: H - 40, width: W, height: 28,
+    x: W / 2, y: H - 40, width: 5000, height: 28,
     isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1,
   }));
   addStatic(createObject({
     id: 'wall-l', type: 'rectangle',
-    x: -4, y: H / 2, width: 16, height: H * 2,
-    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1,
+    x: -8, y: H / 2, width: 16, height: 5000,
+    isStatic: true, alpha: 0, strokeWidth: 0,
   }));
   addStatic(createObject({
     id: 'wall-r', type: 'rectangle',
-    x: W + 4, y: H / 2, width: 16, height: H * 2,
-    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1,
+    x: W + 8, y: H / 2, width: 16, height: 5000,
+    isStatic: true, alpha: 0, strokeWidth: 0,
   }));
 
   return dynamic;
 }
+
+// ─── AI Response Parser & UI Components ───────────────────────────────────────
+
+const parseExplanationText = (text: string) => {
+  const sections: Record<string, string> = {};
+  if (!text) return sections;
+
+  // Standard split by markdown headers
+  const parts = text.split(/(?=###\s*✦?\s*)/gi);
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+
+    // Match ### ✦ NAME or ### NAME
+    const match = trimmed.match(/^###\s*✦?\s*([^\n]+)/i);
+    if (match) {
+      const title = match[1].trim().toUpperCase();
+      const content = trimmed.substring(match[0].length).trim();
+      sections[title] = content;
+    }
+  }
+  return sections;
+};
+
+interface StepCardProps {
+  num: number;
+  title: string;
+  description: string;
+  type: 'blue' | 'green' | 'orange' | 'purple';
+}
+
+const StepCard: React.FC<StepCardProps> = ({ num, title, description, type }) => {
+  const isBlue = type === 'blue';
+  const isGreen = type === 'green';
+  const isOrange = type === 'orange';
+
+  let glowColor = 'rgba(168, 85, 247, 0.35)';
+  let iconBg = 'rgba(168, 85, 247, 0.2)';
+  let iconColor = '#c084fc';
+
+  if (isBlue) {
+    glowColor = 'rgba(14, 165, 233, 0.35)';
+    iconBg = 'rgba(14, 165, 233, 0.2)';
+    iconColor = '#38bdf8';
+  } else if (isGreen) {
+    glowColor = 'rgba(16, 185, 129, 0.35)';
+    iconBg = 'rgba(16, 185, 129, 0.2)';
+    iconColor = '#34d399';
+  } else if (isOrange) {
+    glowColor = 'rgba(245, 158, 11, 0.35)';
+    iconBg = 'rgba(245, 158, 11, 0.2)';
+    iconColor = '#fbbf24';
+  }
+
+  const formattedTitle = num === 1 ? '1. What Happened'
+    : num === 2 ? '2. What Changed'
+      : num === 3 ? '3. Simple Why'
+        : '4. What to Notice';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      style={{
+        display: 'flex',
+        gap: 16,
+        padding: '12px 0',
+        alignItems: 'flex-start',
+        borderBottom: num < 4 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+      }}
+    >
+      <div style={{
+        width: 38,
+        height: 38,
+        borderRadius: '50%',
+        background: iconBg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: `0 0 12px ${glowColor}`,
+        flexShrink: 0,
+        marginTop: 1,
+        border: `1px solid ${iconColor}33`
+      }}>
+        {isBlue && <Sparkles size={18} color={iconColor} />}
+        {isGreen && (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="2" fill={iconColor} />
+            <line x1="12" y1="12" x2="6" y2="6" />
+            <path d="M6 10V6H10" />
+            <line x1="12" y1="12" x2="18" y2="6" />
+            <path d="M14 6H18V10" />
+            <line x1="12" y1="12" x2="6" y2="18" />
+            <path d="M6 14V18H10" />
+            <line x1="12" y1="12" x2="18" y2="18" />
+            <path d="M14 18H18V14" />
+          </svg>
+        )}
+        {isOrange && <Lightbulb size={18} color={iconColor} />}
+        {type === 'purple' && <Eye size={18} color={iconColor} />}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+        <span style={{
+          fontSize: 13.5,
+          fontWeight: 700,
+          color: iconColor,
+          fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif"
+        }}>
+          {formattedTitle}
+        </span>
+        <div style={{
+          fontSize: 12,
+          color: '#cbd5e1',
+          lineHeight: 1.55,
+          fontWeight: 500
+        }}>
+          <ReactMarkdown
+            remarkPlugins={[remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+            components={{
+              p: ({ node, ...props }: any) => <p style={{ margin: 0 }} {...props} />,
+              code: ({ node, inline, ...props }: any) => (
+                <code style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  padding: '2px 4px',
+                  borderRadius: 4,
+                  fontSize: '0.85em',
+                  fontFamily: 'monospace',
+                  color: '#e9d5ff'
+                }} {...props} />
+              )
+            }}
+          >
+            {description}
+          </ReactMarkdown>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -129,53 +283,225 @@ export const SandboxCanvas: React.FC = () => {
   const interactionRef = useRef<InteractionRefs | null>(null);
   const constraintRegRef = useRef<ConstraintRegistry | null>(null);
   const constraintRenRef = useRef<ConstraintRenderer | null>(null);
+  const gravityRenRef = useRef<GravityRenderer | null>(null);
   const observableEngineRef = useRef<ObservableEngine | null>(null);
   const dynRef = useRef<Body[]>([]);
 
   const [running, setRunning] = useState(false);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [ready, setReady] = useState(false);
   const [bodyCount, setBodyCount] = useState(0);
   const [gravity, setGravity] = useState<GravityPreset>('earth');
   const [speed, setSpeed] = useState(1);
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
   const [tutorEnabled, setTutorEnabled] = useState(true);
+  const [dynamicExplanationEnabled, setDynamicExplanationEnabled] = useState(false);
+  const [tutorWidth, setTutorWidth] = useState(380);
+  const [tutorHeight, setTutorHeight] = useState(500);
+  const [tutorMinimized, setTutorMinimized] = useState(false);
+  const [tutorPinned, setTutorPinned] = useState(false);
+  const [tutorMaximized, setTutorMaximized] = useState(false);
+  const [activeTab, setActiveTab] = useState<'explanation' | 'effects' | 'formula'>('explanation');
+
+  const handleResizeLeft = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = tutorWidth;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const newWidth = Math.max(280, Math.min(800, startWidth + (startX - moveEvent.clientX)));
+      setTutorWidth(newWidth);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  }, [tutorWidth]);
+
+  const handleResizeBottom = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = tutorHeight;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const newHeight = Math.max(200, Math.min(900, startHeight + (moveEvent.clientY - startY)));
+      setTutorHeight(newHeight);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  }, [tutorHeight]);
+
+  const handleResizeBottomLeft = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = tutorWidth;
+    const startHeight = tutorHeight;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const newWidth = Math.max(280, Math.min(800, startWidth + (startX - moveEvent.clientX)));
+      const newHeight = Math.max(200, Math.min(900, startHeight + (moveEvent.clientY - startY)));
+      setTutorWidth(newWidth);
+      setTutorHeight(newHeight);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  }, [tutorWidth, tutorHeight]);
+
+  // Modular Switchable Gravity System states
+  const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
+  const [gConstant, setGConstant] = useState(0.0012);
+  const [radialDebug, setRadialDebug] = useState(true);
+
+  // Textbook Examples Panel States
+  const [activeLeftTab, setActiveLeftTab] = useState<'toolbox' | 'examples'>('toolbox');
+  const [selectedExampleId, setSelectedExampleId] = useState<string | null>(null);
+  const [exampleSearch, setExampleSearch] = useState('');
+
+  // Viewport Camera states
+  const [zoom, setZoom] = useState(1.0);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+
+  const zoomRef = useRef(1.0);
+  const panXRef = useRef(0);
+  const panYRef = useRef(0);
+
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { panXRef.current = panX; }, [panX]);
+  useEffect(() => { panYRef.current = panY; }, [panY]);
+
+  const spacePressedRef = useRef(false);
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        spacePressedRef.current = true;
+        const canvas = runtimeRef.current?.renderer.getApp().canvas as HTMLCanvasElement;
+        if (canvas && canvas.style.cursor === 'default') {
+          canvas.style.cursor = 'grab';
+        }
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        spacePressedRef.current = false;
+        const canvas = runtimeRef.current?.renderer.getApp().canvas as HTMLCanvasElement;
+        if (canvas && canvas.style.cursor === 'grab') {
+          canvas.style.cursor = 'default';
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [showAiPanel, setShowAiPanel] = useState(false);
 
-  const { currentExplanation, queueCount, handleDismiss, setIsHovered, pushExplanation } = useExplanationEngine();
+  const activeExample = selectedExampleId ? getAllExamples().find(ex => ex.id === selectedExampleId) : null;
+  const activeExampleName = activeExample?.title || undefined;
+  const activeExampleDescription = activeExample?.description || undefined;
+
+  const { currentExplanation, queueCount, handleDismiss, setIsHovered, pushExplanation, handleNext, handleClear } = useExplanationEngine(
+    tutorEnabled,
+    gravityMode,
+    activeExampleName,
+    activeExampleDescription
+  );
 
   const handleAiQuery = async () => {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
+
+    // Clear previous AI asset suggestions on every new query
+    useAssetStore.getState().clearSuggestedAssets();
+
     try {
-      const resp = await fetch('/api/tutor/sandbox-query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: aiPrompt })
-      });
+      // ── Fire both calls in parallel ────────────────────────────────────────
+      const [tutorResp, sceneResp] = await Promise.allSettled([
+        // 1. Tutor explanation call — correct endpoint
+        fetch(getApiUrl('/api/tutor/analyze'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: aiPrompt })
+        }),
+        // 2. Scene parser call
+        fetch(getApiUrl('/api/scene/parse'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_input: aiPrompt })
+        }),
+      ]);
 
-      if (!resp.ok) {
-        throw new Error(`Backend error: ${resp.status} ${resp.statusText}`);
-      }
-
-      const json = await resp.json();
-
-      if (json.success && json.data) {
-        const d = json.data;
-        // sandbox-query returns exact shape: title, explanation, formula, effects[], suggestions[]
-        pushExplanation({
-          title: d.title || 'AI Answer',
-          explanation: d.explanation || '',
-          effects: d.effects || [],
-          formula: d.formula || '',
-          suggestions: d.suggestions || []
-        });
+      // ── Handle tutor response ──────────────────────────────────────────────
+      if (tutorResp.status === 'fulfilled') {
+        const resp = tutorResp.value;
+        if (!resp.ok) throw new Error(`Backend error: ${resp.status} ${resp.statusText}`);
+        const json = await resp.json();
+        if (json.success && json.data) {
+          const d = json.data;
+          pushExplanation({
+            title: d.title || 'AI Answer',
+            explanation: d.ai_explanation || d.explanation || '',
+            effects: d.related_concepts?.map((c: string) => `📌 ${c}`) || [],
+            formula: d.formula || '',
+            suggestions: d.concepts || []
+          });
+        } else {
+          throw new Error(json.detail || 'Unknown error from backend');
+        }
       } else {
-        throw new Error(json.detail || 'Unknown error from backend');
+        pushExplanation({
+          title: 'Connection Error',
+          explanation: tutorResp.reason?.message || 'Tutor call failed',
+          effects: ['Ensure the EduSim API is running on port 8000'],
+          formula: '',
+          suggestions: []
+        });
       }
+
+
+      // ── Handle scene parse response ────────────────────────────────────────
+      if (sceneResp.status === 'fulfilled') {
+        try {
+          const sceneJson = await sceneResp.value.json();
+          if (sceneJson.success && sceneJson.data) {
+            const scene = sceneJson.data;
+            const assets: string[] = scene.recommended_assets || [];
+            const topic: string = scene.topic || '';
+            if (assets.length > 0) {
+              useAssetStore.getState().setSuggestedAssets(assets, topic);
+            }
+          }
+        } catch (_) {
+          // Non-critical — scene parse failure doesn't break the tutor UX
+          console.warn('[SceneParser] Failed to parse scene response');
+        }
+      }
+
     } catch (e) {
       pushExplanation({
         title: 'Connection Error',
@@ -202,6 +528,8 @@ export const SandboxCanvas: React.FC = () => {
   const observerRef = useRef<RuntimeObserver | null>(null);
   const [propertyVersion, setPropertyVersion] = useState(0);
   const [telemetryTick, setTelemetryTick] = useState(0);
+  const simTimeRef = useRef(0);
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
 
   // Initialize runtime observer once ready
   useEffect(() => {
@@ -221,64 +549,15 @@ export const SandboxCanvas: React.FC = () => {
     };
   }, [ready]);
 
-  // Newton Second Law HUD DOM refs
-  const hudForceRef = useRef<HTMLSpanElement>(null);
-  const hudMassRef = useRef<HTMLSpanElement>(null);
-  const hudAccRef = useRef<HTMLSpanElement>(null);
-  const hudFormulaRef = useRef<HTMLDivElement>(null);
-
+  // Synchronize pin state with tutor auto-dismiss timer by setting isHovered
   useEffect(() => {
-    let frameId: number;
-    const updateHud = () => {
-      const store = storeRef.current;
-      const controller = propertyControllerRef.current;
-      const obs = observableEngineRef.current;
-      if (selected && store && controller) {
-        const force = controller.getActiveForce(selected.id);
-        const forceMag = Math.hypot(force.x, force.y);
-        const mass = selected.body.mass;
+    setIsHovered(tutorPinned);
+  }, [tutorPinned, setIsHovered]);
 
-        let accMag = 0;
-        if (obs) {
-          const metrics = obs.getObservables(selected.id);
-          if (metrics && metrics.acceleration) {
-            accMag = metrics.acceleration.magnitude;
-          }
-        }
 
-        // Live text updates based directly on the applied force to isolate F = ma physics educationally
-        const forceMagScaled = forceMag * 100;
-        const accMagScaled = forceMagScaled / mass;
-
-        if (hudForceRef.current) {
-          hudForceRef.current.innerText = `${forceMagScaled.toFixed(1)} N`;
-        }
-        if (hudMassRef.current) {
-          hudMassRef.current.innerText = `${mass.toFixed(1)} kg`;
-        }
-        if (hudAccRef.current) {
-          hudAccRef.current.innerText = `${accMagScaled.toFixed(2)} m/s²`;
-        }
-        if (hudFormulaRef.current) {
-          hudFormulaRef.current.innerHTML = `
-            <div style="font-size: 15px; font-weight: 800; color: #fde047; text-shadow: 0 0 10px rgba(253,224,71,0.25);">
-              F = m &middot; a
-            </div>
-            <div style="font-size: 11px; color: #94a3b8; margin-top: 4px; font-family: monospace; font-weight: 600;">
-              ${forceMagScaled.toFixed(1)} N = ${mass.toFixed(1)} kg &times; ${accMagScaled.toFixed(2)} m/s&sup2;
-            </div>
-          `;
-        }
-      }
-      frameId = requestAnimationFrame(updateHud);
-    };
-
-    frameId = requestAnimationFrame(updateHud);
-    return () => cancelAnimationFrame(frameId);
-  }, [selected, propertyVersion]);
 
   // Panel drag-and-drop state
-  type PanelDragType = 'circle' | 'rectangle' | 'pendulum-rope' | 'pivot' | 'spring' | 'rope' | null;
+  type PanelDragType = 'circle' | 'rectangle' | 'pendulum-rope' | 'pivot' | 'spring' | 'rope' | 'sun' | 'planet' | null;
   const panelDragRef = useRef<PanelDragType>(null);          // type being dragged
   const didDragRef = useRef(false);                        // suppresses onClick after a real drag
   const hoveredBodyRef = useRef<Body | null>(null);
@@ -294,7 +573,7 @@ export const SandboxCanvas: React.FC = () => {
     if (!rt || !creg) return;
 
     const allBodies = rt.physics.getWorld().bodies;
-    const sensors = allBodies.filter(b => b.label && b.label.startsWith('sensor-target:'));
+    const sensors = allBodies.filter((b: any) => b.label && b.label.startsWith('sensor-target:'));
 
     for (const sensor of sensors) {
       const dist = Math.hypot(newBody.position.x - sensor.position.x, newBody.position.y - sensor.position.y);
@@ -334,6 +613,81 @@ export const SandboxCanvas: React.FC = () => {
     }
   }, []);
 
+  const stabilizeDraggedCelestial = useCallback(async (body: Body) => {
+    const rt = runtimeRef.current;
+    const store = storeRef.current;
+    const customData = (body as any).customData;
+    if (!rt || !store || !customData?.celestialConfig) return;
+
+    const config = customData.celestialConfig;
+    const virtualMass = customData.mass ?? body.mass;
+    const canvasX = body.position.x;
+    const canvasY = body.position.y;
+
+    const radialGravity = rt.gravitySystem.getRadialGravity();
+    const activeSources = radialGravity.getSources();
+
+    let parentSource = null;
+    let minDist = Infinity;
+
+    for (const src of activeSources) {
+      if (src.id === (body as any).objectId) continue;
+      const dist = Math.hypot(src.position.x - canvasX, src.position.y - canvasY);
+      if (src.mass > virtualMass && dist < minDist) {
+        minDist = dist;
+        parentSource = src;
+      }
+    }
+
+    if (!parentSource) {
+      for (const src of activeSources) {
+        if (src.id === (body as any).objectId) continue;
+        const dist = Math.hypot(src.position.x - canvasX, src.position.y - canvasY);
+        if (dist < minDist) {
+          minDist = dist;
+          parentSource = src;
+        }
+      }
+    }
+
+    if (parentSource) {
+      const parentBody = rt.sync.getPairs().get(parentSource.id)?.body || store.getObject(parentSource.id)?.body;
+      if (parentBody) {
+        customData.parentGravitySource = parentSource.id;
+        console.log(`[Celestial Drag Stabilizer] Parent detected: ${parentSource.id} for dragged body: ${(body as any).objectId}`);
+
+        const parentRadius = parentBody.circleRadius || (parentBody as any).customData?.celestialConfig?.radius || 35;
+        const childRadius = body.circleRadius || config.radius || 14;
+        const minSafeRadius = parentRadius + childRadius + 30;
+
+        let currentRadius = minDist;
+        if (currentRadius < minSafeRadius) {
+          currentRadius = minSafeRadius;
+        }
+
+        const angle = Math.atan2(canvasY - parentBody.position.y, canvasX - parentBody.position.x);
+        const G = radialGravity.getConfig().gravitationalConstant;
+        const softening = radialGravity.getConfig().softeningFactor ?? 100;
+
+        const { OrbitSpawner } = await import('../orbits/orbitSpawner');
+
+        OrbitSpawner.spawnCircularOrbit({
+          centerBody: parentBody,
+          orbitingBody: body,
+          radius: currentRadius,
+          angle: angle,
+          clockwise: config.orbitalDefaults?.preferredDirection !== 'counterclockwise',
+          initialVelocityMultiplier: config.orbitalDefaults?.initialVelocityMultiplier ?? 1.0,
+        }, G, softening);
+
+        console.log(`[Celestial Drag Stabilizer] Orbit re-stabilized around ${parentSource.id} at radius ${currentRadius.toFixed(1)}`);
+      }
+    }
+  }, []);
+
+  const stabilizeDraggedCelestialRef = useRef<((body: Body) => void) | null>(null);
+  stabilizeDraggedCelestialRef.current = stabilizeDraggedCelestial;
+
   // ── Mount ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -341,6 +695,15 @@ export const SandboxCanvas: React.FC = () => {
     if (!el) return;
 
     let alive = true;
+    let canvasEl: HTMLCanvasElement | null = null;
+    let lastSelectTime = 0;
+
+    let handleMouseDown: ((e: MouseEvent) => void) | null = null;
+    let handleMouseMove: ((e: MouseEvent) => void) | null = null;
+    let handleMouseUp: ((e: MouseEvent) => void) | null = null;
+    let handleDoubleClick: ((e: MouseEvent) => void) | null = null;
+    let handleContextMenu: ((e: MouseEvent) => void) | null = null;
+    let handleWheel: ((e: WheelEvent) => void) | null = null;
 
     (async () => {
       try {
@@ -351,6 +714,8 @@ export const SandboxCanvas: React.FC = () => {
           { RuntimeControls },
           { ConstraintRegistry },
           { ConstraintRenderer },
+          { GravityRenderer },
+          Matter,
         ] = await Promise.all([
           import('../engine/runtime'),
           import('../interactions/drag'),
@@ -358,6 +723,8 @@ export const SandboxCanvas: React.FC = () => {
           import('../interactions/controls'),
           import('../constraints/constraintRegistry'),
           import('../constraints/constraintRenderer'),
+          import('../gravity/gravityRenderer'),
+          import('matter-js'),
         ]);
 
         const rt = new SandboxRuntime();
@@ -387,14 +754,180 @@ export const SandboxCanvas: React.FC = () => {
 
         // 2. Interaction systems
         const canvas = rt.renderer.getApp().canvas as HTMLCanvasElement;
+        canvasEl = canvas;
         const drag = new DragController(rt.physics.getEngine(), canvas);
         const selection = new SelectionManager();
         const controls = new RuntimeControls(rt);
         drag.enable();
+
+        let isPanning = false;
+        let startPointerX = 0;
+        let startPointerY = 0;
+        let startPanX = 0;
+        let startPanY = 0;
+        let hasDragged = false;
+        let dragStartedOnCanvas = false;
+
+        handleMouseDown = (e: MouseEvent) => {
+          const isRightClick = e.button === 2;
+          const isMiddleClick = e.button === 1;
+          const isSpaceHeld = spacePressedRef.current;
+
+          dragStartedOnCanvas = true;
+
+          // Track values in case the user starts dragging empty space to pan
+          hasDragged = false;
+          startPointerX = e.clientX;
+          startPointerY = e.clientY;
+          startPanX = panXRef.current;
+          startPanY = panYRef.current;
+
+          if (isRightClick || isMiddleClick || isSpaceHeld) {
+            isPanning = true;
+            canvas.style.cursor = 'grabbing';
+            drag.disable();
+            e.preventDefault();
+          } else if (e.button === 0) {
+            isPanning = false; // Checked dynamically in handleMouseMove to separate empty space drag from asset drag
+
+            const rect = canvas.getBoundingClientRect();
+            const clickX = ((e.clientX - rect.left) / rect.width) * canvas.width;
+            const clickY = ((e.clientY - rect.top) / rect.height) * canvas.height;
+
+            const worldX = (clickX - panXRef.current) / zoomRef.current;
+            const worldY = (clickY - panYRef.current) / zoomRef.current;
+
+            const bodies = Matter.Composite.allBodies(rt.physics.getEngine().world);
+            const clickedBodies = Matter.Query.point(bodies, { x: worldX, y: worldY });
+            const targetBody = clickedBodies.find((b: any) => {
+              const id = (b as any).objectId || b.label;
+              return id && !id.startsWith('ground') && !id.startsWith('wall') && id !== 'boundary';
+            });
+
+            if (targetBody) {
+              const bodyId = (targetBody as any).objectId || targetBody.label;
+              console.log(`[Canvas Direct Click] Selected body synchronously: ${bodyId}`);
+              lastSelectTime = Date.now();
+              drag.enable();
+              selection.select(bodyId);
+            }
+          }
+        };
+
+        handleMouseMove = (e: MouseEvent) => {
+          // If the mouse buttons are released, reset drag origin safely
+          if (e.buttons === 0) {
+            dragStartedOnCanvas = false;
+          }
+
+          // If the user does a standard left-click drag and NO physics body is actively grabbed,
+          // then the user is dragging empty space, and we dynamically initiate panning!
+          // Crucially, this only triggers if the click drag actually started ON the canvas.
+          if (!isPanning && e.buttons === 1 && !spacePressedRef.current && dragStartedOnCanvas) {
+            const activeGrabbedBody = drag.getMouseConstraint()?.body;
+            if (!activeGrabbedBody) {
+              const dx = e.clientX - startPointerX;
+              const dy = e.clientY - startPointerY;
+              if (Math.hypot(dx, dy) > 5) {
+                isPanning = true;
+                hasDragged = true;
+                drag.disable(); // Prevent physics mouse constraint from clicking anything else
+                canvas.style.cursor = 'grabbing';
+              }
+            }
+          }
+
+          if (!isPanning) return;
+
+          const dx = e.clientX - startPointerX;
+          const dy = e.clientY - startPointerY;
+
+          if (Math.hypot(dx, dy) > 3) {
+            hasDragged = true;
+          }
+
+          const nextPanX = startPanX + dx;
+          const nextPanY = startPanY + dy;
+
+          handleCameraChange(zoomRef.current, nextPanX, nextPanY);
+        };
+
+        handleMouseUp = (e: MouseEvent) => {
+          dragStartedOnCanvas = false;
+          if (isPanning) {
+            isPanning = false;
+
+            canvas.style.cursor = spacePressedRef.current ? 'grab' : 'default';
+            drag.enable();
+
+            // If the user clicked empty space and DID NOT drag to pan, deselect!
+            if (e.button === 0 && !hasDragged) {
+              if (Date.now() - lastSelectTime > 100) {
+                selection.deselect();
+              }
+            }
+          }
+        };
+
+        handleDoubleClick = (e: MouseEvent) => {
+          const rect = canvas.getBoundingClientRect();
+          const clickX = ((e.clientX - rect.left) / rect.width) * canvas.width;
+          const clickY = ((e.clientY - rect.top) / rect.height) * canvas.height;
+
+          const worldX = (clickX - panXRef.current) / zoomRef.current;
+          const worldY = (clickY - panYRef.current) / zoomRef.current;
+
+          const bodies = Matter.Composite.allBodies(rt.physics.getEngine().world);
+          const clickedBodies = Matter.Query.point(bodies, { x: worldX, y: worldY });
+          const targetBody = clickedBodies.find((b: any) => {
+            const id = (b as any).objectId || b.label;
+            return id && !id.startsWith('ground') && !id.startsWith('wall') && id !== 'boundary';
+          });
+
+          if (!targetBody) {
+            handleCameraChange(1.0, 0, 0);
+          }
+        };
+
+        handleContextMenu = (e: MouseEvent) => {
+          e.preventDefault();
+        };
+
+        handleWheel = (e: WheelEvent) => {
+          e.preventDefault();
+          const rect = canvas.getBoundingClientRect();
+          const mouseX = ((e.clientX - rect.left) / rect.width) * canvas.width;
+          const mouseY = ((e.clientY - rect.top) / rect.height) * canvas.height;
+
+          const currentZoom = zoomRef.current;
+          const currentPanX = panXRef.current;
+          const currentPanY = panYRef.current;
+
+          const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+          const nextZoom = Math.min(Math.max(currentZoom * zoomFactor, 0.25), 2.5);
+
+          // Focus zoom to mouse position
+          const worldX = (mouseX - currentPanX) / currentZoom;
+          const worldY = (mouseY - currentPanY) / currentZoom;
+
+          const nextPanX = mouseX - worldX * nextZoom;
+          const nextPanY = mouseY - worldY * nextZoom;
+
+          handleCameraChange(nextZoom, nextPanX, nextPanY);
+        };
+
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('dblclick', handleDoubleClick);
+        canvas.addEventListener('contextmenu', handleContextMenu);
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+
         selection.onChange((obj) => {
           const prevId = storeRef.current?.getSelectedObjectId();
           setSelected(obj);
           if (obj) {
+            lastSelectTime = Date.now();
             store.setSelectedObject(obj.id);
             // Automatically upgrade observables for the selected object to render Force, Velocity, and Acceleration
             observableEngineRef.current?.registerObservable({
@@ -449,17 +982,17 @@ export const SandboxCanvas: React.FC = () => {
             store.clearSelection();
           }
         });
-        rt.renderer.getApp().stage.eventMode = 'static';
-        rt.renderer.getApp().stage.on('pointerdown', () => selection.deselect());
+
         interactionRef.current = { drag, selection, controls };
 
         // Real-time telemetry updating hook during active loop running
         rt.addHook({
           id: 'ui-telemetry-sync',
           afterStep: () => {
-            if (store.getSelectedObject()) {
-              setTelemetryTick((t) => t + 1);
+            if (rt.getState() === 'running') {
+              simTimeRef.current += 16.67;
             }
+            setTelemetryTick((t) => t + 1);
           },
         });
 
@@ -470,6 +1003,12 @@ export const SandboxCanvas: React.FC = () => {
             Matter.Events.on(mc, 'enddrag', (event: any) => {
               if (event.body) {
                 checkConstraintSnapping(event.body);
+
+                // If it is a celestial body, automatically stabilize its orbit around the nearest gravity source!
+                const customData = (event.body as any).customData;
+                if (customData?.celestialComponent && customData?.celestialConfig?.affectedByGravity) {
+                  stabilizeDraggedCelestialRef.current?.(event.body);
+                }
               }
             });
           }
@@ -481,6 +1020,11 @@ export const SandboxCanvas: React.FC = () => {
         constraintRegRef.current = constraintReg;
         constraintRenRef.current = constraintRen;
         constraintRen.enable(() => constraintReg.getAll());
+
+        // Gravity diagnostics rendering overlay
+        const gravityRen = new GravityRenderer(rt);
+        gravityRenRef.current = gravityRen;
+        gravityRen.enable();
 
         const observableEngine = new ObservableEngine(rt, rt.sync, propertyController);
         observableEngine.enable();
@@ -536,10 +1080,19 @@ export const SandboxCanvas: React.FC = () => {
 
     return () => {
       alive = false;
+      if (canvasEl) {
+        if (handleMouseDown) canvasEl.removeEventListener('mousedown', handleMouseDown);
+        if (handleMouseMove) canvasEl.removeEventListener('mousemove', handleMouseMove);
+        if (handleMouseUp) canvasEl.removeEventListener('mouseup', handleMouseUp);
+        if (handleDoubleClick) canvasEl.removeEventListener('dblclick', handleDoubleClick);
+        if (handleContextMenu) canvasEl.removeEventListener('contextmenu', handleContextMenu);
+        if (handleWheel) canvasEl.removeEventListener('wheel', handleWheel);
+      }
       interactionRef.current?.drag.destroy();
       interactionRef.current?.selection.clear();
       constraintRegRef.current?.clear();
       constraintRenRef.current?.destroy();
+      gravityRenRef.current?.destroy();
       observableEngineRef.current?.destroy();
       runtimeRef.current?.destroy();
       runtimeRef.current = null;
@@ -547,11 +1100,58 @@ export const SandboxCanvas: React.FC = () => {
       interactionRef.current = null;
       constraintRegRef.current = null;
       constraintRenRef.current = null;
+      gravityRenRef.current = null;
       observableEngineRef.current = null;
       setReady(false);
       setRunning(false);
     };
   }, []);
+
+  // Dynamically reposition static borders (ground and walls) when the canvas container resizes
+  useEffect(() => {
+    const el = mountRef.current;
+    if (!el || !ready) return;
+
+    let resizeObserver: ResizeObserver | null = null;
+
+    import('matter-js').then((Matter) => {
+      resizeObserver = new ResizeObserver((entries) => {
+        const store = storeRef.current;
+        if (!store) return;
+
+        for (const entry of entries) {
+          const W = entry.contentRect.width || el.clientWidth;
+          const H = entry.contentRect.height || el.clientHeight;
+
+          const ground = store.getObject('ground');
+          const wallR = store.getObject('wall-r');
+          const wallL = store.getObject('wall-l');
+
+          if (ground) {
+            Matter.Body.setPosition(ground.body, { x: W / 2, y: H - 40 });
+            ground.display.x = W / 2;
+            ground.display.y = H - 40;
+          }
+          if (wallR) {
+            Matter.Body.setPosition(wallR.body, { x: W + 8, y: H / 2 });
+            wallR.display.x = W + 8;
+            wallR.display.y = H / 2;
+          }
+          if (wallL) {
+            Matter.Body.setPosition(wallL.body, { x: -8, y: H / 2 });
+            wallL.display.x = -8;
+            wallL.display.y = H / 2;
+          }
+        }
+      });
+
+      resizeObserver.observe(el);
+    });
+
+    return () => {
+      resizeObserver?.disconnect();
+    };
+  }, [ready]);
 
   // ── Controls ───────────────────────────────────────────────────────────────
 
@@ -561,6 +1161,242 @@ export const SandboxCanvas: React.FC = () => {
     if (running) { ctrl.pause(); setRunning(false); }
     else { ctrl.resume(); setRunning(true); }
   };
+
+  const spawnStar = useCallback(async (customX?: number, customY?: number) => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const el = mountRef.current;
+    const store = storeRef.current;
+    if (!rt || !ia || !el || !store || !ready) return;
+
+    const { createObject } = await import('../objects/objectFactory');
+
+    const W = el.clientWidth || 800;
+    const H = el.clientHeight || 600;
+    const centerX = customX ?? (W / 2);
+    const centerY = customY ?? (H / 2);
+    const starId = 'orbit-star';
+
+    // Remove old star if it exists to avoid duplicates
+    const oldObj = store.getObject(starId);
+    if (oldObj) {
+      rt.physics.removeBodies(oldObj.body);
+      rt.sync.unregister(starId);
+      store.removeObject(starId);
+      rt.gravitySystem.getRadialGravity().removeGravitySource(starId);
+    }
+
+    const starObj = createObject({
+      id: starId,
+      type: 'circle',
+      x: centerX,
+      y: centerY,
+      radius: 35,
+      isStatic: true, // Fixed central solar anchor
+      fillColor: 0xeab308, // Glowing Golden Sun
+      strokeColor: 0xf97316, // Solar Orange Outline
+      strokeWidth: 3.5,
+    });
+    starObj.body.label = 'Orbit Star';
+    (starObj.body as any).customData = { mass: 800 };
+
+    rt.renderer.getViewport().addChild(starObj.display);
+    rt.physics.addBodies(starObj.body);
+    rt.sync.register(starObj.id, starObj.body, starObj.display);
+    store.addObject(starObj);
+
+    // Register as Gravity Source in RadialGravity
+    rt.gravitySystem.getRadialGravity().addGravitySource({
+      id: starId,
+      mass: 800,
+      position: { x: centerX, y: centerY },
+      enabled: true,
+      metadata: { isStar: true }
+    });
+
+    physicsEventBus.emit({
+      type: 'OBJECT_SPAWNED',
+      objectId: starId,
+      metadata: { name: 'Orbit Star', shape: 'circle', mass: 800 }
+    });
+  }, [ready]);
+
+  const spawnOrbitingPlanet = useCallback(async (customX?: number, customY?: number) => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const el = mountRef.current;
+    const store = storeRef.current;
+    if (!rt || !ia || !el || !store || !ready) return;
+
+    const { createObject } = await import('../objects/objectFactory');
+    const Matter = await import('matter-js');
+
+    // 1. Ensure Star exists. If not, spawn it first!
+    let star = store.getObject('orbit-star');
+    if (!star) {
+      await spawnStar();
+      star = store.getObject('orbit-star');
+    }
+    if (!star) return;
+
+    const starPos = star.body.position;
+
+    // 2. Spawn planet at an offset above the star or custom position
+    const planetId = uid('planet');
+    const radius = 11 + Math.random() * 5;
+
+    let planetX: number;
+    let planetY: number;
+    let offset: number;
+    let angle: number;
+
+    if (customX !== undefined && customY !== undefined) {
+      planetX = customX;
+      planetY = customY;
+      const dx = planetX - starPos.x;
+      const dy = planetY - starPos.y;
+      offset = Math.hypot(dx, dy);
+      angle = Math.atan2(dy, dx);
+    } else {
+      offset = 120 + Math.random() * 50;
+      planetX = starPos.x;
+      planetY = starPos.y - offset;
+      angle = -Math.PI / 2;
+    }
+
+    const { fill, stroke } = nextColour();
+    const planetObj = createObject({
+      id: planetId,
+      type: 'circle',
+      x: planetX,
+      y: planetY,
+      radius: radius,
+      restitution: 0.1,
+      friction: 0.05,
+      frictionAir: 0,
+      density: 0.002,
+      fillColor: fill,
+      strokeColor: stroke,
+      strokeWidth: 2,
+    });
+    planetObj.body.label = 'Orbiting Planet';
+
+    // 3. Solve and apply circular orbital velocity using our standardized OrbitSpawner module
+    const G = rt.gravitySystem.getRadialGravity().getConfig().gravitationalConstant;
+    const softening = rt.gravitySystem.getRadialGravity().getConfig().softeningFactor ?? 100;
+    const { OrbitSpawner } = await import('../orbits/orbitSpawner');
+    OrbitSpawner.spawnCircularOrbit({
+      centerBody: star.body,
+      orbitingBody: planetObj.body,
+      radius: offset,
+      angle: angle,
+      clockwise: true,
+    }, G, softening);
+
+    rt.renderer.getViewport().addChild(planetObj.display);
+    rt.physics.addBodies(planetObj.body);
+    rt.sync.register(planetObj.id, planetObj.body, planetObj.display);
+    ia.selection.register(planetObj);
+    store.addObject(planetObj);
+    dynRef.current.push(planetObj.body);
+    setBodyCount(dynRef.current.length);
+
+    physicsEventBus.emit({
+      type: 'OBJECT_SPAWNED',
+      objectId: planetId,
+      metadata: { name: 'Orbit Planet', shape: 'circle', mass: planetObj.body.mass }
+    });
+  }, [ready, spawnStar]);
+
+  // Synchronize React states reactively to the underlying modular GravitySystem
+  useEffect(() => {
+    const rt = runtimeRef.current;
+    if (rt && ready) {
+      rt.gravitySystem.setMode(gravityMode);
+      rt.gravitySystem.getRadialGravity().setConfig({
+        gravitationalConstant: gConstant,
+        debug: radialDebug,
+      });
+
+      // Dynamically toggle static boundaries visibility & collisions based on gravity mode
+      const store = storeRef.current;
+      if (store) {
+        const ground = store.getObject('ground');
+        const wallR = store.getObject('wall-r');
+        const wallL = store.getObject('wall-l');
+        const isRadial = gravityMode === 'radial';
+
+        if (ground) {
+          ground.display.visible = !isRadial;
+          ground.body.collisionFilter = isRadial
+            ? { group: -1, category: 0, mask: 0 }
+            : { group: 0, category: 1, mask: 4294967295 };
+        }
+        if (wallR) {
+          wallR.display.visible = !isRadial;
+          wallR.body.collisionFilter = isRadial
+            ? { group: -1, category: 0, mask: 0 }
+            : { group: 0, category: 1, mask: 4294967295 };
+        }
+        if (wallL) {
+          wallL.display.visible = !isRadial;
+          wallL.body.collisionFilter = isRadial
+            ? { group: -1, category: 0, mask: 0 }
+            : { group: 0, category: 1, mask: 4294967295 };
+        }
+      }
+    }
+  }, [ready, gravityMode, gConstant, radialDebug]);
+
+  const handleModeChange = (mode: 'linear' | 'radial') => {
+    setGravityMode(mode);
+    const rt = runtimeRef.current;
+    if (rt) {
+      rt.gravitySystem.setMode(mode);
+      if (mode === 'radial') {
+        rt.gravitySystem.getRadialGravity().setConfig({
+          gravitationalConstant: gConstant,
+          debug: radialDebug
+        });
+      }
+    }
+  };
+
+  const handleCameraChange = useCallback((newZoom: number, newPanX: number, newPanY: number) => {
+    setZoom(newZoom);
+    setPanX(newPanX);
+    setPanY(newPanY);
+
+    const rt = runtimeRef.current;
+    if (!rt) return;
+
+    const vp = rt.renderer.getViewport();
+
+    // Scale viewport
+    vp.scale.set(newZoom);
+
+    // Apply translation panning
+    vp.position.set(newPanX, newPanY);
+
+    // Synchronize physics mouse constraint scale and offset
+    const drag = interactionRef.current?.drag;
+    if (drag) {
+      const mouse = drag.getMouse();
+      if (mouse) {
+        const canvas = rt.renderer.getApp().canvas as HTMLCanvasElement;
+        if (canvas) {
+          const { width: cssW, height: cssH } = canvas.getBoundingClientRect();
+          const baseScaleX = canvas.width / (cssW || 1);
+          const baseScaleY = canvas.height / (cssH || 1);
+
+          mouse.scale.x = baseScaleX / newZoom;
+          mouse.scale.y = baseScaleY / newZoom;
+          mouse.offset.x = newPanX / baseScaleX;
+          mouse.offset.y = newPanY / baseScaleY;
+        }
+      }
+    }
+  }, []);
 
   const handleReset = useCallback(async () => {
     const rt = runtimeRef.current;
@@ -573,17 +1409,79 @@ export const SandboxCanvas: React.FC = () => {
     const wasRunning = running;
     rt.pause();
     store.reset();
+    simTimeRef.current = 0;
+
+    // Reset camera zoom/pan states and physics mouse
+    handleCameraChange(1.0, 0, 0);
+
+    // Clear old gravity sources during system reset
+    if (rt.gravitySystem) {
+      rt.gravitySystem.getRadialGravity().clear();
+    }
+
+    // Clean up textbook-example specific HTML overlays
+    const burnOverlay = document.getElementById('example-burn-overlay');
+    if (burnOverlay) burnOverlay.remove();
+    const energyOverlay = document.getElementById('example-energy-overlay');
+    if (energyOverlay) energyOverlay.remove();
+
     const dyn = await buildScene(rt, el, ia, creg, store);
     dynRef.current = dyn;
     setBodyCount(dyn.length);
     setSelected(null);
-    ia.controls.setGravity(GRAVITY_VALUES[gravity]);
+
+    // Restore correct gravity behaviors based on active mode
+    if (gravityMode === 'linear') {
+      ia.controls.setGravity(GRAVITY_VALUES[gravity]);
+    }
+
     ia.controls.setSimulationSpeed(speed);
     if (wasRunning) {
       rt.start();
       store.setRuntimeState('running');
     }
-  }, [ready, running, gravity, speed]);
+  }, [ready, running, gravity, speed, gravityMode, handleCameraChange]);
+
+  const handleSelectExample = useCallback(async (exampleId: string) => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const store = storeRef.current;
+    const propCtrl = propertyControllerRef.current;
+    const obsEngine = observableEngineRef.current;
+    if (!rt || !ia || !store || !propCtrl || !obsEngine || !ready) return;
+
+    // Clean up example-specific HTML overlays before loading the new one
+    const burnOverlay = document.getElementById('example-burn-overlay');
+    if (burnOverlay) burnOverlay.remove();
+    const energyOverlay = document.getElementById('example-energy-overlay');
+    if (energyOverlay) energyOverlay.remove();
+
+    const examples = getAllExamples();
+    const entry = examples.find((e: any) => e.id === exampleId);
+    if (!entry) return;
+
+    setSelectedExampleId(exampleId);
+    setSelected(null);
+    simTimeRef.current = 0;
+
+    const initialZoom = entry.config.camera?.zoom ?? 1.0;
+    handleCameraChange(initialZoom, 0, 0);
+
+    // Call the generic orchestrator loader
+    await loadExample(rt, store, propCtrl, obsEngine, ia.selection, entry.config);
+
+    // Synchronize React state values from the loaded example config
+    setGravityMode(entry.config.gravityMode ?? 'radial');
+    if (entry.config.gConstant !== undefined) {
+      setGConstant(entry.config.gConstant);
+    }
+    setRunning(true);
+
+    // Update body count state dynamically
+    const dynamicBodies = rt.physics.getWorld().bodies.filter(b => !b.isStatic);
+    setBodyCount(dynamicBodies.length);
+    dynRef.current = dynamicBodies;
+  }, [ready, handleCameraChange]);
 
   const spawnShape = useCallback(async (type: 'circle' | 'rectangle') => {
     const rt = runtimeRef.current;
@@ -625,9 +1523,9 @@ export const SandboxCanvas: React.FC = () => {
       type: 'OBJECT_SPAWNED',
       objectId: obj.id,
       metadata: {
-        shape:   type,
-        name:    type === 'circle' ? 'Circle' : 'Rectangle',
-        mass:    obj.body.mass,
+        shape: type,
+        name: type === 'circle' ? 'Circle' : 'Rectangle',
+        mass: obj.body.mass,
         gravity: GRAVITY_VALUES[gravity],
       },
     });
@@ -658,6 +1556,8 @@ export const SandboxCanvas: React.FC = () => {
     setSpeed(val);
     interactionRef.current?.controls.setSimulationSpeed(val);
   };
+
+
 
   // ── Panel drag-and-drop ────────────────────────────────────────────────────
 
@@ -904,7 +1804,7 @@ export const SandboxCanvas: React.FC = () => {
     rt.sync.register(pin.id, pin.body, pin.display);
 
     // ── 2. Terminal receptor sensor with visible drop-zone display ──────────
-    const terminalId   = uid('rope-terminal');
+    const terminalId = uid('rope-terminal');
     const sensorDispId = uid('rope-sensor-disp');
 
     const sensor = Matter.Bodies.circle(
@@ -999,6 +1899,155 @@ export const SandboxCanvas: React.FC = () => {
     checkConstraintSnapping(obj.body);
   }, [ready, checkConstraintSnapping]);
 
+  const initializeCelestialEntity = useCallback(async (
+    obj: any,
+    asset: import('../../config/assetsRegistry').AssetDefinition,
+    canvasX: number,
+    canvasY: number,
+  ) => {
+    const rt = runtimeRef.current;
+    const store = storeRef.current;
+    if (!rt || !store || !asset.celestialConfig) return;
+
+    const config = asset.celestialConfig;
+    const isStar = config.type === 'star';
+    const isPlanet = config.type === 'planet';
+    const isMoon = config.type === 'moon';
+    const isSatellite = config.type === 'satellite';
+    const isAsteroid = config.type === 'asteroid';
+
+    const virtualMass = config.mass ?? obj.body.mass;
+    const customData = {
+      mass: virtualMass,
+      celestialConfig: config,
+      celestialComponent: true,
+      orbitalComponent: true,
+      gravityComponent: true,
+      observableMetadata: { label: asset.name },
+      runtimeCategory: config.type,
+      parentGravitySource: null as string | null,
+    };
+    obj.body.customData = customData;
+    obj.body.label = asset.name;
+    // Ensure all celestial bodies have exactly 0 air friction (no atmosphere in space)
+    obj.body.frictionAir = 0;
+    obj.metadata = {
+      ...obj.metadata,
+      ...customData,
+      educationalTags: ['celestial', 'orbital', config.type],
+    };
+
+    console.log(`[Celestial Initializer] Spawning ${asset.name} (${config.type}) at (x: ${canvasX.toFixed(1)}, y: ${canvasY.toFixed(1)})`);
+
+    // Register gravity source
+    if (config.isGravitySource) {
+      console.log(`[Celestial Initializer] Gravity source registered: ${asset.name} with mass ${virtualMass}`);
+      rt.gravitySystem.getRadialGravity().addGravitySource({
+        id: obj.id,
+        mass: virtualMass,
+        position: { x: canvasX, y: canvasY },
+        influenceRadius: config.influenceRadius ?? (config.radius ? config.radius * 20 : 1000),
+        enabled: true,
+        metadata: {
+          isStar,
+          isPlanet,
+          isMoon,
+          gravityStrength: config.gravityStrength ?? 1.0,
+        }
+      });
+    }
+
+    // Register gravity body
+    if (config.affectedByGravity) {
+      console.log(`[Celestial Initializer] Gravity body registered: ${asset.name} with mass ${virtualMass}`);
+      rt.gravitySystem.getRadialGravity().addGravityBody({
+        id: obj.id,
+        body: obj.body,
+        mass: virtualMass,
+        affectedByGravity: true,
+        ignoreGravity: false,
+      });
+    }
+
+    // Register Observables
+    if (config.affectedByGravity) {
+      console.log(`[Celestial Initializer] Observables telemetry HUD registered for: ${asset.name}`);
+      observableEngineRef.current?.registerObservable({
+        objectId: obj.id,
+        types: ['velocity', 'acceleration', 'force'],
+        label: asset.name,
+        color: isPlanet ? 0x38bdf8 : isMoon ? 0xa5b4fc : 0x34d399,
+      });
+    }
+
+    // Orbit Initialization
+    if (config.affectedByGravity && config.orbitalDefaults?.autoOrbit !== false) {
+      const radialGravity = rt.gravitySystem.getRadialGravity();
+      const activeSources = radialGravity.getSources();
+
+      let parentSource = null;
+      let minDist = Infinity;
+
+      for (const src of activeSources) {
+        if (src.id === obj.id) continue;
+        const dist = Math.hypot(src.position.x - canvasX, src.position.y - canvasY);
+        // Find nearest heavier source to establish clean hierarchy
+        if (src.mass > virtualMass && dist < minDist) {
+          minDist = dist;
+          parentSource = src;
+        }
+      }
+
+      // Fallback: nearest active source
+      if (!parentSource) {
+        for (const src of activeSources) {
+          if (src.id === obj.id) continue;
+          const dist = Math.hypot(src.position.x - canvasX, src.position.y - canvasY);
+          if (dist < minDist) {
+            minDist = dist;
+            parentSource = src;
+          }
+        }
+      }
+
+      if (parentSource) {
+        const parentBody = rt.sync.getPairs().get(parentSource.id)?.body || store.getObject(parentSource.id)?.body;
+        if (parentBody) {
+          customData.parentGravitySource = parentSource.id;
+          console.log(`[Celestial Initializer] Parent detected: ${parentSource.id} for child: ${obj.id}`);
+
+          const parentRadius = parentBody.circleRadius || (parentBody as any).customData?.celestialConfig?.radius || 35;
+          const childRadius = obj.body.circleRadius || config.radius || 14;
+          const minSafeRadius = parentRadius + childRadius + 30;
+
+          let currentRadius = minDist;
+          if (currentRadius < minSafeRadius) {
+            currentRadius = minSafeRadius;
+          }
+
+          const angle = Math.atan2(canvasY - parentBody.position.y, canvasX - parentBody.position.x);
+          const G = radialGravity.getConfig().gravitationalConstant;
+          const softening = radialGravity.getConfig().softeningFactor ?? 100;
+
+          const { OrbitSpawner } = await import('../orbits/orbitSpawner');
+
+          OrbitSpawner.spawnCircularOrbit({
+            centerBody: parentBody,
+            orbitingBody: obj.body,
+            radius: currentRadius,
+            angle: angle,
+            clockwise: config.orbitalDefaults?.preferredDirection !== 'counterclockwise',
+            initialVelocityMultiplier: config.orbitalDefaults?.initialVelocityMultiplier ?? 1.0,
+          }, G, softening);
+
+          console.log(`[Celestial Initializer] Orbit stable initialized around ${parentSource.id} at radius ${currentRadius.toFixed(1)}`);
+        }
+      } else {
+        console.log(`[Celestial Initializer] No compatible gravity source found for ${obj.id}. Spawning in free-fall.`);
+      }
+    }
+  }, []);
+
   // ── Asset Library drop handler ─────────────────────────────────────────────
   // Called by FloatingAssetPanel when user drops an asset onto the simulation canvas.
   // Translates AssetDefinition → RuntimeObject using existing objectFactory, keeping
@@ -1015,8 +2064,9 @@ export const SandboxCanvas: React.FC = () => {
 
     const { createObject } = await import('../objects/objectFactory');
     const { spawnType, spawnConfig } = asset;
+    const isCelestial = !!asset.celestialConfig;
 
-    const base = {
+    const base: any = {
       x: canvasX,
       y: canvasY,
       restitution: spawnConfig.restitution ?? 0.5,
@@ -1026,7 +2076,15 @@ export const SandboxCanvas: React.FC = () => {
       strokeColor: spawnConfig.strokeColor,
       strokeWidth: 2,
       isStatic: spawnConfig.isStatic ?? false,
+      texture: asset.texture,
     };
+
+    if (isCelestial) {
+      base.frictionAir = 0; // Space has no atmosphere; celestial bodies must orbit without drag!
+      if (asset.celestialConfig?.type === 'star') {
+        base.isStatic = true;
+      }
+    }
 
     let obj;
     if (spawnType === 'circle') {
@@ -1051,26 +2109,39 @@ export const SandboxCanvas: React.FC = () => {
     rt.physics.addBodies(obj.body);
     rt.sync.register(obj.id, obj.body, obj.display);
 
-    if (!spawnConfig.isStatic) {
-      ia.selection.register(obj);
-      store.addObject(obj);
+    if (isCelestial) {
+      const Matter = await import('matter-js');
+      if (asset.celestialConfig?.type === 'star') {
+        Matter.Body.setStatic(obj.body, true);
+      }
+      await initializeCelestialEntity(obj, asset, canvasX, canvasY);
+    }
+
+    // Register with selection and store
+    ia.selection.register(obj);
+    store.addObject(obj);
+
+    if (!obj.body.isStatic) {
       dynRef.current.push(obj.body);
       setBodyCount(dynRef.current.length);
       checkConstraintSnapping(obj.body);
-
-      // Emit spawn event so explanation card shows free-fall context
-      physicsEventBus.emit({
-        type: 'OBJECT_SPAWNED',
-        objectId: obj.id,
-        metadata: {
-          shape:   spawnType,
-          name:    asset.name,
-          mass:    obj.body.mass,
-          gravity: GRAVITY_VALUES[gravity],
-        },
-      });
     }
-  }, [ready, checkConstraintSnapping, gravity]);
+
+    // Select the dropped asset immediately so user can see property panel
+    ia.selection.select(obj.id);
+
+    // Emit spawn event so explanation card shows free-fall context
+    physicsEventBus.emit({
+      type: 'OBJECT_SPAWNED',
+      objectId: obj.id,
+      metadata: {
+        shape: spawnType,
+        name: asset.name,
+        mass: obj.body.mass,
+        gravity: gravityMode === 'radial' ? 'radial' : GRAVITY_VALUES[gravity],
+      },
+    });
+  }, [ready, checkConstraintSnapping, gravity, gravityMode, initializeCelestialEntity]);
 
   // ── Canvas HTML5 drag-and-drop bridge (for FloatingAssetPanel) ────────────
   // Uses native window-level listeners to bypass react-rnd / framer-motion event capture.
@@ -1124,7 +2195,6 @@ export const SandboxCanvas: React.FC = () => {
   const onPanelPointerDown = (type: PanelDragType) =>
     (e: React.PointerEvent) => {
       if (!ready) return;
-      e.currentTarget.setPointerCapture(e.pointerId);
 
       // Pause physics engine drag controller during menu drag-and-drop to prevent automatic sticking
       interactionRef.current?.drag.disable();
@@ -1135,84 +2205,111 @@ export const SandboxCanvas: React.FC = () => {
       setGhostPos({ x: e.clientX, y: e.clientY });
     };
 
-  const onPanelPointerMove = (e: React.PointerEvent) => {
+  useEffect(() => {
     if (!isDragging) return;
-    didDragRef.current = true;    // pointer moved — this is a drag, not a tap
-    setGhostPos({ x: e.clientX, y: e.clientY });
 
-    const canvas = mountRef.current;
-    if (canvas) {
+    const handlePointerMove = (e: PointerEvent) => {
+      didDragRef.current = true;    // pointer moved — this is a drag, not a tap
+      setGhostPos({ x: e.clientX, y: e.clientY });
+
+      const canvas = mountRef.current;
+      if (canvas) {
+        const r = canvas.getBoundingClientRect();
+        const over = (
+          e.clientX >= r.left && e.clientX <= r.right &&
+          e.clientY >= r.top && e.clientY <= r.bottom
+        );
+        setIsOverCanvas(over);
+
+        // Query body under cursor for constraints
+        const dragType = panelDragRef.current;
+        if (over && dragType && ['pivot', 'spring', 'rope'].includes(dragType)) {
+          const canvasX = e.clientX - r.left;
+          const canvasY = e.clientY - r.top;
+          const queryPoint = { x: canvasX, y: canvasY };
+          const bodies = dynRef.current;
+
+          import('matter-js').then((Matter) => {
+            const hovered = bodies.find(b => Matter.Vertices.contains(b.vertices, queryPoint));
+            if (hovered) {
+              hoveredBodyRef.current = hovered;
+              setHoveredBodyId(hovered.label || hovered.id.toString());
+            } else {
+              hoveredBodyRef.current = null;
+              setHoveredBodyId(null);
+            }
+          });
+        } else {
+          hoveredBodyRef.current = null;
+          setHoveredBodyId(null);
+        }
+      }
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      const type = panelDragRef.current;
+      panelDragRef.current = null;
+      setIsDragging(false);
+      setIsOverCanvas(false);
+
+      // Re-enable the physics engine drag controller now that panel drag is complete
+      interactionRef.current?.drag.enable();
+
+      const hoveredBody = hoveredBodyRef.current;
+      hoveredBodyRef.current = null;
+      setHoveredBodyId(null);
+
+      if (!type) return;
+      const canvas = mountRef.current;
+      if (!canvas) return;
       const r = canvas.getBoundingClientRect();
-      const over = (
-        e.clientX >= r.left && e.clientX <= r.right &&
-        e.clientY >= r.top && e.clientY <= r.bottom
-      );
-      setIsOverCanvas(over);
-
-      // Query body under cursor for constraints
-      const dragType = panelDragRef.current;
-      if (over && dragType && ['pivot', 'spring', 'rope'].includes(dragType)) {
+      // Only drop if released over the canvas
+      if (e.clientX >= r.left && e.clientX <= r.right &&
+        e.clientY >= r.top && e.clientY <= r.bottom) {
         const canvasX = e.clientX - r.left;
         const canvasY = e.clientY - r.top;
-        const queryPoint = { x: canvasX, y: canvasY };
-        const bodies = dynRef.current;
-
-        import('matter-js').then((Matter) => {
-          const hovered = bodies.find(b => Matter.Vertices.contains(b.vertices, queryPoint));
-          if (hovered) {
-            hoveredBodyRef.current = hovered;
-            setHoveredBodyId(hovered.label || hovered.id.toString());
-          } else {
-            hoveredBodyRef.current = null;
-            setHoveredBodyId(null);
-          }
-        });
-      } else {
-        hoveredBodyRef.current = null;
-        setHoveredBodyId(null);
+        if (['pivot', 'spring', 'rope'].includes(type)) {
+          spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', canvasX, canvasY, hoveredBody);
+        } else if (type === 'pendulum-rope') {
+          spawnPendulumRope(canvasX, canvasY);
+        } else if (type === 'sun') {
+          spawnStar(canvasX, canvasY);
+        } else if (type === 'planet') {
+          spawnOrbitingPlanet(canvasX, canvasY);
+        } else {
+          spawnAt(type as 'circle' | 'rectangle', canvasX, canvasY);
+        }
       }
-    }
-  };
+    };
 
-  const onPanelPointerUp = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const type = panelDragRef.current;
-    panelDragRef.current = null;
-    setIsDragging(false);
-    setIsOverCanvas(false);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDragging, ready, spawnConstraintAt, spawnPendulumRope, spawnAt]);
 
-    // Re-enable the physics engine drag controller now that panel drag is complete
-    interactionRef.current?.drag.enable();
-
-    const hoveredBody = hoveredBodyRef.current;
-    hoveredBodyRef.current = null;
-    setHoveredBodyId(null);
-
-    if (!type) return;
-    const canvas = mountRef.current;
-    if (!canvas) return;
-    const r = canvas.getBoundingClientRect();
-    // Only drop if released over the canvas
-    if (e.clientX >= r.left && e.clientX <= r.right &&
-      e.clientY >= r.top && e.clientY <= r.bottom) {
-      const canvasX = e.clientX - r.left;
-      const canvasY = e.clientY - r.top;
-      if (['pivot', 'spring', 'rope'].includes(type)) {
-        spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', canvasX, canvasY, hoveredBody);
-      } else if (type === 'pendulum-rope') {
-        spawnPendulumRope(canvasX, canvasY);
-      } else {
-        spawnAt(type as 'circle' | 'rectangle', canvasX, canvasY);
-      }
-    }
-  };
+  // Wheel and panning controls are handled in the main initialization useEffect
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div style={S.root}>
       {/* ── Left panel ─────────────────────────────────────── */}
-      <aside style={S.panel}>
+      <aside
+        style={{
+          ...S.panel,
+          width: leftPanelOpen ? 288 : 0,
+          minWidth: leftPanelOpen ? 268 : 0,
+          padding: leftPanelOpen ? '20px 16px' : 0,
+          borderRight: leftPanelOpen ? S.panel.borderRight : 'none',
+          opacity: leftPanelOpen ? 1 : 0,
+          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          overflowY: leftPanelOpen ? (activeLeftTab === 'toolbox' ? 'auto' : 'hidden') : 'hidden',
+          overflowX: 'hidden',
+        }}
+      >
         <div style={S.header}>
           <span style={S.pulse} />
           <span style={S.tag}>Interactive Physics</span>
@@ -1220,341 +2317,635 @@ export const SandboxCanvas: React.FC = () => {
         <h1 style={S.title}>EduSim Sandbox</h1>
         <p style={S.subtitle}>Drag · Select · Control</p>
 
-        {/* Status */}
-        <div style={S.cards}>
-          <div style={S.card}>
-            <div style={S.cardLbl}>Engine</div>
-            <div style={S.cardVal}>
-              <span style={{ ...S.dot, background: running ? '#10b981' : '#f59e0b' }} />
-              {ready ? (running ? 'Running' : 'Paused') : 'Loading…'}
-            </div>
-          </div>
-          <div style={S.card}>
-            <div style={S.cardLbl}>Dynamic Bodies</div>
-            <div style={S.cardVal}>{bodyCount}</div>
-          </div>
-        </div>
-
-
-
-        <Sep label="Controls" />
-        <div style={S.row}>
-          <button style={{ ...S.btn, ...S.btnPrimary, flex: 1 }} onClick={togglePlay} disabled={!ready}>
-            {running ? '⏸ Pause' : '▶ Resume'}
-          </button>
-          <button style={{ ...S.btn, ...S.btnGhost }} onClick={handleReset} disabled={!ready} title="Reset">↺</button>
-        </div>
-
-        {/* Tutor Explanation Toggle */}
+        {/* Premium Tab Toggles */}
         <div style={{
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginTop: 2,
-          marginBottom: 6,
-          padding: '7px 10px',
-          borderRadius: 10,
-          background: tutorEnabled
-            ? 'rgba(99, 102, 241, 0.10)'
-            : 'rgba(255,255,255,0.03)',
-          border: tutorEnabled
-            ? '1px solid rgba(99,102,241,0.30)'
-            : '1px solid rgba(255,255,255,0.07)',
-          transition: 'all 0.2s ease',
+          background: 'rgba(0, 0, 0, 0.4)',
+          borderRadius: '10px',
+          padding: '3px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          marginBottom: '14px',
+          flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 14 }}>🤖</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: tutorEnabled ? '#a5b4fc' : '#64748b', transition: 'color 0.2s' }}>
-              AI Explanation
-            </span>
-          </div>
           <button
-            id="tutor-toggle-btn"
-            onClick={() => setTutorEnabled((v) => !v)}
+            onClick={() => setActiveLeftTab('toolbox')}
             style={{
-              position: 'relative',
-              width: 38,
-              height: 20,
-              borderRadius: 10,
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '8px 0',
+              borderRadius: '8px',
               border: 'none',
+              background: activeLeftTab === 'toolbox' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+              color: activeLeftTab === 'toolbox' ? '#fff' : '#64748b',
+              fontSize: '11px',
+              fontWeight: 700,
               cursor: 'pointer',
-              padding: 0,
-              background: tutorEnabled
-                ? 'linear-gradient(135deg, #6366f1, #818cf8)'
-                : 'rgba(71,85,105,0.6)',
-              boxShadow: tutorEnabled
-                ? '0 0 8px rgba(99,102,241,0.5)'
-                : 'none',
               transition: 'all 0.25s ease',
-              flexShrink: 0,
+              boxShadow: activeLeftTab === 'toolbox' ? '0 4px 12px rgba(79, 70, 229, 0.3)' : 'none',
+              outline: 'none',
             }}
-            title={tutorEnabled ? 'Disable AI explanations' : 'Enable AI explanations'}
           >
-            <span style={{
-              position: 'absolute',
-              top: 3,
-              left: tutorEnabled ? 21 : 3,
-              width: 14,
-              height: 14,
-              borderRadius: '50%',
-              background: '#fff',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
-              transition: 'left 0.25s ease',
-              display: 'block',
-            }} />
+            <Settings size={12} />
+            Sandbox Toolbox
           </button>
-        </div>
-
-        <Sep label="Spawn Shapes — click or drag" />
-        <div
-          style={S.row}
-          onPointerMove={onPanelPointerMove}
-          onPointerUp={onPanelPointerUp}
-        >
           <button
-            style={{ ...S.btn, ...S.btnIndigo, flex: 1, cursor: ready ? 'grab' : 'not-allowed' }}
-            disabled={!ready}
-            onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnShape('rectangle'); }}
-            onPointerDown={onPanelPointerDown('rectangle')}
-          >▪ Rectangle</button>
-          <button
-            style={{ ...S.btn, ...S.btnEmerald, flex: 1, cursor: ready ? 'grab' : 'not-allowed' }}
-            disabled={!ready}
-            onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnShape('circle'); }}
-            onPointerDown={onPanelPointerDown('circle')}
-          >● Circle</button>
-        </div>
-        {/* Rope as a first-class shape asset */}
-        <div
-          style={{ ...S.row, marginTop: -2 }}
-          onPointerMove={onPanelPointerMove}
-          onPointerUp={onPanelPointerUp}
-        >
-          <button
+            onClick={() => setActiveLeftTab('examples')}
             style={{
-              ...S.btn,
-              width: '100%',
-              cursor: ready ? 'grab' : 'not-allowed',
-              background: 'rgba(99,102,241,0.13)',
-              color: '#a5b4fc',
-              borderColor: 'rgba(99,102,241,0.28)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '8px 0',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeLeftTab === 'examples' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+              color: activeLeftTab === 'examples' ? '#fff' : '#64748b',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.25s ease',
+              boxShadow: activeLeftTab === 'examples' ? '0 4px 12px rgba(79, 70, 229, 0.3)' : 'none',
+              outline: 'none',
             }}
-            disabled={!ready}
-            onClick={() => {
-              if (didDragRef.current) { didDragRef.current = false; return; }
-              const el = mountRef.current;
-              if (!el) return;
-              const W = el.clientWidth || 800;
-              spawnPendulumRope(120 + Math.random() * (W - 240), 40 + Math.random() * 30);
-            }}
-            onPointerDown={onPanelPointerDown('pendulum-rope')}
           >
-            <span style={{ fontSize: 13 }}>🪢</span>
-            <span>Rope  <span style={{ fontSize: 9, opacity: 0.65 }}>— drop bob to complete pendulum</span></span>
+            <BookOpen size={12} />
+            Textbook Examples
           </button>
         </div>
 
-        <Sep label="Spawn Constraints — click or drag" />
-        <div
-          style={{ ...S.row, flexWrap: 'wrap' }}
-          onPointerMove={onPanelPointerMove}
-          onPointerUp={onPanelPointerUp}
-        >
-          <button
-            style={{ ...S.btn, ...S.btnIndigo, flex: '1 1 45%', cursor: ready ? 'grab' : 'not-allowed', padding: '7px 4px', fontSize: 11 }}
-            disabled={!ready}
-            onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('pivot'); }}
-            onPointerDown={onPanelPointerDown('pivot')}
-          >📌 Pivot</button>
-          <button
-            style={{ ...S.btn, ...S.btnEmerald, flex: '1 1 45%', cursor: ready ? 'grab' : 'not-allowed', padding: '7px 4px', fontSize: 11 }}
-            disabled={!ready}
-            onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('spring'); }}
-            onPointerDown={onPanelPointerDown('spring')}
-          >🌀 Spring</button>
-          <button
-            style={{ ...S.btn, ...S.btnSky, width: '100%', cursor: ready ? 'grab' : 'not-allowed', marginTop: 4 }}
-            disabled={!ready}
-            onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('rope'); }}
-            onPointerDown={onPanelPointerDown('rope')}
-          >🔗 Rope Chain</button>
-        </div>
+        {activeLeftTab === 'toolbox' ? (
+          <>
 
-        <Sep label="Impulse" />
-        <button style={{ ...S.btn, ...S.btnSky, width: '100%', marginBottom: 8 }} onClick={blast} disabled={!ready}>↑ Upward Blast</button>
-        <div style={S.row}>
-          <button style={{ ...S.btn, ...S.btnGhost, flex: 1 }} onClick={() => push('left')} disabled={!ready}>◀ Left</button>
-          <button style={{ ...S.btn, ...S.btnGhost, flex: 1 }} onClick={() => push('right')} disabled={!ready}>Right ▶</button>
-        </div>
-
-        <Sep label="Gravity" />
-        <div style={S.gravRow}>
-          {(Object.keys(GRAVITY_VALUES) as GravityPreset[]).map((k) => (
-            <button key={k}
-              style={{ ...S.gravBtn, ...(gravity === k ? S.gravActive : {}) }}
-              onClick={() => changeGravity(k)} disabled={!ready}
-            >{k}</button>
-          ))}
-        </div>
-
-        <Sep label="Simulation Speed" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <input
-            type="range" min={0.1} max={3} step={0.1}
-            value={speed} disabled={!ready}
-            onChange={(e) => changeSpeed(parseFloat(e.target.value))}
-            style={{ flex: 1, accentColor: '#6366f1' }}
-          />
-          <span style={{ fontSize: 11, color: '#818cf8', minWidth: 30, textAlign: 'right' }}>{speed.toFixed(1)}×</span>
-        </div>
-
-        <Sep label="Constraint Tuning" />
-        {storeRef.current && storeRef.current.getAllConstraints().length > 0 ? (
-          <div style={S.constraintsList}>
-            {storeRef.current.getAllConstraints().map((rc) => {
-              const { id, type, constraint } = rc;
-              const hasStiffness = type === 'spring' || type === 'pivot' || type === 'rope';
-              const hasDamping = type === 'spring' || type === 'pivot';
-              const hasLength = true;
-
-              return (
-                <div key={id} style={S.constraintCard}>
-                  <div style={S.constraintCardHeader}>
-                    <span style={S.constraintName}>
-                      {type === 'spring' ? '🌀 Spring' : type === 'pivot' ? '📌 Pivot' : '🔗 Rope Link'}
-                    </span>
-                    <span style={{ fontSize: 9, color: '#475569', fontFamily: 'monospace' }}>{id}</span>
-                  </div>
-
-                  {hasStiffness && (
-                    <div style={S.controlRow}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label style={S.controlLabel}>Stiffness</label>
-                        <span style={S.controlVal}>{constraint.stiffness.toFixed(3)}</span>
-                      </div>
-                      <div style={S.sliderContainer}>
-                        <input
-                          type="range"
-                          min={type === 'spring' ? 0.001 : 0.05}
-                          max={1.0}
-                          step={type === 'spring' ? 0.002 : 0.05}
-                          value={constraint.stiffness}
-                          onChange={(e) => propertyControllerRef.current?.updateConstraintProperty(id, 'stiffness', parseFloat(e.target.value))}
-                          style={S.slider}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {hasDamping && (
-                    <div style={S.controlRow}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label style={S.controlLabel}>Damping</label>
-                        <span style={S.controlVal}>{constraint.damping.toFixed(4)}</span>
-                      </div>
-                      <div style={S.sliderContainer}>
-                        <input
-                          type="range"
-                          min={0.0}
-                          max={0.1}
-                          step={0.002}
-                          value={constraint.damping}
-                          onChange={(e) => propertyControllerRef.current?.updateConstraintProperty(id, 'damping', parseFloat(e.target.value))}
-                          style={S.slider}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {hasLength && (
-                    <div style={S.controlRow}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label style={S.controlLabel}>Rest Length</label>
-                        <span style={S.controlVal}>{Math.round(constraint.length)} px</span>
-                      </div>
-                      <div style={S.sliderContainer}>
-                        <input
-                          type="range"
-                          min={10}
-                          max={350}
-                          step={5}
-                          value={constraint.length}
-                          onChange={(e) => propertyControllerRef.current?.updateConstraintProperty(id, 'length', parseFloat(e.target.value))}
-                          style={S.slider}
-                        />
-                      </div>
-                    </div>
-                  )}
+            {/* Status */}
+            <div style={S.cards}>
+              <div style={S.card}>
+                <div style={S.cardLbl}>Engine</div>
+                <div style={S.cardVal}>
+                  <span style={{ ...S.dot, background: running ? '#10b981' : '#f59e0b' }} />
+                  {ready ? (running ? 'Running' : 'Paused') : 'Loading…'}
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div style={S.noSelectionCard}>
-            <span style={{ color: '#475569', fontSize: 10 }}>No active constraints to tune.</span>
-          </div>
-        )}
-
-        <p style={S.hint}>
-          <strong style={{ color: '#6366f1' }}>Drag</strong> objects · <strong style={{ color: '#6366f1' }}>Click</strong> to select · Use controls to shape the simulation.
-        </p>
-
-        {/* AI Query Input Section */}
-        <div style={{ marginTop: 'auto', paddingTop: 20 }}>
-          <div style={{ 
-            background: 'rgba(255, 255, 255, 0.03)', 
-            border: '1px solid rgba(168, 85, 247, 0.2)', 
-            borderRadius: 12, 
-            padding: 12,
-            boxShadow: '0 0 15px rgba(168, 85, 247, 0.1) inset' 
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-              <Sparkles size={14} color="#c084fc" />
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#e9d5ff', letterSpacing: '0.05em' }}>AI QUERY</span>
+              </div>
+              <div style={S.card}>
+                <div style={S.cardLbl}>Dynamic Bodies</div>
+                <div style={S.cardVal}>{bodyCount}</div>
+              </div>
             </div>
-            <textarea
-              value={aiPrompt}
-              onChange={e => setAiPrompt(e.target.value)}
-              onKeyDown={handleAiKeyDown}
-              disabled={aiLoading}
-              placeholder="Ask about physics..."
-              style={{
-                width: '100%',
-                background: 'rgba(0, 0, 0, 0.3)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: 8,
-                padding: '8px 10px',
-                color: '#f8fafc',
-                fontSize: 12,
-                resize: 'none',
-                minHeight: 50,
-                outline: 'none',
-                opacity: aiLoading ? 0.5 : 1
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-              <span style={{ fontSize: 9, color: '#64748b' }}>Press Enter to send</span>
+
+
+
+            <Sep label="Controls" />
+            <div style={S.row}>
+              <button style={{ ...S.btn, ...S.btnPrimary, flex: 1 }} onClick={togglePlay} disabled={!ready}>
+                {running ? '⏸ Pause' : '▶ Resume'}
+              </button>
+              <button style={{ ...S.btn, ...S.btnGhost }} onClick={handleReset} disabled={!ready} title="Reset">↺</button>
+            </div>
+
+            {/* Tutor Explanation Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 2,
+              marginBottom: 6,
+              padding: '7px 10px',
+              borderRadius: 10,
+              background: tutorEnabled
+                ? 'rgba(99, 102, 241, 0.10)'
+                : 'rgba(255,255,255,0.03)',
+              border: tutorEnabled
+                ? '1px solid rgba(99,102,241,0.30)'
+                : '1px solid rgba(255,255,255,0.07)',
+              transition: 'all 0.2s ease',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14 }}>🤖</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: tutorEnabled ? '#a5b4fc' : '#64748b', transition: 'color 0.2s' }}>
+                  AI Explanation
+                </span>
+              </div>
               <button
-                onClick={handleAiQuery}
-                disabled={aiLoading || !aiPrompt.trim()}
+                id="tutor-toggle-btn"
+                onClick={() => setTutorEnabled((v) => !v)}
                 style={{
-                  background: aiLoading ? '#475569' : 'linear-gradient(135deg, #a855f7, #6366f1)',
-                  color: 'white',
+                  position: 'relative',
+                  width: 38,
+                  height: 20,
+                  borderRadius: 10,
                   border: 'none',
-                  borderRadius: 6,
-                  padding: '4px 12px',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: (aiLoading || !aiPrompt.trim()) ? 'default' : 'pointer',
-                  opacity: (aiLoading || !aiPrompt.trim()) ? 0.6 : 1
+                  cursor: 'pointer',
+                  padding: 0,
+                  background: tutorEnabled
+                    ? 'linear-gradient(135deg, #6366f1, #818cf8)'
+                    : 'rgba(71,85,105,0.6)',
+                  boxShadow: tutorEnabled
+                    ? '0 0 8px rgba(99,102,241,0.5)'
+                    : 'none',
+                  transition: 'all 0.25s ease',
+                  flexShrink: 0,
                 }}
+                title={tutorEnabled ? 'Disable AI explanations' : 'Enable AI explanations'}
               >
-                {aiLoading ? '...' : 'Send'}
+                <span style={{
+                  position: 'absolute',
+                  top: 3,
+                  left: tutorEnabled ? 21 : 3,
+                  width: 14,
+                  height: 14,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+                  transition: 'left 0.25s ease',
+                  display: 'block',
+                }} />
               </button>
             </div>
+
+            <Sep label="Spawn Shapes — click or drag" />
+            <div
+              style={S.row}
+            >
+              <button
+                style={{ ...S.btn, ...S.btnIndigo, flex: 1, cursor: ready ? 'grab' : 'not-allowed' }}
+                disabled={!ready}
+                onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnShape('rectangle'); }}
+                onPointerDown={onPanelPointerDown('rectangle')}
+              >▪ Rectangle</button>
+              <button
+                style={{ ...S.btn, ...S.btnEmerald, flex: 1, cursor: ready ? 'grab' : 'not-allowed' }}
+                disabled={!ready}
+                onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnShape('circle'); }}
+                onPointerDown={onPanelPointerDown('circle')}
+              >● Circle</button>
+            </div>
+            {/* Rope as a first-class shape asset */}
+            <div
+              style={{ ...S.row, marginTop: -2 }}
+            >
+              <button
+                style={{
+                  ...S.btn,
+                  width: '100%',
+                  cursor: ready ? 'grab' : 'not-allowed',
+                  background: 'rgba(99,102,241,0.13)',
+                  color: '#a5b4fc',
+                  borderColor: 'rgba(99,102,241,0.28)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+                disabled={!ready}
+                onClick={() => {
+                  if (didDragRef.current) { didDragRef.current = false; return; }
+                  const el = mountRef.current;
+                  if (!el) return;
+                  const W = el.clientWidth || 800;
+                  spawnPendulumRope(120 + Math.random() * (W - 240), 40 + Math.random() * 30);
+                }}
+                onPointerDown={onPanelPointerDown('pendulum-rope')}
+              >
+                <span style={{ fontSize: 13 }}>🪢</span>
+                <span>Rope  <span style={{ fontSize: 9, opacity: 0.65 }}>— drop bob to complete pendulum</span></span>
+              </button>
+            </div>
+
+            <Sep label="Spawn Constraints — click or drag" />
+            <div
+              style={{ ...S.row, flexWrap: 'wrap' }}
+            >
+              <button
+                style={{ ...S.btn, ...S.btnIndigo, flex: '1 1 45%', cursor: ready ? 'grab' : 'not-allowed', padding: '7px 4px', fontSize: 11 }}
+                disabled={!ready}
+                onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('pivot'); }}
+                onPointerDown={onPanelPointerDown('pivot')}
+              >📌 Pivot</button>
+              <button
+                style={{ ...S.btn, ...S.btnEmerald, flex: '1 1 45%', cursor: ready ? 'grab' : 'not-allowed', padding: '7px 4px', fontSize: 11 }}
+                disabled={!ready}
+                onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('spring'); }}
+                onPointerDown={onPanelPointerDown('spring')}
+              >🌀 Spring</button>
+              <button
+                style={{ ...S.btn, ...S.btnSky, width: '100%', cursor: ready ? 'grab' : 'not-allowed', marginTop: 4 }}
+                disabled={!ready}
+                onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('rope'); }}
+                onPointerDown={onPanelPointerDown('rope')}
+              >🔗 Rope Chain</button>
+            </div>
+
+            <Sep label="Impulse" />
+            <button style={{ ...S.btn, ...S.btnSky, width: '100%', marginBottom: 8 }} onClick={blast} disabled={!ready}>↑ Upward Blast</button>
+            <div style={S.row}>
+              <button style={{ ...S.btn, ...S.btnGhost, flex: 1 }} onClick={() => push('left')} disabled={!ready}>◀ Left</button>
+              <button style={{ ...S.btn, ...S.btnGhost, flex: 1 }} onClick={() => push('right')} disabled={!ready}>Right ▶</button>
+            </div>
+
+            <Sep label="Gravity System" />
+            <div style={{ ...S.gravRow, gap: 4, display: 'flex', marginBottom: 8 }}>
+              <button
+                style={{
+                  ...S.gravBtn,
+                  ...(gravityMode === 'linear' ? S.gravActive : {}),
+                  flex: 1
+                }}
+                onClick={() => handleModeChange('linear')}
+                disabled={!ready}
+              >
+                🍎 Linear
+              </button>
+              <button
+                style={{
+                  ...S.gravBtn,
+                  ...(gravityMode === 'radial' ? S.gravActive : {}),
+                  flex: 1
+                }}
+                onClick={() => handleModeChange('radial')}
+                disabled={!ready}
+              >
+                🌌 Orbital
+              </button>
+            </div>
+
+            {gravityMode === 'linear' ? (
+              <div style={S.gravRow}>
+                {(Object.keys(GRAVITY_VALUES) as GravityPreset[]).map((k) => (
+                  <button key={k}
+                    style={{ ...S.gravBtn, ...(gravity === k ? S.gravActive : {}) }}
+                    onClick={() => changeGravity(k)} disabled={!ready}
+                  >{k}</button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, padding: '4px 8px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 8 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    style={{ ...S.btn, ...S.btnIndigo, flex: 1, fontSize: 10, padding: '6px 2px', cursor: ready ? 'grab' : 'not-allowed' }}
+                    disabled={!ready}
+                    onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnStar(); }}
+                    onPointerDown={onPanelPointerDown('sun')}
+                  >
+                    ☀️ Spawn Sun
+                  </button>
+                  <button
+                    style={{ ...S.btn, ...S.btnSky, flex: 1, fontSize: 10, padding: '6px 2px', cursor: ready ? 'grab' : 'not-allowed' }}
+                    disabled={!ready}
+                    onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnOrbitingPlanet(); }}
+                    onPointerDown={onPanelPointerDown('planet')}
+                  >
+                    🌎 Spawn Orbit Planet
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#94a3b8' }}>
+                    <span>Gravitational Pull (G)</span>
+                    <span style={{ fontFamily: 'monospace', color: '#fbbf24' }}>{gConstant.toFixed(4)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.0003}
+                    max={0.004}
+                    step={0.0001}
+                    value={gConstant}
+                    disabled={!ready}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setGConstant(val);
+                    }}
+                    style={{ width: '100%', accentColor: '#38bdf8', height: 4, cursor: 'pointer' }}
+                  />
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 10, color: '#94a3b8' }}>
+                  <input
+                    type="checkbox"
+                    checked={radialDebug}
+                    disabled={!ready}
+                    onChange={(e) => setRadialDebug(e.target.checked)}
+                    style={{ accentColor: '#38bdf8', cursor: 'pointer' }}
+                  />
+                  <span>Predict Orbits & Draw Field Lines</span>
+                </label>
+              </div>
+            )}
+
+            <Sep label="Simulation Speed" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <input
+                type="range" min={0.1} max={3} step={0.1}
+                value={speed} disabled={!ready}
+                onChange={(e) => changeSpeed(parseFloat(e.target.value))}
+                style={{ flex: 1, accentColor: '#6366f1' }}
+              />
+              <span style={{ fontSize: 11, color: '#818cf8', minWidth: 30, textAlign: 'right' }}>{speed.toFixed(1)}×</span>
+            </div>
+
+            <Sep label="Constraint Tuning" />
+            {storeRef.current && storeRef.current.getAllConstraints().length > 0 ? (
+              <div style={S.constraintsList}>
+                {storeRef.current.getAllConstraints().map((rc) => {
+                  const { id, type, constraint } = rc;
+                  const hasStiffness = type === 'spring' || type === 'pivot' || type === 'rope';
+                  const hasDamping = type === 'spring' || type === 'pivot';
+                  const hasLength = true;
+
+                  return (
+                    <div key={id} style={S.constraintCard}>
+                      <div style={S.constraintCardHeader}>
+                        <span style={S.constraintName}>
+                          {type === 'spring' ? '🌀 Spring' : type === 'pivot' ? '📌 Pivot' : '🔗 Rope Link'}
+                        </span>
+                        <span style={{ fontSize: 9, color: '#475569', fontFamily: 'monospace' }}>{id}</span>
+                      </div>
+
+                      {hasStiffness && (
+                        <div style={S.controlRow}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={S.controlLabel}>Stiffness</label>
+                            <span style={S.controlVal}>{constraint.stiffness.toFixed(3)}</span>
+                          </div>
+                          <div style={S.sliderContainer}>
+                            <input
+                              type="range"
+                              min={type === 'spring' ? 0.001 : 0.05}
+                              max={1.0}
+                              step={type === 'spring' ? 0.002 : 0.05}
+                              value={constraint.stiffness}
+                              onChange={(e) => propertyControllerRef.current?.updateConstraintProperty(id, 'stiffness', parseFloat(e.target.value))}
+                              style={S.slider}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {hasDamping && (
+                        <div style={S.controlRow}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={S.controlLabel}>Damping</label>
+                            <span style={S.controlVal}>{constraint.damping.toFixed(4)}</span>
+                          </div>
+                          <div style={S.sliderContainer}>
+                            <input
+                              type="range"
+                              min={0.0}
+                              max={0.1}
+                              step={0.002}
+                              value={constraint.damping}
+                              onChange={(e) => propertyControllerRef.current?.updateConstraintProperty(id, 'damping', parseFloat(e.target.value))}
+                              style={S.slider}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {hasLength && (
+                        <div style={S.controlRow}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={S.controlLabel}>Rest Length</label>
+                            <span style={S.controlVal}>{Math.round(constraint.length)} px</span>
+                          </div>
+                          <div style={S.sliderContainer}>
+                            <input
+                              type="range"
+                              min={10}
+                              max={350}
+                              step={5}
+                              value={constraint.length}
+                              onChange={(e) => propertyControllerRef.current?.updateConstraintProperty(id, 'length', parseFloat(e.target.value))}
+                              style={S.slider}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={S.noSelectionCard}>
+                <span style={{ color: '#475569', fontSize: 10 }}>No active constraints to tune.</span>
+              </div>
+            )}
+
+            <p style={S.hint}>
+              <strong style={{ color: '#6366f1' }}>Drag</strong> objects · <strong style={{ color: '#6366f1' }}>Click</strong> to select · Use controls to shape the simulation.
+            </p>
+
+            {/* AI Query Input Section */}
+            <div style={{ marginTop: 'auto', paddingTop: 20 }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(168, 85, 247, 0.2)',
+                borderRadius: 12,
+                padding: 12,
+                boxShadow: '0 0 15px rgba(168, 85, 247, 0.1) inset'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <Sparkles size={14} color="#c084fc" />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#e9d5ff', letterSpacing: '0.05em' }}>AI QUERY</span>
+                </div>
+                <textarea
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  onKeyDown={handleAiKeyDown}
+                  disabled={aiLoading}
+                  placeholder="Ask about physics..."
+                  style={{
+                    width: '100%',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    color: '#f8fafc',
+                    fontSize: 12,
+                    resize: 'none',
+                    minHeight: 50,
+                    outline: 'none',
+                    opacity: aiLoading ? 0.5 : 1
+                  }}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, minHeight: 0 }}>
+            {/* Search Input */}
+            <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', display: 'flex', alignItems: 'center' }}>
+                <Search size={13} />
+              </span>
+              <input
+                type="text"
+                value={exampleSearch}
+                onChange={e => setExampleSearch(e.target.value)}
+                placeholder="Search examples..."
+                style={{
+                  width: '100%',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '8px',
+                  padding: '8px 10px 8px 30px',
+                  color: '#fff',
+                  fontSize: '12px',
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            {/* Clear Example mode button */}
+            {selectedExampleId && (
+              <button
+                onClick={() => {
+                  setSelectedExampleId(null);
+                  handleReset();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '8px',
+                  border: '1px dashed rgba(239, 68, 68, 0.5)',
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  color: '#f87171',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s',
+                  flexShrink: 0,
+                  outline: 'none',
+                }}
+              >
+                <span>✕ Exit Example Mode</span>
+              </button>
+            )}
+
+            {/* List of Examples */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+              {getAllExamples()
+                .filter((ex: any) =>
+                  ex.title.toLowerCase().includes(exampleSearch.toLowerCase()) ||
+                  ex.description.toLowerCase().includes(exampleSearch.toLowerCase())
+                )
+                .map((ex: any) => {
+                  const isSelected = selectedExampleId === ex.id;
+                  return (
+                    <div
+                      key={ex.id}
+                      onClick={() => handleSelectExample(ex.id)}
+                      style={{
+                        background: isSelected
+                          ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(79, 70, 229, 0.05))'
+                          : 'rgba(255, 255, 255, 0.02)',
+                        border: isSelected
+                          ? '1px solid rgba(99, 102, 241, 0.45)'
+                          : '1px solid rgba(255, 255, 255, 0.06)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: isSelected ? '0 4px 16px rgba(99, 102, 241, 0.15)' : 'none',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignSelf: 'stretch', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{
+                          fontSize: '8px',
+                          fontWeight: 800,
+                          color: '#818cf8',
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                        }}>{ex.category}</span>
+                        {isSelected && (
+                          <span style={{
+                            fontSize: '9px',
+                            fontWeight: 800,
+                            color: '#10b981',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}>
+                            ● Active
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 style={{
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: isSelected ? '#a5b4fc' : '#cbd5e1',
+                        margin: 0,
+                      }}>{ex.title}</h3>
+
+                      <p style={{
+                        fontSize: '11px',
+                        color: '#94a3b8',
+                        margin: 0,
+                        lineHeight: '1.4',
+                      }}>{ex.description}</p>
+
+                      {/* Launch / Play button inside the card */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectExample(ex.id);
+                        }}
+                        style={{
+                          marginTop: '4px',
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: isSelected
+                            ? 'linear-gradient(135deg, #10b981, #059669)'
+                            : 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                          color: '#fff',
+                          fontSize: '10.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          transition: 'all 0.2s',
+                          boxShadow: isSelected ? '0 4px 10px rgba(16, 185, 129, 0.2)' : '0 4px 10px rgba(79, 70, 229, 0.2)',
+                          outline: 'none',
+                        }}
+                      >
+                        <Play size={10} fill="#fff" />
+                        {isSelected ? 'Reset Scenario' : 'Launch Simulation'}
+                      </button>
+
+                      {/* Educational Highlights */}
+                      <div style={{
+                        marginTop: '4px',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        background: 'rgba(0, 0, 0, 0.25)',
+                        border: '1px solid rgba(255, 255, 255, 0.03)',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '6px' }}>
+                          <Info size={11} color="#818cf8" />
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Key Concepts</span>
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: '14px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          {ex.config.metadata.educationalNotes.map((note: any, idx: any) => (
+                            <li key={idx} style={{ fontSize: '10px', color: '#cbd5e1', lineHeight: '1.4' }}>{note}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           </div>
-        </div>
+        )}
       </aside>
 
       {/* ── Canvas ─────────────────────────────────────────── */}
@@ -1565,12 +2956,88 @@ export const SandboxCanvas: React.FC = () => {
           outline: isOverCanvas ? '2px dashed rgba(99,102,241,0.6)' : 'none',
           outlineOffset: '-3px',
         }}
-        onClick={() => interactionRef.current?.selection.deselect()}
-        onPointerMove={onPanelPointerMove}
-        onPointerUp={onPanelPointerUp}
       >
         <div style={S.dotGrid} />
         <div ref={mountRef} style={S.mount} />
+
+        {/* Viewport Control HUD removed as requested - zoom/pan is controlled directly by the mouse wheel and dragging */}
+
+        {/* Floating Sidebar Toggle Buttons */}
+        <button
+          onClick={() => setLeftPanelOpen((open) => !open)}
+          style={{
+            position: 'absolute',
+            left: 14,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 350,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(15, 23, 42, 0.65)',
+            color: '#a5b4fc',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            outline: 'none',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(99, 102, 241, 0.85)';
+            e.currentTarget.style.color = '#ffffff';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(15, 23, 42, 0.65)';
+            e.currentTarget.style.color = '#a5b4fc';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+          }}
+          title={leftPanelOpen ? 'Collapse Left Panel' : 'Expand Left Panel'}
+        >
+          {leftPanelOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+        </button>
+
+        <button
+          onClick={() => setRightPanelOpen((open) => !open)}
+          style={{
+            position: 'absolute',
+            right: 14,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 350,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(15, 23, 42, 0.65)',
+            color: '#a5b4fc',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            outline: 'none',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(99, 102, 241, 0.85)';
+            e.currentTarget.style.color = '#ffffff';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(15, 23, 42, 0.65)';
+            e.currentTarget.style.color = '#a5b4fc';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+          }}
+          title={rightPanelOpen ? 'Collapse Right Panel' : 'Expand Right Panel'}
+        >
+          {rightPanelOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
 
         {/* Asset drag-over visual highlight — pointer events always off, window listener handles the drop */}
         <div
@@ -1617,147 +3084,1160 @@ export const SandboxCanvas: React.FC = () => {
           </div>
         )}
 
-        <div style={S.badge}>
+        <div style={{ ...S.badge, bottom: bottomPanelOpen ? 124 : 14, transition: 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
           <span style={{ ...S.dot, background: '#6366f1', marginRight: 6 }} />
           Drag shapes & constraints · Drop anywhere
         </div>
 
+        {/* Persistent Bottom Observables & Telemetry Dock */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: bottomPanelOpen ? '110px' : '0px',
+          background: 'rgba(15, 23, 42, 0.92)',
+          backdropFilter: 'blur(20px)',
+          borderTop: bottomPanelOpen ? '1px solid rgba(255, 255, 255, 0.08)' : '0px solid transparent',
+          display: 'flex',
+          alignItems: 'stretch',
+          zIndex: 340,
+          fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif',
+          color: '#cbd5e1',
+          userSelect: 'none',
+          overflow: 'hidden',
+          boxShadow: '0 -8px 30px rgba(0, 0, 0, 0.4)',
+          transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-top-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}>
+          {/* Collapse Button */}
+          <button
+            onClick={() => setBottomPanelOpen(false)}
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              width: 22,
+              height: 22,
+              borderRadius: 6,
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#94a3b8',
+              fontSize: 12,
+              fontWeight: 700,
+              transition: 'all 0.15s',
+              zIndex: 10,
+              outline: 'none',
+            }}
+            onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
+            onMouseOut={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+            title="Hide Telemetry"
+          >
+            ▼
+          </button>
 
-
-        {/* Floating glassmorphic STEM Laboratory HUD Overlay */}
-        {selected && (
-          <div style={S.floatingHud}>
-            <div style={S.floatingHudTitle}>🔬 F = ma Educational HUD</div>
-            <div ref={hudFormulaRef} style={S.floatingHudEq}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#fde047', textShadow: '0 0 10px rgba(253,224,71,0.25)' }}>
-                F = m &middot; a
-              </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, fontFamily: 'monospace' }}>
-                0.0 N = 10.0 kg &times; 0.00 m/s&sup2;
-              </div>
+          {/* Global Clock & Mode */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            padding: '0 20px',
+            borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(0, 0, 0, 0.2)',
+            minWidth: '170px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: running ? '#10b981' : '#f59e0b',
+                boxShadow: running ? '0 0 8px #10b981' : '0 0 8px #f59e0b'
+              }} />
+              <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Simulation Time</span>
             </div>
-            <div style={S.floatingHudGrid}>
-              <div style={S.floatingHudCard}>
-                <span style={S.floatingHudLabel}>Applied Force</span>
-                <span ref={hudForceRef} style={{ ...S.floatingHudValue, color: '#ef4444' }}>0.0 N</span>
-              </div>
-              <div style={S.floatingHudCard}>
-                <span style={S.floatingHudLabel}>Mass</span>
-                <span ref={hudMassRef} style={{ ...S.floatingHudValue, color: '#c084fc' }}>10.0 kg</span>
-              </div>
-              <div style={S.floatingHudCard}>
-                <span style={S.floatingHudLabel}>Applied Accel.</span>
-                <span ref={hudAccRef} style={{ ...S.floatingHudValue, color: '#10b981' }}>0.00 m/s²</span>
-              </div>
+            <span style={{ fontSize: '18px', fontWeight: 900, color: '#818cf8', fontFamily: 'monospace', textShadow: '0 0 10px rgba(129, 140, 248, 0.3)' }}>
+              {formatTime(simTimeRef.current)}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+              <span style={{
+                fontSize: '8px',
+                fontWeight: 800,
+                padding: '2px 6px',
+                borderRadius: '4px',
+                textTransform: 'uppercase',
+                background: gravityMode === 'radial' ? 'rgba(167, 139, 250, 0.15)' : 'rgba(14, 165, 233, 0.15)',
+                color: gravityMode === 'radial' ? '#c084fc' : '#38bdf8',
+              }}>
+                {gravityMode === 'radial' ? '🌌 Orbital Gravity' : '🍎 Linear Gravity'}
+              </span>
             </div>
           </div>
+
+          {/* Active Bodies Telemetry Scroll View */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            padding: '12px 40px 12px 16px',
+            overflowX: 'auto',
+            flex: 1,
+            alignItems: 'center',
+            scrollbarWidth: 'thin',
+          }}>
+            {(storeRef.current?.getAllObjects().filter(o => !o.body.isStatic) ?? []).map(obj => {
+              const isSelected = selected?.id === obj.id;
+              const m = obj.body.mass;
+              const speed = Math.hypot(obj.body.velocity.x, obj.body.velocity.y);
+              const ke = 0.5 * m * speed * speed;
+
+              const radialGravity = runtimeRef.current?.gravitySystem?.getRadialGravity();
+              const sources = radialGravity?.getSources() ?? [];
+              const G = radialGravity?.getConfig()?.gravitationalConstant ?? 0.0012;
+              const bodyPos = obj.body.position;
+
+              let centralSource: any = null;
+              let minDistance = Infinity;
+
+              for (const source of sources) {
+                if (source.id === obj.id || !source.enabled) continue;
+                const dist = Math.hypot(source.position.x - bodyPos.x, source.position.y - bodyPos.y);
+                if (dist < minDistance) {
+                  minDistance = dist;
+                  centralSource = source;
+                }
+              }
+
+              let pe = 0;
+              let totalEnergy = ke;
+              let angularMomentum = 0;
+
+              if (centralSource) {
+                const r = Math.max(0.1, Math.hypot(bodyPos.x - centralSource.position.x, bodyPos.y - centralSource.position.y));
+                const M = centralSource.mass * (centralSource.metadata?.gravityStrength ?? 1.0);
+                pe = - (G * M * m) / (r / 100);
+                totalEnergy = ke + pe;
+                angularMomentum = m * ((bodyPos.x - centralSource.position.x) * obj.body.velocity.y - (bodyPos.y - centralSource.position.y) * obj.body.velocity.x);
+              }
+
+              return (
+                <div
+                  key={obj.id}
+                  onClick={() => {
+                    setSelected(obj);
+                    storeRef.current?.setSelectedObject(obj.id);
+                  }}
+                  style={{
+                    minWidth: '220px',
+                    background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'rgba(0, 0, 0, 0.3)',
+                    border: isSelected ? '1px solid rgba(99, 102, 241, 0.6)' : '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isSelected ? '0 0 15px rgba(99, 102, 241, 0.2)' : 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
+                >
+                  {/* Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: isSelected ? '#a5b4fc' : '#cbd5e1', fontFamily: 'monospace' }}>
+                      🛰️ {obj.id.replace('example-', '').replace('orbit-', '')}
+                    </span>
+                    <span style={{
+                      fontSize: '8px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      color: isSelected ? '#6ee7b7' : '#94a3b8',
+                      background: isSelected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                      padding: '1px 4px',
+                      borderRadius: '4px'
+                    }}>
+                      {obj.body.isStatic ? 'Static' : 'Dynamic'}
+                    </span>
+                  </div>
+
+                  {/* Real-time stats */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginTop: '2px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '7px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Kinetic (K)</span>
+                      <span style={{ fontSize: '10px', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {formatScientific(ke * 10, 'GJ')}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '7px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Potential (U)</span>
+                      <span style={{ fontSize: '10px', color: '#fb7185', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {gravityMode === 'radial' && centralSource ? formatScientific(pe * 10, 'GJ') : '0.00 GJ'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '7px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Total (E)</span>
+                      <span style={{ fontSize: '10px', color: '#a78bfa', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {gravityMode === 'radial' && centralSource ? formatScientific(totalEnergy * 10, 'GJ') : formatScientific(ke * 10, 'GJ')}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '7px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Ang Momentum</span>
+                      <span style={{ fontSize: '10px', color: '#fde047', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {gravityMode === 'radial' && centralSource ? formatScientific(angularMomentum * 10, 'kg·m²/s') : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {(storeRef.current?.getAllObjects().filter(o => !o.body.isStatic) ?? []).length === 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, height: '100%' }}>
+                <span style={{ fontSize: '11px', color: '#475569', fontStyle: 'italic' }}>
+                  🚀 Spawn orbiting satellites or planets to view live telemetry readouts.
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Floating Expand Button when Collapsed */}
+        {!bottomPanelOpen && (
+          <button
+            onClick={() => setBottomPanelOpen(true)}
+            style={{
+              position: 'absolute',
+              bottom: 14,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '6px 16px',
+              borderRadius: '999px',
+              background: 'rgba(15, 23, 42, 0.85)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              color: '#c7d2fe',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              zIndex: 340,
+              transition: 'all 0.2s ease',
+              outline: 'none',
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.background = 'rgba(99, 102, 241, 0.85)';
+              e.currentTarget.style.color = '#ffffff';
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1.05)';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.background = 'rgba(15, 23, 42, 0.85)';
+              e.currentTarget.style.color = '#c7d2fe';
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
+            }}
+          >
+            📊 Show Telemetry
+          </button>
         )}
 
+
+
+
+
+        {/* Circular Floating AI Toggle Button */}
+        <motion.button
+          onClick={() => setTutorEnabled(!tutorEnabled)}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.95 }}
+          style={{
+            position: 'absolute',
+            top: 20,
+            right: 20,
+            zIndex: 390,
+            width: 46,
+            height: 46,
+            borderRadius: '50%',
+            background: tutorEnabled
+              ? 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)'
+              : 'rgba(15, 23, 42, 0.65)',
+            border: tutorEnabled
+              ? '2px solid #5B5FFF'
+              : '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: tutorEnabled
+              ? '0 0 16px rgba(91, 95, 255, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3)'
+              : '0 4px 12px rgba(0, 0, 0, 0.35)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'border 0.25s, background 0.25s, box-shadow 0.25s',
+            outline: 'none',
+          }}
+          title={tutorEnabled ? 'Close AI explanation panel' : 'Open AI explanation panel'}
+        >
+          <Sparkles
+            size={20}
+            color="#fbbf24"
+            style={{
+              animation: tutorEnabled ? 'pulse-glow 1.8s infinite ease-in-out' : 'none',
+              transform: tutorEnabled ? 'scale(1.05)' : 'none',
+              transition: 'transform 0.2s'
+            }}
+          />
+
+          {/* Glowing Notification Dot for queued events */}
+          {queueCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: 2,
+              right: 2,
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: '#ec4899', // Pink glow
+              border: '1.5px solid #0f172a',
+              boxShadow: '0 0 6px #ec4899',
+              display: 'block'
+            }} />
+          )}
+        </motion.button>
+
         {/* Floating AI Response Panel — hidden when tutor is off */}
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {tutorEnabled && currentExplanation && (
+            /* Expanded Full Workspace AI Inspector Panel */
             <motion.div
-              key={currentExplanation.id}
-              initial={{ opacity: 0, y: -20, x: '-50%' }}
-              animate={{ opacity: 1, y: 0, x: '-50%' }}
-              exit={{ opacity: 0, y: -20, x: '-50%' }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              key="tutor-expanded"
+              initial={{ opacity: 0, y: 15, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 15, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 200 }}
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
               style={{
                 position: 'absolute',
-                top: 24,
-                left: '50%',
-                zIndex: 100,
-                width: 420,
-                background: 'rgba(15, 23, 42, 0.9)',
+                top: 20,
+                right: 84,
+                zIndex: 380,
+                width: tutorMaximized ? 480 : tutorWidth,
+                height: tutorMinimized ? 'auto' : (tutorMaximized ? 'calc(100% - 40px)' : tutorHeight),
+                maxHeight: 'calc(100% - 40px)',
+                background: 'linear-gradient(180deg, #0B1020, #121933)',
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(168, 85, 247, 0.5)',
-                borderRadius: 16,
-                padding: 20,
-                boxShadow: '0 10px 40px -10px rgba(168, 85, 247, 0.4), 0 0 20px rgba(168, 85, 247, 0.15) inset',
+                border: '1px solid rgba(120, 120, 255, 0.15)',
+                borderRadius: 20,
+                padding: '16px 16px 18px 16px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05)',
                 color: '#f8fafc',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 14
+                gap: 12,
+                overflow: 'hidden',
+                transition: 'width 0.3s ease, height 0.3s ease',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 10 }}>
+              {/* CSS Glow Animations Injector */}
+              <style dangerouslySetInnerHTML={{
+                __html: `
+                @keyframes shimmer {
+                  0% { background-position: -200% 0; }
+                  100% { background-position: 200% 0; }
+                }
+                @keyframes pulse-glow {
+                  0%, 100% { transform: scale(1); opacity: 0.6; filter: drop-shadow(0 0 1px rgba(120, 120, 255, 0.4)); }
+                  50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 6px rgba(120, 120, 255, 0.8)); }
+                }
+                .shimmer-bg {
+                  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.03) 75%);
+                  background-size: 200% 100%;
+                  animation: shimmer 1.5s infinite linear;
+                }
+                .hover-glow-left {
+                  transition: background-color 0.2s, box-shadow 0.2s;
+                }
+                .hover-glow-left:hover {
+                  background-color: rgba(120, 120, 255, 0.2);
+                  box-shadow: 2px 0 10px rgba(120, 120, 255, 0.4);
+                }
+                .hover-glow-bottom {
+                  transition: background-color 0.2s, box-shadow 0.2s;
+                }
+                .hover-glow-bottom:hover {
+                  background-color: rgba(120, 120, 255, 0.2);
+                  box-shadow: 0 -2px 10px rgba(120, 120, 255, 0.4);
+                }
+                .tutor-scroll-container::-webkit-scrollbar {
+                  width: 4px;
+                }
+                .tutor-scroll-container::-webkit-scrollbar-track {
+                  background: transparent;
+                }
+                .tutor-scroll-container::-webkit-scrollbar-thumb {
+                  background: rgba(255, 255, 255, 0.08);
+                  border-radius: 4px;
+                }
+                .tutor-scroll-container::-webkit-scrollbar-thumb:hover {
+                  background: rgba(120, 120, 255, 0.35);
+                }
+              ` }} />
+
+              {/* Resizer Handle Left Edge (Horizontal) */}
+              {!tutorMinimized && !tutorMaximized && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 6,
+                    cursor: 'w-resize',
+                    zIndex: 210,
+                  }}
+                  onPointerDown={handleResizeLeft}
+                  className="hover-glow-left"
+                  title="Drag to resize width"
+                />
+              )}
+
+              {/* Resize Handle Bottom Edge (Vertical) */}
+              {!tutorMinimized && !tutorMaximized && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 6,
+                    cursor: 's-resize',
+                    zIndex: 210,
+                  }}
+                  onPointerDown={handleResizeBottom}
+                  className="hover-glow-bottom"
+                  title="Drag to resize height"
+                />
+              )}
+
+              {/* Premium Sticky Header */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                paddingBottom: 10,
+                flexShrink: 0,
+              }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Sparkles size={18} color="#c084fc" />
-                  <span style={{ fontSize: 14, fontWeight: 800, color: '#e9d5ff', letterSpacing: '0.02em' }}>✨ AI Explanation</span>
+                  <Sparkles size={16} color="#fbbf24" className="pulse-svg" style={{ animation: 'pulse-glow 1.8s infinite ease-in-out' }} />
+                  <span style={{ fontSize: 13.5, fontWeight: 800, color: '#ffffff', letterSpacing: '0.02em', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+                    AI Explanation
+                  </span>
+
+                  {/* Violet Queue Badge */}
+                  <span style={{
+                    background: '#5B5FFF',
+                    color: '#ffffff',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: 12,
+                    marginLeft: 4,
+                    boxShadow: '0 0 8px rgba(91, 95, 255, 0.4)'
+                  }}>
+                    {queueCount > 0 ? `+${queueCount}` : '+1'}
+                  </span>
+
+                  {/* Next explanation navigation button */}
                   {queueCount > 0 && (
-                    <span style={{ background: '#a855f7', color: 'white', fontSize: 10, padding: '2px 6px', borderRadius: 10, fontWeight: 800 }}>
-                      +{queueCount}
-                    </span>
+                    <button
+                      onClick={handleNext}
+                      style={{
+                        background: 'rgba(91, 95, 255, 0.25)',
+                        border: '1px solid rgba(91, 95, 255, 0.45)',
+                        borderRadius: 12,
+                        padding: '2px 8.5px',
+                        color: '#ffffff',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        marginLeft: 6,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        boxShadow: '0 0 8px rgba(91, 95, 255, 0.3)',
+                        transition: 'all 0.2s',
+                        outline: 'none',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(91, 95, 255, 0.4)';
+                        e.currentTarget.style.borderColor = 'rgba(91, 95, 255, 0.6)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(91, 95, 255, 0.25)';
+                        e.currentTarget.style.borderColor = 'rgba(91, 95, 255, 0.45)';
+                      }}
+                      title="View next queued physics explanation"
+                    >
+                      <span>Next</span>
+                      <ChevronRight size={10} strokeWidth={3} />
+                    </button>
                   )}
                 </div>
-                <button 
-                  onClick={handleDismiss}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              
-              <div>
-                <h4 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 8 }}>{currentExplanation.insight.title}</h4>
-                <p style={{ fontSize: 13, lineHeight: 1.5, color: '#cbd5e1' }}>{currentExplanation.insight.explanation}</p>
-              </div>
 
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Effects:</span>
-                <ul style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {currentExplanation.insight.effects.map((effect, idx) => (
-                    <li key={idx} style={{ fontSize: 12, color: '#e2e8f0', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                      <span style={{ color: '#c084fc', marginTop: -1 }}>•</span> {effect}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Formula:</span>
-                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: 6, marginTop: 4, fontFamily: 'monospace', color: '#fde047', fontSize: 13, fontWeight: 600, border: '1px solid rgba(255,255,255,0.05)' }}>
-                  {currentExplanation.insight.formula}
+                {/* Window Controls Button Group */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {/* Pin button */}
+                  <button
+                    onClick={() => setTutorPinned(!tutorPinned)}
+                    style={{
+                      background: tutorPinned ? 'rgba(91, 95, 255, 0.2)' : 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: tutorPinned ? '#a5b4fc' : '#94a3b8',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      outline: 'none',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = tutorPinned ? '#a5b4fc' : '#94a3b8'}
+                    title={tutorPinned ? "Dock Floating (Auto-Dismiss Enabled)" : "Pin Inspector (Disable Auto-Dismiss)"}
+                  >
+                    <Pin size={13} style={{ transform: tutorPinned ? 'rotate(45deg)' : 'none' }} />
+                  </button>
+                  {/* Maximize button */}
+                  <button
+                    onClick={() => setTutorMaximized(!tutorMaximized)}
+                    style={{
+                      background: tutorMaximized ? 'rgba(91, 95, 255, 0.15)' : 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: tutorMaximized ? '#ffffff' : '#94a3b8',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      outline: 'none',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = tutorMaximized ? '#ffffff' : '#94a3b8'}
+                    title={tutorMaximized ? "Restore Layout" : "Maximize Panel"}
+                  >
+                    <Maximize2 size={13} />
+                  </button>
+                  {/* Minimize arrow (chevron down) */}
+                  <button
+                    onClick={() => setTutorMinimized(!tutorMinimized)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      outline: 'none',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                    title={tutorMinimized ? "Expand Panel" : "Minimize Panel"}
+                  >
+                    {tutorMinimized ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  </button>
+                  {/* Close button */}
+                  <button
+                    onClick={() => {
+                      handleClear();
+                      setTutorEnabled(false);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      outline: 'none',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                    title="Close and dismiss explanation panel"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                {currentExplanation.insight.suggestions.map((action, i) => (
-                  <button 
-                    key={i} 
-                    style={{
-                      background: 'rgba(168,85,247,0.15)',
-                      border: '1px solid rgba(168,85,247,0.3)',
-                      borderRadius: 6,
-                      padding: '6px 12px',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: '#e9d5ff',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(168,85,247,0.25)';
-                      e.currentTarget.style.borderColor = 'rgba(168,85,247,0.5)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(168,85,247,0.15)';
-                      e.currentTarget.style.borderColor = 'rgba(168,85,247,0.3)';
-                    }}
-                  >
-                    {action}
-                  </button>
-                ))}
+              {/* Animated Pill Tabs */}
+              <div style={{
+                display: 'flex',
+                background: 'rgba(0, 0, 0, 0.35)',
+                borderRadius: 30,
+                padding: 4,
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                gap: 4,
+                flexShrink: 0
+              }}>
+                {(['explanation', 'effects', 'formula'] as const).map((tab) => {
+                  const isActive = activeTab === tab;
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      style={{
+                        flex: 1,
+                        background: isActive ? 'linear-gradient(90deg, #5B5FFF, #7B61FF)' : 'transparent',
+                        color: isActive ? '#ffffff' : '#94a3b8',
+                        border: 'none',
+                        borderRadius: 20,
+                        padding: '6px 0',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        letterSpacing: '0.02em',
+                        cursor: 'pointer',
+                        boxShadow: isActive ? '0 0 12px rgba(91, 95, 255, 0.4)' : 'none',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        outline: 'none',
+                        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif"
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.color = '#cbd5e1';
+                        } else {
+                          e.currentTarget.style.filter = 'brightness(1.15)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.color = '#94a3b8';
+                        } else {
+                          e.currentTarget.style.filter = 'none';
+                        }
+                      }}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  );
+                })}
               </div>
+
+              {/* Independent Scrollable Content Area */}
+              {!tutorMinimized && (
+                <div
+                  className="tutor-scroll-container"
+                  style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    paddingRight: 4,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 12,
+                  }}
+                >
+                  {currentExplanation.loading ? (
+                    /* Sleek glassmorphic shimmering loader */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 8 }}>
+                      <div className="shimmer-bg" style={{ height: 20, width: '70%', borderRadius: 6 }} />
+                      <div className="shimmer-bg" style={{ height: 60, width: '100%', borderRadius: 8 }} />
+                      <div className="shimmer-bg" style={{ height: 60, width: '100%', borderRadius: 8 }} />
+                      <div className="shimmer-bg" style={{ height: 60, width: '100%', borderRadius: 8 }} />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Active Tab View Router */}
+                      {activeTab === 'explanation' && (() => {
+                        const sections = parseExplanationText(currentExplanation.insight.explanation);
+                        const getParsedSection = (queryKey: string) => {
+                          const keys = Object.keys(sections);
+                          const foundKey = keys.find(k => k.includes(queryKey) || queryKey.includes(k));
+                          return foundKey ? sections[foundKey] : null;
+                        };
+
+                        let step1Text = getParsedSection('EXPLANATION') || getParsedSection('LIVE') || getParsedSection('HAPPENED') || getParsedSection('STEP 1');
+                        let step2Text = getParsedSection('UNDERSTANDING') || getParsedSection('DEEPER') || getParsedSection('CHANGED') || getParsedSection('STEP 2');
+                        let step3Text = getParsedSection('WHY') || getParsedSection('STEP 3');
+                        let step4Text = getParsedSection('NOTICE') || getParsedSection('STEP 4');
+
+                        if (!step1Text && !step2Text && !step3Text && !step4Text) {
+                          // Offline fallback: split by sentences and distribute across steps
+                          const rawExp = currentExplanation.insight.explanation || '';
+                          const sentences = rawExp.split(/[.!?]+\s+/).filter(Boolean);
+                          step1Text = sentences[0] || "The Earth object is now attached to the pendulum.";
+                          step2Text = sentences[1] || "The pendulum has more mass and swings with greater weight.";
+                          step3Text = sentences[2] || "Adding the Earth increases the total mass, so gravity pulls it down more strongly.";
+                          step4Text = sentences[3] || sentences.slice(3).join('. ') || "Watch how the pendulum swings slower and with more force compared to before.";
+                        }
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <StepCard num={1} title="What Happened" description={step1Text || ''} type="blue" />
+                            <StepCard num={2} title="What Changed" description={step2Text || ''} type="green" />
+                            <StepCard num={3} title="Simple Why" description={step3Text || ''} type="orange" />
+                            <StepCard num={4} title="What to Notice" description={step4Text || ''} type="purple" />
+
+                            {/* Key Effects Section inside the Explanation tab */}
+                            <div style={{ marginTop: 14, borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: 14 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: '#7B61FF', letterSpacing: '0.02em', display: 'block', marginBottom: 8, fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+                                Key Effects
+                              </span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                {(currentExplanation.insight.effects && currentExplanation.insight.effects.length > 0
+                                  ? currentExplanation.insight.effects
+                                  : ['Greater gravitational force', 'Slower swing', 'More inertia', 'More kinetic energy at the bottom']
+                                ).map((effect, idx) => {
+                                  const cleanedEffect = effect.replace(/^[^\w\s]+/g, '').trim();
+                                  return (
+                                    <motion.span
+                                      key={idx}
+                                      whileHover={{ scale: 1.04, borderColor: '#7B61FF' }}
+                                      style={{
+                                        fontSize: 11,
+                                        padding: '5px 12px',
+                                        borderRadius: 20,
+                                        background: 'rgba(255, 255, 255, 0.03)',
+                                        border: '1px solid rgba(123, 97, 255, 0.25)',
+                                        boxShadow: '0 0 8px rgba(123, 97, 255, 0.08)',
+                                        color: '#cbd5e1',
+                                        cursor: 'default',
+                                        transition: 'all 0.2s',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                      }}
+                                    >
+                                      {cleanedEffect}
+                                    </motion.span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {activeTab === 'effects' && (() => {
+                        const hasSelected = !!selected;
+                        const body = selected?.body;
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {/* Live Telemetry Table */}
+                            <div style={{
+                              background: 'rgba(0, 0, 0, 0.25)',
+                              border: '1px solid rgba(255, 255, 255, 0.05)',
+                              borderRadius: 12,
+                              padding: 10,
+                            }}>
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>
+                                🛰️ Active Simulation Telemetry
+                              </span>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                                <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: 7.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 800 }}>Target</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: hasSelected ? '#f87171' : '#64748b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                    {hasSelected ? (body?.label || selected.id) : 'None'}
+                                  </span>
+                                </div>
+                                <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: 7.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 800 }}>Gravity Mode</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#38bdf8' }}>
+                                    {gravityMode === 'radial' ? '🌌 Radial' : '🍎 Downward'}
+                                  </span>
+                                </div>
+                                <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: 7.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 800 }}>Bodies</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399' }}>{bodyCount} shapes</span>
+                                </div>
+                                <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: 7.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 800 }}>Speed</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24' }}>{speed.toFixed(1)}x</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Live Target Telemetry if selected */}
+                            {hasSelected && body && (
+                              <div style={{
+                                background: 'rgba(99, 102, 241, 0.05)',
+                                border: '1px solid rgba(99, 102, 241, 0.15)',
+                                borderRadius: 12,
+                                padding: 10,
+                              }}>
+                                <span style={{ fontSize: 9.5, fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>
+                                  🎯 Target Telemetry: {body.label || selected.id}
+                                </span>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: 7.5, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Mass</span>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1', fontFamily: 'monospace' }}>{body.mass.toFixed(1)} kg</span>
+                                  </div>
+                                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: 7.5, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Speed (v)</span>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1', fontFamily: 'monospace' }}>
+                                      {Math.hypot(body.velocity.x, body.velocity.y).toFixed(1)} m/s
+                                    </span>
+                                  </div>
+                                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: 7.5, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Bounciness (e)</span>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1', fontFamily: 'monospace' }}>{body.restitution.toFixed(2)}</span>
+                                  </div>
+                                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: 7.5, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Friction (μ)</span>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1', fontFamily: 'monospace' }}>{body.friction.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Suggested Experiments */}
+                            <div>
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>
+                                🧪 Sandbox Experiments
+                              </span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {currentExplanation.insight.suggestions && currentExplanation.insight.suggestions.length > 0 ? (
+                                  currentExplanation.insight.suggestions.map((sug, i) => (
+                                    <motion.button
+                                      key={i}
+                                      whileHover={{ scale: 1.02, x: 4, background: 'rgba(251, 191, 36, 0.12)' }}
+                                      onClick={() => {
+                                        setAiPrompt(`Help me perform the suggested experiment: ${sug}`);
+                                        handleAiQuery();
+                                      }}
+                                      style={{
+                                        background: 'rgba(255, 255, 255, 0.02)',
+                                        border: '1px solid rgba(251, 191, 36, 0.25)',
+                                        borderRadius: 8,
+                                        padding: '8px 12px',
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        color: '#fde047',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        transition: 'all 0.2s',
+                                        outline: 'none',
+                                      }}
+                                    >
+                                      <span>👉 {sug}</span>
+                                      <span style={{ fontSize: 8, opacity: 0.6, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Launch</span>
+                                    </motion.button>
+                                  ))
+                                ) : (
+                                  <span style={{ fontSize: 10.5, color: '#64748b', fontStyle: 'italic' }}>No suggested experiments.</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {activeTab === 'formula' && (() => {
+                        const rawFormula = currentExplanation.insight.formula || '';
+
+                        const getFormattedFormula = (formula: string) => {
+                          if (!formula) return 'No formula identified';
+                          if (formula.includes('$')) return formula;
+                          return `$$${formula.replace(/×/g, '\\times').replace(/\*/g, '\\cdot')}$$`;
+                        };
+
+                        const getFormulaContext = (formula: string) => {
+                          const f = formula.toLowerCase();
+                          if (f.includes('hooke') || f.includes('-kx') || f.includes('spring')) {
+                            return {
+                              name: "Hooke's Law (Simple Harmonic Oscillation)",
+                              desc: "Hooke's Law states that the force exerted by a spring is directly proportional to its displacement from equilibrium, but in the opposite direction. This linear restoring force drives simple harmonic motion.",
+                              insight: "💡 Try increasing spring stiffness (k) in the left panel — watch how the bob rebounds faster!"
+                            };
+                          }
+                          if (f.includes('gravity') || f.includes('m × g') || f.includes('mg')) {
+                            return {
+                              name: "Newton's Second Law: Gravity & Weight",
+                              desc: "Gravity exerts a downward force proportional to mass. In linear mode, this results in uniform downward acceleration (g ≈ 9.8 m/s² on Earth) regardless of body weight.",
+                              insight: "💡 In free-fall, objects of different weights fall at the exact same rate because gravity's force scales directly with inertia!"
+                            };
+                          }
+                          if (f.includes('momentum') || f.includes('collision') || f.includes('m1') || f.includes('mv')) {
+                            return {
+                              name: "Conservation of Linear Momentum",
+                              desc: "During collisions, the total momentum remains constant. Any momentum lost by Object A is gained by Object B. Restitution (e) determines energy conservation.",
+                              insight: "💡 Try changing Restitution (e) to 1.0 (elastic) — bodies will bounce indefinitely without energy loss!"
+                            };
+                          }
+                          if (f.includes('pivot') || f.includes('l/g') || f.includes('pendulum')) {
+                            return {
+                              name: "Simple Pendulum Swing Cycle",
+                              desc: "A pendulum's swing period is determined strictly by its string length (L) and the gravity constant (g). Crucially, the period is independent of bob mass!",
+                              insight: "💡 Try launching a pendulum bob and changing its mass — the swing rate remains identical!"
+                            };
+                          }
+                          return {
+                            name: "Core Physics Equation",
+                            desc: "This mathematical relationship governs the active sandbox state. The simulator evaluates this equation in real-time at 60 steps per second to solve body coordinates.",
+                            insight: "💡 Select a shape and modify its mass or friction — watch how these immediately alter the live graphs!"
+                          };
+                        };
+
+                        const context = getFormulaContext(rawFormula);
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {/* Premium LaTeX FormulaCard */}
+                            <div style={{
+                              background: 'rgba(99, 102, 241, 0.03)',
+                              border: '1px solid rgba(120, 120, 255, 0.25)',
+                              borderRadius: 14,
+                              padding: '16px 12px',
+                              boxShadow: '0 4px 16px rgba(120, 120, 255, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.05)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              textAlign: 'center',
+                              gap: 12
+                            }}>
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#a5b4fc', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                {context.name}
+                              </span>
+
+                              <div style={{
+                                fontSize: 16,
+                                color: '#fde047',
+                                fontWeight: 700,
+                                margin: '8px 0',
+                                width: '100%',
+                                display: 'flex',
+                                justifyContent: 'center'
+                              }}>
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkMath]}
+                                  rehypePlugins={[rehypeKatex]}
+                                  components={{
+                                    p: ({ node, ...props }: any) => <p style={{ margin: 0 }} {...props} />,
+                                  }}
+                                >
+                                  {getFormattedFormula(rawFormula)}
+                                </ReactMarkdown>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                                <motion.button
+                                  whileHover={{ scale: 1.02, background: 'rgba(99, 102, 241, 0.2)' }}
+                                  onClick={() => {
+                                    setAiPrompt(`Explain the mathematical equation "${rawFormula}" and its variables in detail.`);
+                                    handleAiQuery();
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    background: 'rgba(99, 102, 241, 0.1)',
+                                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                                    borderRadius: 8,
+                                    padding: '6px 0',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    color: '#cbd5e1',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    outline: 'none',
+                                  }}
+                                >
+                                  📚 Explain Formula
+                                </motion.button>
+                                <motion.button
+                                  whileHover={{ scale: 1.02, background: 'rgba(168, 85, 247, 0.2)' }}
+                                  onClick={() => {
+                                    setAiPrompt(`Give me some interactive math experiments to test Hookes/Newtons laws in this Sandbox.`);
+                                    handleAiQuery();
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    background: 'rgba(168, 85, 247, 0.1)',
+                                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                                    borderRadius: 8,
+                                    padding: '6px 0',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    color: '#cbd5e1',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    outline: 'none',
+                                  }}
+                                >
+                                  ⚙️ Open Formula Lab
+                                </motion.button>
+                              </div>
+                            </div>
+
+                            {/* Written Context */}
+                            <div style={{
+                              background: 'rgba(255, 255, 255, 0.02)',
+                              border: '1px solid rgba(255, 255, 255, 0.04)',
+                              borderRadius: 12,
+                              padding: 12,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 8
+                            }}>
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#cbd5e1', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                Theoretical Context
+                              </span>
+                              <p style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                                {context.desc}
+                              </p>
+                              <div style={{
+                                borderTop: '1px dashed rgba(255,255,255,0.06)',
+                                paddingTop: 8,
+                                fontSize: 10.5,
+                                color: '#fde047',
+                                fontWeight: 500,
+                                lineHeight: 1.45
+                              }}>
+                                {context.insight}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Bottom Row Action Buttons */}
+              {!tutorMinimized && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                  paddingTop: 12,
+                  flexShrink: 0,
+                  gap: 10
+                }}>
+                  <div style={{ display: 'flex', gap: 8, flex: 1 }}>
+                    <motion.button
+                      whileHover={{ scale: 1.03, boxShadow: '0 0 12px rgba(120, 120, 255, 0.25)' }}
+                      onClick={() => {
+                        setAiPrompt("Generate a graph analysis and explain the velocity curves of the active bodies");
+                        handleAiQuery();
+                      }}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: 10,
+                        padding: '8px 12px',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#cbd5e1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        outline: 'none',
+                      }}
+                    >
+                      <LineChart size={14} color="#7B61FF" />
+                      <span>Show Graph</span>
+                    </motion.button>
+
+                    <motion.button
+                      whileHover={{ scale: 1.03, boxShadow: '0 0 12px rgba(168, 85, 247, 0.25)' }}
+                      onClick={() => {
+                        setAiPrompt("Show me the step-by-step mathematical calculations for the current event");
+                        handleAiQuery();
+                      }}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: 10,
+                        padding: '8px 12px',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#cbd5e1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        outline: 'none',
+                      }}
+                    >
+                      <Cpu size={14} color="#c084fc" />
+                      <span>View Calculations</span>
+                    </motion.button>
+                  </div>
+
+                  {/* Diagonal Resize Grab Handle */}
+                  {!tutorMaximized && (
+                    <motion.div
+                      whileHover={{ scale: 1.05, borderColor: 'rgba(120, 120, 255, 0.3)' }}
+                      onPointerDown={handleResizeBottomLeft}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 8,
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: 'rgba(15, 23, 42, 0.6)',
+                        cursor: 'sw-resize',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        transition: 'all 0.2s',
+                      }}
+                      title="Drag to resize panel diagonally"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'rotate(90deg)' }}>
+                        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                      </svg>
+                    </motion.div>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
       {/* ── Right panel ─────────────────────────────────────── */}
-      <aside style={S.rightSidebar}>
+      <aside
+        style={{
+          ...S.rightSidebar,
+          width: rightPanelOpen ? 320 : 0,
+          minWidth: rightPanelOpen ? 300 : 0,
+          padding: rightPanelOpen ? '20px 16px' : 0,
+          borderLeft: rightPanelOpen ? S.rightSidebar.borderLeft : 'none',
+          opacity: rightPanelOpen ? 1 : 0,
+          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          overflowY: rightPanelOpen ? 'auto' : 'hidden',
+          overflowX: 'hidden',
+        }}
+      >
         {propertyControllerRef.current && storeRef.current && (
           <PropertyPanel
             store={storeRef.current}
@@ -1775,15 +4255,19 @@ export const SandboxCanvas: React.FC = () => {
             left: ghostPos.x,
             top: ghostPos.y,
             transform: 'translate(-50%, -50%)',
-            width:  ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
-                  : panelDragRef.current === 'pendulum-rope' ? 52
-                  : (panelDragRef.current === 'circle' ? 44 : 40),
+            width: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
+              : panelDragRef.current === 'pendulum-rope' ? 52
+                : panelDragRef.current === 'sun' ? 70
+                  : panelDragRef.current === 'planet' ? 32
+                    : (panelDragRef.current === 'circle' ? 44 : 40),
             height: ['pivot', 'spring', 'rope'].includes(panelDragRef.current || '') ? 48
-                  : panelDragRef.current === 'pendulum-rope' ? 52
-                  : (panelDragRef.current === 'circle' ? 44 : 40),
-            borderRadius: panelDragRef.current === 'circle' || panelDragRef.current === 'pivot' ? '50%'
-                        : panelDragRef.current === 'pendulum-rope' ? 12
-                        : 10,
+              : panelDragRef.current === 'pendulum-rope' ? 52
+                : panelDragRef.current === 'sun' ? 70
+                  : panelDragRef.current === 'planet' ? 32
+                    : (panelDragRef.current === 'circle' ? 44 : 40),
+            borderRadius: panelDragRef.current === 'circle' || panelDragRef.current === 'pivot' || panelDragRef.current === 'sun' || panelDragRef.current === 'planet' ? '50%'
+              : panelDragRef.current === 'pendulum-rope' ? 12
+                : 10,
             background: panelDragRef.current === 'circle'
               ? 'rgba(16,185,129,0.55)'
               : panelDragRef.current === 'rectangle'
@@ -1794,13 +4278,18 @@ export const SandboxCanvas: React.FC = () => {
                     ? 'rgba(139,92,246,0.55)'
                     : panelDragRef.current === 'spring'
                       ? 'rgba(16,185,129,0.55)'
-                      : 'rgba(251,191,36,0.55)',
-            border: `2px solid ${
-              panelDragRef.current === 'pendulum-rope' ? '#818cf8' :
+                      : panelDragRef.current === 'sun'
+                        ? 'rgba(234,179,8,0.7)'
+                        : panelDragRef.current === 'planet'
+                          ? 'rgba(14,165,233,0.7)'
+                          : 'rgba(251,191,36,0.55)',
+            border: `2px solid ${panelDragRef.current === 'pendulum-rope' ? '#818cf8' :
               panelDragRef.current === 'circle' || panelDragRef.current === 'spring' ? '#6ee7b7' :
-              panelDragRef.current === 'rectangle' ? '#a5b4fc' :
-              panelDragRef.current === 'pivot' ? '#c084fc' : '#fde047'
-            }`,
+                panelDragRef.current === 'rectangle' ? '#a5b4fc' :
+                  panelDragRef.current === 'pivot' ? '#c084fc' :
+                    panelDragRef.current === 'sun' ? '#f97316' :
+                      panelDragRef.current === 'planet' ? '#38bdf8' : '#fde047'
+              }`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1819,6 +4308,8 @@ export const SandboxCanvas: React.FC = () => {
           {panelDragRef.current === 'spring' && '🌀'}
           {panelDragRef.current === 'rope' && '🔗'}
           {panelDragRef.current === 'pendulum-rope' && '🪢'}
+          {panelDragRef.current === 'sun' && '☀️'}
+          {panelDragRef.current === 'planet' && '🌎'}
         </div>
       )}
 
@@ -1826,7 +4317,35 @@ export const SandboxCanvas: React.FC = () => {
   );
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const formatScientific = (val: number, unit: string) => {
+  if (isNaN(val) || !isFinite(val)) return `0.00 ${unit}`;
+  const absVal = Math.abs(val);
+  if (absVal === 0) return `0.00 ${unit}`;
+
+  if (absVal >= 1000 || absVal < 0.01) {
+    const exp = val.toExponential(2);
+    const [base, power] = exp.split('e');
+    const superscriptMap: Record<string, string> = {
+      '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+    };
+    const formattedPower = power
+      .replace('+', '')
+      .split('')
+      .map(c => superscriptMap[c] || c)
+      .join('');
+    return `${base} × 10${formattedPower} ${unit}`;
+  }
+  return `${val.toFixed(2)} ${unit}`;
+};
+
+const formatTime = (timeMs: number) => {
+  const totalSecs = Math.floor(timeMs / 1000);
+  const secs = totalSecs % 60;
+  const mins = Math.floor(totalSecs / 60) % 60;
+  const hrs = Math.floor(totalSecs / 3600);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+};
 
 const Sep: React.FC<{ label: string }> = ({ label }) => (
   <div style={{
@@ -1841,7 +4360,7 @@ const Sep: React.FC<{ label: string }> = ({ label }) => (
 const S: Record<string, React.CSSProperties> = {
   root: {
     display: 'flex', width: '100%', height: '100%', minHeight: 560,
-    background: '#dbeafe', color: '#0f172a',
+    background: '#090d16', color: '#0f172a',
     fontFamily: '"Plus Jakarta Sans",system-ui,sans-serif',
     overflow: 'hidden', userSelect: 'none'
   },
@@ -1849,12 +4368,14 @@ const S: Record<string, React.CSSProperties> = {
     width: 288, minWidth: 268, height: '100%', padding: '20px 16px',
     background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(20px)',
     borderRight: '1px solid rgba(255,255,255,0.06)',
-    display: 'flex', flexDirection: 'column', overflowY: 'auto'
+    display: 'flex', flexDirection: 'column', overflowY: 'auto',
+    flexShrink: 0
   },
   rightSidebar: {
     width: 320, minWidth: 300, height: '100%', background: 'rgba(15,23,42,0.92)',
     backdropFilter: 'blur(20px)', borderLeft: '1px solid rgba(255,255,255,0.06)',
-    display: 'flex', flexDirection: 'column', overflowY: 'auto'
+    display: 'flex', flexDirection: 'column', overflowY: 'auto',
+    flexShrink: 0
   },
   header: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 },
   pulse: {
@@ -1870,7 +4391,7 @@ const S: Record<string, React.CSSProperties> = {
     background: 'linear-gradient(135deg,#c7d2fe,#bfdbfe)',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
   },
-  subtitle: { fontSize: 11, color: '#475569', marginBottom: 16 },
+  subtitle: { fontSize: 11, color: '#cbd5e1', marginBottom: 16 },
   cards: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 },
   card: {
     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
@@ -1910,7 +4431,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 10, color: '#334155', lineHeight: 1.55, marginTop: 'auto', paddingTop: 14,
     borderTop: '1px solid rgba(255,255,255,0.04)'
   },
-  canvasWrap: { flex: 1, position: 'relative', overflow: 'hidden', background: '#bfdbfe', cursor: 'default', transition: 'outline 0.15s' },
+  canvasWrap: { flex: 1, position: 'relative', overflow: 'hidden', background: '#0b0f19', cursor: 'default', transition: 'outline 0.15s' },
   dropHint: {
     position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
     padding: '8px 18px', borderRadius: 10, background: 'rgba(99,102,241,0.2)',
@@ -1919,12 +4440,12 @@ const S: Record<string, React.CSSProperties> = {
   },
   dotGrid: {
     position: 'absolute', inset: 0, pointerEvents: 'none',
-    backgroundImage: 'radial-gradient(#1e293b 1px,transparent 1px)',
-    backgroundSize: '18px 18px', opacity: 0.55
+    backgroundImage: 'radial-gradient(rgba(99, 102, 241, 0.15) 1.5px,transparent 1.5px)',
+    backgroundSize: '18px 18px', opacity: 1
   },
   mount: { position: 'absolute', inset: 0 },
   badge: {
-    position: 'absolute', bottom: 14, right: 14, display: 'flex', alignItems: 'center',
+    position: 'absolute', bottom: 124, right: 14, display: 'flex', alignItems: 'center',
     padding: '5px 12px', borderRadius: 8, backdropFilter: 'blur(12px)',
     background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.08)',
     fontSize: 11, color: '#818cf8', pointerEvents: 'none'

@@ -17,7 +17,7 @@ function buildResolvedAsset(name: string) {
     return exact;
   }
 
-  const resolved = resolveBestAsset(name);
+  const resolved = resolveBestAsset(name) as any;
   if (!resolved) {
     return null;
   }

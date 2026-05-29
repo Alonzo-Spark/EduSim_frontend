@@ -1,6 +1,7 @@
 import { PhysicsEngine } from './physics';
-import { PixiRenderer }  from './renderer';
-import { SyncRegistry }  from './sync';
+import { PixiRenderer } from './renderer';
+import { SyncRegistry } from './sync';
+import { GravitySystem } from '../gravity/gravitySystem';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -10,7 +11,7 @@ export type RuntimeState = 'idle' | 'running' | 'paused' | 'destroyed';
 export interface RuntimeHook {
   id: string;
   beforeStep?: (dt: number) => void;
-  afterStep?:  (dt: number) => void;
+  afterStep?: (dt: number) => void;
 }
 
 // ─── SandboxRuntime ───────────────────────────────────────────────────────────
@@ -28,14 +29,26 @@ export interface RuntimeHook {
  */
 export class SandboxRuntime {
   // Public so simulation code can reach sub-systems directly
-  readonly physics  = new PhysicsEngine();
+  readonly physics = new PhysicsEngine();
   readonly renderer = new PixiRenderer();
-  readonly sync     = new SyncRegistry();
+  readonly sync = new SyncRegistry();
+  readonly gravitySystem = new GravitySystem(this.physics.getEngine());
 
   private state: RuntimeState = 'idle';
-  private rafId:  number | null = null;
+  private rafId: number | null = null;
   private lastTs: number = 0;
+  private accumulator = 0;
   private readonly hooks = new Map<string, RuntimeHook>();
+
+  constructor() {
+    // Add automatic high-performance gravity update hook before each physics step
+    this.addHook({
+      id: 'gravity-system-hook',
+      beforeStep: (dt) => {
+        this.gravitySystem.update(dt);
+      },
+    });
+  }
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -53,9 +66,10 @@ export class SandboxRuntime {
   start(): void {
     if (this.state === 'running') return;
     if (this.state === 'destroyed') throw new Error('[SandboxRuntime] Cannot start a destroyed runtime.');
-    this.state  = 'running';
+    this.state = 'running';
     this.lastTs = performance.now();
-    this.rafId  = requestAnimationFrame(this.loop);
+    this.accumulator = 0;
+    this.rafId = requestAnimationFrame(this.loop);
   }
 
   pause(): void {
@@ -74,8 +88,8 @@ export class SandboxRuntime {
 
   // ── Hooks (drag, observables, constraints, etc.) ──────────────────────────
 
-  addHook(hook: RuntimeHook): void    { this.hooks.set(hook.id, hook); }
-  removeHook(id: string): void        { this.hooks.delete(id); }
+  addHook(hook: RuntimeHook): void { this.hooks.set(hook.id, hook); }
+  removeHook(id: string): void { this.hooks.delete(id); }
 
   // ── Simulation control ────────────────────────────────────────────────────
 
@@ -83,6 +97,7 @@ export class SandboxRuntime {
     this.pause();
     this.physics.reset();
     this.sync.clear();
+    this.accumulator = 0;
 
     const vp = this.renderer.getViewport();
     vp.removeChildren();
@@ -110,11 +125,22 @@ export class SandboxRuntime {
     const dt = Math.min(ts - this.lastTs, 100);
     this.lastTs = ts;
 
-    // 1. beforeStep hooks (drag forces, user input, etc.)
-    this.hooks.forEach((h) => h.beforeStep?.(dt));
+    // Fixed timestep accumulator to prevent orbital velocity decay and numerical drift
+    this.accumulator += dt;
+    const fixedTimeStep = 16.67;
+    let stepsRun = 0;
 
-    // 2. Physics step
-    this.physics.step(dt);
+    // Limit maximum steps per frame to avoid "spiral of death" during extreme lag spikes
+    while (this.accumulator >= fixedTimeStep && stepsRun < 5) {
+      // 1. beforeStep hooks (gravity, drag forces, user input, etc.)
+      this.hooks.forEach((h) => h.beforeStep?.(fixedTimeStep));
+
+      // 2. Physics step
+      this.physics.step(fixedTimeStep);
+
+      this.accumulator -= fixedTimeStep;
+      stepsRun++;
+    }
 
     // 3. Sync sprites → physics positions
     this.sync.flush();

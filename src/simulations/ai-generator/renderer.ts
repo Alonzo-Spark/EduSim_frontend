@@ -16,7 +16,7 @@ function getSpritePath(obj: PhysicsObject): string | null {
     return directPath;
   }
 
-  const resolvedAsset = resolveBestAsset(obj.type || obj.name || obj.id || "block");
+  const resolvedAsset = resolveBestAsset(obj.type || obj.name || obj.id || "block") as any;
   return resolvedAsset?.path || null;
 }
 
@@ -124,7 +124,7 @@ export class SimulationRenderer {
     const [x, y] = obj.position;
     const color = obj.color || "#3b82f6";
     const imagePath = getSpritePath(obj);
-    const resolvedAsset = resolveBestAsset(obj.type || obj.name || obj.id || "block");
+    const resolvedAsset = resolveBestAsset(obj.type || obj.name || obj.id || "block") as any;
     const assetDims = resolvedAsset ? getAssetDimensions(resolvedAsset.id) : null;
 
     this.ctx.save();

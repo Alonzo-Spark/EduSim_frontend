@@ -102,7 +102,7 @@ function flattenText(node: React.ReactNode): string {
   if (node == null || typeof node === "boolean") return "";
   if (typeof node === "string" || typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(flattenText).join(" ");
-  if (React.isValidElement(node)) return flattenText(node.props.children);
+  if (React.isValidElement(node)) return flattenText((node as any).props.children);
   return "";
 }
 
@@ -133,7 +133,7 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
 }
 
 function renderMarkdownBody(body: string, isDark: boolean, sectionKind: SectionKind, isHero: boolean = false) {
-  const components: Components = {
+  const components: Components & { math?: any; inlineMath?: any } = {
     h1: ({ children }) => (
       <h1 className="mt-4 mb-2 text-3xl font-extrabold tracking-tight text-foreground/95">{children}</h1>
     ),
@@ -196,7 +196,7 @@ function renderMarkdownBody(body: string, isDark: boolean, sectionKind: SectionK
     tr: ({ children }) => <tr className="transition-colors hover:bg-white/[0.02]">{children}</tr>,
     th: ({ children }) => <th className="px-6 py-4 font-semibold text-foreground/90">{children}</th>,
     td: ({ children }) => <td className="px-6 py-4 text-foreground/70 font-light">{children}</td>,
-    code: ({ inline, children }) => {
+    code: ({ inline, children }: any) => {
       if (inline) {
         return (
           <code className="rounded-[6px] border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[0.9em] font-medium text-foreground/90">
@@ -206,11 +206,11 @@ function renderMarkdownBody(body: string, isDark: boolean, sectionKind: SectionK
       }
       return <code className="font-mono text-[14px] text-foreground/80">{children}</code>;
     },
-    pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
-    math: ({ children }) => (
+    pre: ({ children }: any) => <CodeBlock>{children}</CodeBlock>,
+    math: ({ children }: any) => (
       <BlockMath math={String(children).trim()} />
     ),
-    inlineMath: ({ children }) => (
+    inlineMath: ({ children }: any) => (
       <InlineMath math={String(children).trim()} />
     ),
   };

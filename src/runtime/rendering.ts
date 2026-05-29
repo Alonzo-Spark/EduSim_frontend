@@ -21,7 +21,7 @@ function getSpritePath(obj: any) {
     return explicit;
   }
 
-  const resolved = resolveBestAsset(obj?.type || obj?.name || obj?.id || "block");
+  const resolved = resolveBestAsset(obj?.type || obj?.name || obj?.id || "block") as any;
   return resolved?.path || null;
 }
 
@@ -99,7 +99,7 @@ export class SimulationRenderer {
     const { physics, visual, shape, trail } = obj;
     const ctx = this.ctx;
     const spritePath = getSpritePath(obj);
-       const resolvedAsset = resolveBestAsset(obj?.type || obj?.name || obj?.id || "block");
+       const resolvedAsset = resolveBestAsset(obj?.type || obj?.name || obj?.id || "block") as any;
        const assetDims = resolvedAsset ? getAssetDimensions(resolvedAsset.id) : null;
 
     // 1. Draw Trail

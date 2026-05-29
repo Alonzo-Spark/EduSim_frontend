@@ -92,7 +92,7 @@ export function SimulationCanvas({ dsl, title, className = "", compact = false, 
           canvas: canvasRef.current!,
           dsl: normalizedDsl,
           onStateChange: (snap: any) => {
-            setSnapshot(prev => ({ ...prev, ...snap }));
+            setSnapshot((prev: any) => ({ ...prev, ...snap }));
             onSimulationStateChangeRef.current?.(snap);
           },
           onSelectionChange: setSelection,
