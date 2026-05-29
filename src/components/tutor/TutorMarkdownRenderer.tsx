@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -6,7 +6,8 @@ import rehypeKatex from "rehype-katex";
 import { BlockMath } from "@/components/math/Katex";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
-import { FormulaCard } from "./FormulaCard";
+import { FormulaCard, parseFormulaBody } from "./FormulaCard";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   AlertTriangle, 
   CheckCircle2, 
@@ -20,9 +21,12 @@ import {
   Compass,
   Bookmark,
   Sliders,
-  Brain
+  Brain,
+  ChevronDown
 } from "lucide-react";
 import "katex/dist/katex.min.css";
+
+const ListDepthContext = React.createContext(0);
 
 type Density = "compact" | "regular" | "spacious";
 type SectionKind = 
@@ -30,8 +34,6 @@ type SectionKind =
   | "concepts" 
   | "summary" 
   | "applications" 
-  | "note" 
-  | "mistakes" 
   | "comparison" 
   | "formula" 
   | "examples" 
@@ -70,11 +72,12 @@ const SECTION_KIND_MATCHERS: Array<{ kind: SectionKind; patterns: RegExp[] }> = 
   { kind: "concepts", patterns: [/key concepts?/i, /concepts?/i, /core ideas?/i, /important ideas?/i] },
   { kind: "summary", patterns: [/summary/i, /key takeaways?/i, /revision/i, /recap/i] },
   { kind: "applications", patterns: [/applications?/i, /real world/i, /uses?/i, /industry usage/i] },
-  { kind: "note", patterns: [/important notes?/i, /notes?/i, /warning/i, /caution/i] },
-  { kind: "mistakes", patterns: [/common mistakes?/i, /mistakes?/i, /pitfalls?/i] },
   { kind: "comparison", patterns: [/advantages?/i, /disadvantages?/i, /pros and cons/i, /comparison/i] },
-  { kind: "formula", patterns: [/formulas?/i, /equations?/i, /mathematics?/i, /expressions?/i, /derivatives?/i] },
-  { kind: "examples", patterns: [/examples?/i, /worked examples?/i, /practice examples?/i, /illustrations?/i] },
+  { kind: "formula", patterns: [/formulas?/i, /equations?/i, /mathematics?/i, /expressions?/i, /derivatives?/i, /derivation/i] },
+  { kind: "examples", patterns: [
+    /examples?/i, /worked examples?/i, /practice examples?/i, /illustrations?/i, /numerical/i, /solved/i,
+    /problem/i, /given/i, /substitution/i, /calculation/i, /final answer/i, /interpretation/i, /step-by-step/i
+  ] },
   { kind: "questions", patterns: [/questions?/i, /q&a/i, /questions & answers/i, /suggested questions/i] },
 ];
 
@@ -117,7 +120,6 @@ function normalizeContent(content: unknown): string {
       "advantagesDisadvantages",
       "applications",
       "industryUsage",
-      "importantNotes",
       "summary",
       "suggestedQuestions",
     ];
@@ -135,6 +137,198 @@ function normalizeContent(content: unknown): string {
     return JSON.stringify(content, null, 2);
   }
   return String(content);
+}
+
+function mergeFragmentedFormulas(text: string): string {
+  const lines = text.split("\n");
+  const processed: string[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line && (line.length <= 4 || /^[=\-+−*/=<>≤≥∝()/\\_]+$/.test(line)) && !line.startsWith("#") && !line.startsWith("*")) {
+      const candidates: string[] = [line];
+      let j = i + 1;
+      while (j < lines.length) {
+        const nextLine = lines[j].trim();
+        if (nextLine === "") {
+          j++;
+          continue;
+        }
+        if ((nextLine.length <= 4 || /^[=\-+−*/=<>≤≥∝()/\\_]+$/.test(nextLine)) && !nextLine.startsWith("#") && !nextLine.startsWith("*")) {
+          candidates.push(nextLine);
+          j++;
+        } else {
+          break;
+        }
+      }
+      
+      if (candidates.length >= 3) {
+        let formula = candidates.join(" ");
+        if (/^1\s+f\s+=\s+1\s+v\s+[−-]\s+1\s+u$/i.test(formula)) {
+          formula = "\\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u}";
+        } else {
+          formula = formula
+            .replace(/(\w+)\s*[\/]\s*(\w+)/g, "\\frac{$1}{$2}")
+            .replace(/−/g, "-");
+        }
+        processed.push(`\n\n$$\n${formula}\n$$\n\n`);
+        i = j - 1;
+        continue;
+      }
+    }
+    processed.push(lines[i]);
+  }
+  return processed.join("\n");
+}
+
+function fixMalformedTables(text: string): string {
+  const lines = text.split("\n");
+  const processed: string[] = [];
+  let tableLines: string[] = [];
+  
+  const flushTable = () => {
+    if (tableLines.length === 0) return;
+    const hasDelimiter = tableLines.some(line => /^[|:\s\-]+$/.test(line.trim()) && line.includes("-"));
+    
+    if (!hasDelimiter && tableLines.length >= 2) {
+      const firstRow = tableLines[0].trim();
+      const cleanRow = firstRow.replace(/^\||\|$/g, "");
+      const colsCount = cleanRow.split("|").length;
+      const delimiterRow = "|" + Array(colsCount).fill("---").join("|") + "|";
+      tableLines.splice(1, 0, delimiterRow);
+    }
+    
+    processed.push("");
+    processed.push(...tableLines);
+    processed.push("");
+    tableLines = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const currentTrimmed = line.trim();
+    const isTable = currentTrimmed.startsWith("|") || (currentTrimmed.split("|").length > 2);
+    
+    if (isTable) {
+      tableLines.push(line);
+    } else {
+      if (tableLines.length > 0) {
+        flushTable();
+      }
+      processed.push(line);
+    }
+  }
+  if (tableLines.length > 0) {
+    flushTable();
+  }
+  return processed.join("\n");
+}
+
+function sanitizeSectionBody(body: string, title: string): string {
+  let cleaned = mergeFragmentedFormulas(body);
+  cleaned = fixMalformedTables(cleaned);
+  cleaned = cleaned.trim();
+
+  // 1. Replace HTML line breaks and spaces/tabs
+  cleaned = cleaned.replace(/<br\s*\/?>/gi, "\n");
+  cleaned = cleaned.replace(/&nbsp;/gi, " ");
+  cleaned = cleaned.replace(/\t/g, " ");
+
+  // 2. Convert literal \n or \\n characters to real newlines
+  cleaned = cleaned.replace(/\\n/g, "\n");
+
+  // 3. Remove escaped quotes
+  cleaned = cleaned.replace(/\\"/g, '"').replace(/\\'/g, "'");
+
+  // 4. Clean empty lines with whitespace first
+  cleaned = cleaned.replace(/^\s+$/gm, "");
+
+  // 5. Remove standalone bullets and clean empty bullet lines
+  cleaned = cleaned.replace(/^\s*[•*-]\s*$/gm, "");
+  cleaned = cleaned.replace(/\n{2,}\s*[•*-]\s*\n{2,}/g, "\n");
+
+  // 6. Deduplicate adjacent identical text lines (case-insensitive, trimmed comparison)
+  const lines = cleaned.split("\n");
+  const uniqueLines: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const currentTrimmed = lines[i].trim();
+    if (i === 0 || currentTrimmed === "" || currentTrimmed.toLowerCase() !== lines[i - 1].trim().toLowerCase()) {
+      uniqueLines.push(lines[i]);
+    }
+  }
+  cleaned = uniqueLines.join("\n");
+
+  // 7. Collapse spaces inside a line (preserving leading spaces for bullet indentation)
+  const spaceCleanedLines = cleaned.split("\n").map(line => {
+    const leadingSpaces = line.match(/^\s*/)?.[0] || "";
+    const rest = line.substring(leadingSpaces.length);
+    const cleanRest = rest.replace(/[ \t]{2,}/g, " ");
+    return leadingSpaces + cleanRest;
+  });
+  cleaned = spaceCleanedLines.join("\n");
+
+  // 8. Normalize bullet list markers (•, ●, ▪, ◦, -, +, etc.) to standard '*'
+  cleaned = cleaned.replace(/^[•●▪◦]\s*/gm, "* ");
+  cleaned = cleaned.replace(/^(\s*)[*•\-\+▪◦⁃‣]\s*[•\-\+▪◦⁃‣\*]?\s+/gm, "$1* ");
+
+  // 9. Ensure bullet list items have blank lines preceding them if not already in a list block
+  cleaned = cleaned.replace(/([^\n])\s*(\*\s+)/g, "$1\n\n$2");
+
+  // 10. Ensure markdown headings have blank lines before them
+  cleaned = cleaned.replace(/([^\n])\s*(#{1,4}\s+)/g, "$1\n\n$2");
+
+  // 11. Sanitize math blocks (display $$ and inline $) to unescape subscripts \_ and curly braces \{ \}
+  // First, display math $$
+  cleaned = cleaned.replace(/\$$([\s\S]*?)\$\$/g, (match, math) => {
+    const cleanMath = math
+      .replace(/\\_/g, "_")
+      .replace(/\\\{/g, "{")
+      .replace(/\\\}/g, "}")
+      .replace(/\\\\/g, "\\\\"); // Keep double backslash for aligned environments
+    return `\n\n$$\n${cleanMath.trim()}\n$$\n\n`;
+  });
+  // Next, inline math $
+  cleaned = cleaned.replace(/\$([^$\s][^$]*?[^$\s])\$/g, (match, math) => {
+    const cleanMath = math
+      .replace(/\\_/g, "_")
+      .replace(/\\\{/g, "{")
+      .replace(/\\\}/g, "}");
+    return `$${cleanMath}$`;
+  });
+
+  // 12. Remove duplicate line breaks
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
+
+  // 13. Strip markdown heading syntax and bold headers from body content completely (excluding solved numerical steps)
+  cleaned = cleaned.split("\n").map(line => {
+    const trimmed = line.trim();
+    const boldMatch = trimmed.match(/^\*\*(.*?)\*\*$/);
+    if (boldMatch) {
+      const text = boldMatch[1].trim().replace(/[:\-–—]$/, "").trim();
+      const isExampleStep = /^(problem|given|formula|substitution|calculation|final answer|interpretation)$/i.test(text);
+      if (!isExampleStep) {
+        return "";
+      }
+    }
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      const text = headingMatch[2].trim().replace(/\*+/g, "").replace(/[:\-–—]$/, "").trim();
+      const isExampleStep = /^(problem|given|formula|substitution|calculation|final answer|interpretation)$/i.test(text);
+      if (!isExampleStep) {
+        return "";
+      }
+    }
+    return line;
+  }).join("\n").trim();
+
+  // 14. Remove duplicate title or subsection lines anywhere in the body
+  let cleanTitle = title.replace(/\*+/g, "").trim();
+  if (cleanTitle) {
+    const escapedTitle = cleanTitle.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    cleaned = cleaned.replace(new RegExp(`^\\s*(?:#{1,6}|\\*\\*?|[-*•]\\s*)?\\s*${escapedTitle}\\s*(?:\\*\\*?)?\\s*[:\\-–—]?\\s*$`, "gim"), "");
+  }
+
+  return cleaned.trim();
 }
 
 function splitIntoSections(content: unknown): SectionBlock[] {
@@ -157,25 +351,63 @@ function splitIntoSections(content: unknown): SectionBlock[] {
       return;
     }
 
+    const cleanedBody = sanitizeSectionBody(body, currentTitle);
+
+    // Skip empty parent H1 sections or duplicate empty headers to prevent empty cards/accordions
+    if (cleanedBody === "" && currentLevel === 1) {
+      currentBody = [];
+      return;
+    }
+
+    if (!currentTitle && cleanedBody === "") {
+      currentBody = [];
+      return;
+    }
+
     sections.push({
       id: currentTitle ? slugify(currentTitle) : `body-${sections.length + 1}`,
       level: currentLevel,
       title: currentTitle,
       kind: currentKind,
-      body,
+      body: cleanedBody,
     });
 
     currentBody = [];
   };
 
   for (const line of lines) {
-    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    // Match standard markdown headings H1 and H2 only (to keep H3 sub-steps like ### Problem inline)
+    const headingMatch = line.match(/^(#{1,2})\s+(.+)$/);
+    let matchedTitle = "";
+    let matchedLevel: 1 | 2 | 3 = 2;
+
     if (headingMatch) {
-      flush();
-      currentLevel = headingMatch[1].length as 1 | 2 | 3;
-      currentTitle = headingMatch[2].trim();
-      currentKind = detectSectionKind(currentTitle);
-      continue;
+      matchedLevel = headingMatch[1].length as 1 | 2 | 3;
+      matchedTitle = headingMatch[2].trim().replace(/\*+/g, "").replace(/[:\-–—]$/, "").trim();
+    } else {
+      // Match bold titles like "**Definition**", "**Definition:**", etc.
+      const boldMatch = line.match(/^\s*\*\*(?:\s*#\s*)?([^*]+?)\*\*\s*[:\-–—]?\s*$/);
+      if (boldMatch) {
+        const potentialTitle = boldMatch[1].trim().replace(/[:\-–—]$/, "").trim();
+        const isExampleStep = /^(problem|given|formula|substitution|calculation|final answer|interpretation)$/i.test(potentialTitle);
+        const wordCount = potentialTitle.split(/\s+/).length;
+        if (wordCount <= 4 && !isExampleStep) {
+          matchedTitle = potentialTitle;
+          matchedLevel = 2;
+        }
+      }
+    }
+
+    if (matchedTitle) {
+      // Ensure we don't split on example steps like "Problem", "Given", etc.
+      const isExampleStep = /^(problem|given|formula|substitution|calculation|final answer|interpretation)$/i.test(matchedTitle);
+      if (!isExampleStep) {
+        flush();
+        currentLevel = matchedLevel;
+        currentTitle = matchedTitle;
+        currentKind = detectSectionKind(currentTitle);
+        continue;
+      }
     }
 
     currentBody.push(line);
@@ -259,10 +491,6 @@ function getSectionIcon(kind: SectionKind) {
       return <Sparkles className="w-5 h-5 text-emerald-500" />;
     case "summary":
       return <CheckCircle2 className="w-5 h-5 text-amber-500" />;
-    case "note":
-      return <Lightbulb className="w-5 h-5 text-blue-500" />;
-    case "mistakes":
-      return <AlertTriangle className="w-5 h-5 text-rose-500" />;
     case "questions":
       return <HelpCircle className="w-5 h-5 text-teal-500" />;
     case "examples":
@@ -288,10 +516,6 @@ function getSectionColorClasses(kind: SectionKind): { border: string; bg: string
       return { border: "border-l-emerald-500", bg: "bg-emerald-500/5", text: "text-emerald-600 dark:text-emerald-400" };
     case "summary":
       return { border: "border-l-amber-500", bg: "bg-amber-500/5", text: "text-amber-600 dark:text-amber-400" };
-    case "note":
-      return { border: "border-l-blue-500", bg: "bg-blue-500/5", text: "text-blue-600 dark:text-blue-400" };
-    case "mistakes":
-      return { border: "border-l-rose-500", bg: "bg-rose-500/5", text: "text-rose-600 dark:text-rose-400" };
     case "questions":
       return { border: "border-l-teal-500", bg: "bg-teal-500/5", text: "text-teal-600 dark:text-teal-400" };
     case "examples":
@@ -319,16 +543,28 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
         {children}
       </h2>
     ),
-    h3: ({ children }) => (
-      <h3 className="text-xs font-semibold text-foreground/70 mt-2 mb-1">{children}</h3>
-    ),
+    h3: ({ children }) => {
+      const text = flattenText(children).trim();
+      const isExampleStep = /^(problem|given|formula|substitution|calculation|final answer|interpretation)$/i.test(text);
+      if (isExampleStep) {
+        return (
+          <div className="mt-4 mb-2">
+            <span className="inline-flex items-center rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary shadow-sm">
+              {text}
+            </span>
+          </div>
+        );
+      }
+      return (
+        <h3 className="text-xs font-bold text-foreground/70 mt-4 mb-2 uppercase tracking-wider">
+          {children}
+        </h3>
+      );
+    },
     p: ({ children }) => {
-      const contentStr = flattenText(children);
-      const isMathy = hasMath(contentStr);
       return (
         <p className={cn(
-          "text-foreground/80 dark:text-foreground/90 text-sm sm:text-[15px] leading-relaxed w-full font-normal",
-          isMathy ? "max-w-none text-center my-3 py-3.5 bg-secondary/20 rounded-2xl border border-border/30" : "max-w-[85ch]",
+          "text-foreground/80 dark:text-foreground/90 text-sm sm:text-[15px] leading-relaxed w-full font-normal max-w-[85ch]",
           density === "compact" ? "mb-1.5" : "mb-3"
         )}>
           {children}
@@ -343,37 +579,26 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
     ),
     hr: () => <hr className="my-4 border-border/40" />,
     blockquote: ({ children }) => {
-      const toneClasses = sectionKind === "mistakes"
-        ? "border-rose-500/20 bg-rose-500/5 text-rose-500"
-        : sectionKind === "note"
-          ? "border-blue-500/20 bg-blue-500/5"
-          : "border-primary/20 bg-secondary/40";
-
-      const toneIcon = sectionKind === "mistakes"
-        ? <AlertTriangle className="h-4.5 w-4.5 text-rose-500" />
-        : sectionKind === "note"
-          ? <Lightbulb className="h-4.5 w-4.5 text-blue-500" />
-          : <Lightbulb className="h-4.5 w-4.5 text-primary" />;
-
       return (
-        <div className={cn("my-3.5 rounded-2xl border px-5 py-4 shadow-sm", toneClasses)}>
+        <div className="my-3.5 rounded-2xl border border-primary/20 bg-secondary/40 px-5 py-4 shadow-sm">
           <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground/80">
-            {toneIcon}
-            <span>{sectionKind === "mistakes" ? "Common Mistakes" : sectionKind === "note" ? "Important Note" : "Callout"}</span>
+            <Lightbulb className="h-4.5 w-4.5 text-primary" />
+            <span>Callout</span>
           </div>
           <div className="space-y-1.5 text-sm leading-relaxed text-foreground/90">{children}</div>
         </div>
       );
     },
     ul: ({ children }) => {
+      const depth = React.useContext(ListDepthContext);
       const items = React.Children.toArray(children);
       const texts = listItemTexts(children);
-      const isChipList = sectionKind === "concepts" || (texts.length > 0 && texts.length <= 8 && texts.every((text) => countWords(text) <= 4 && text.length <= 32));
-      const isSummaryList = sectionKind === "summary" || texts.some((text) => /^([✓✔-]|\d+\.)/.test(text));
-      const isApplicationList = sectionKind === "applications";
-      const isExampleList = sectionKind === "examples";
-      const isMistakeList = sectionKind === "mistakes";
-
+      
+      const isChipList = depth === 0 && (sectionKind === "concepts" || (texts.length > 0 && texts.length <= 8 && texts.every((text) => countWords(text) <= 4 && text.length <= 32)));
+      const isSummaryList = depth === 0 && (sectionKind === "summary" || texts.some((text) => /^([✓✔-]|\d+\.)/.test(text)));
+      const isApplicationList = depth === 0 && sectionKind === "applications";
+      const isExampleList = depth === 0 && sectionKind === "examples";
+ 
       if (isChipList) {
         return (
           <div className="my-3 flex flex-wrap gap-2">
@@ -388,7 +613,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
           </div>
         );
       }
-
+ 
       if (isApplicationList || isExampleList) {
         const icon = isApplicationList
           ? <Sparkles className="h-4 w-4 text-emerald-500" />
@@ -396,7 +621,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
         const hoverAccent = isApplicationList
           ? "hover:border-emerald-500/30 hover:bg-emerald-500/[0.02]"
           : "hover:border-orange-500/30 hover:bg-orange-500/[0.02]";
-
+ 
         return (
           <div className="my-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {texts.map((text, index) => (
@@ -418,16 +643,11 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
           </div>
         );
       }
-
-      if (isSummaryList || isMistakeList) {
-        const accentClasses = isMistakeList
-          ? "border-rose-500/10 bg-rose-500/[0.01] hover:border-rose-500/30 hover:bg-rose-500/[0.02] text-foreground"
-          : "border-amber-500/10 bg-amber-500/[0.01] hover:border-amber-500/30 hover:bg-amber-500/[0.02] text-foreground";
-
-        const icon = isMistakeList
-          ? <AlertTriangle className="h-4 w-4 text-rose-500" />
-          : <CheckCircle2 className="h-4 w-4 text-amber-500" />;
-
+ 
+      if (isSummaryList) {
+        const accentClasses = "border-amber-500/10 bg-amber-500/[0.01] hover:border-amber-500/30 hover:bg-amber-500/[0.02] text-foreground";
+        const icon = <CheckCircle2 className="h-4 w-4 text-amber-500" />;
+ 
         return (
           <div className="my-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {texts.map((text, index) => (
@@ -443,25 +663,46 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
           </div>
         );
       }
-
+ 
       return (
-        <ul className="my-2 space-y-2 pl-0">
-          {items}
-        </ul>
+        <ListDepthContext.Provider value={depth + 1}>
+          <ul className={cn("space-y-2 list-none pl-0", depth > 0 ? "pl-5 mt-2" : "my-3")}>
+            {children}
+          </ul>
+        </ListDepthContext.Provider>
       );
     },
     ol: ({ children }) => {
-      const items = React.Children.toArray(children);
-      return <ol className="my-2 space-y-2 pl-0">{items}</ol>;
+      const depth = React.useContext(ListDepthContext);
+      return (
+        <ListDepthContext.Provider value={depth + 1}>
+          <ol className={cn("space-y-2 list-decimal", depth > 0 ? "pl-5 mt-2" : "my-3 pl-5")}>
+            {children}
+          </ol>
+        </ListDepthContext.Provider>
+      );
     },
-    li: ({ children }) => (
-      <li className="relative flex gap-2.5 rounded-2xl border border-border/40 bg-card px-4 py-3 text-xs sm:text-sm leading-relaxed text-foreground/80 shadow-sm transition-all hover:border-primary/20 hover:bg-secondary/40">
-        <span className="mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[8px] font-bold text-primary">
-          •
-        </span>
-        <span className="min-w-0 flex-1 font-medium">{children}</span>
-      </li>
-    ),
+    li: ({ children }) => {
+      const depth = React.useContext(ListDepthContext);
+      
+      if (depth > 1) {
+        return (
+          <li className="relative pl-5 text-xs sm:text-sm leading-relaxed text-foreground/80 font-normal my-1">
+            <span className="absolute left-0 top-1.5 flex h-1.5 w-1.5 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background" />
+            <span className="min-w-0 flex-1">{children}</span>
+          </li>
+        );
+      }
+ 
+      return (
+        <li className="relative flex gap-2.5 rounded-2xl border border-border/40 bg-card px-4 py-3 text-xs sm:text-sm leading-relaxed text-foreground/80 shadow-sm transition-all hover:border-primary/20 hover:bg-secondary/40 my-2">
+          <span className="mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[8px] font-bold text-primary">
+            •
+          </span>
+          <span className="min-w-0 flex-1 font-medium">{children}</span>
+        </li>
+      );
+    },
     table: ({ children }) => (
       <div className="my-4 overflow-hidden rounded-2xl border border-border/40 bg-card/30 shadow-sm">
         <div className="overflow-x-auto">
@@ -491,23 +732,22 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
           </code>
         );
       }
-
+ 
       return (
         <code className="block overflow-x-auto rounded-2xl border border-border/40 bg-secondary/35 px-4 py-3.5 font-mono text-[13px] leading-relaxed text-foreground shadow-inner">
           {children}
         </code>
       );
     },
+    math: (props: any) => <BlockMath math={props.value || props.children} />,
+    inlineMath: (props: any) => <InlineMath math={props.value || props.children} />,
     pre: ({ children }) => <div className="my-4 overflow-hidden rounded-2xl border border-border bg-secondary/40 shadow-md">{children}</div>,
   };
 
-  const preprocessedBody = useMemo(() => {
-    let newBody = body;
-    newBody = newBody.replace(/a = v\.e \/ l\.m/g, 'a = \\frac{v \\cdot e}{l \\cdot m}');
-    newBody = newBody.replace(/v\.e/g, 'v \\cdot e');
-    newBody = newBody.replace(/l\.m/g, 'l \\cdot m');
-    return newBody;
-  }, [body]);
+  let preprocessedBody = body;
+  preprocessedBody = preprocessedBody.replace(/a = v\.e \/ l\.m/g, 'a = \\frac{v \\cdot e}{l \\cdot m}');
+  preprocessedBody = preprocessedBody.replace(/v\.e/g, 'v \\cdot e');
+  preprocessedBody = preprocessedBody.replace(/l\.m/g, 'l \\cdot m');
 
   return (
     <div
@@ -525,73 +765,12 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
   );
 }
 
-function SectionCard({ section, density, isDark, parentContent }: { section: SectionBlock; density: Density; isDark: boolean; parentContent: string }) {
-  const colorClasses = getSectionColorClasses(section.kind);
-  const icon = getSectionIcon(section.kind);
-
-  const hasTitle = !!section.title;
-  const displayTitle = section.title || "Introduction";
-  const displayKind = section.title ? section.kind : "introduction";
-  
-  const finalColorClasses = section.title ? colorClasses : getSectionColorClasses("introduction");
-  const finalIcon = section.title ? icon : getSectionIcon("introduction");
-
-  if (section.kind === "formula") {
-    return (
-      <section 
-        id={section.id} 
-        className="mb-6 last:mb-0 transition-all duration-300 rounded-[2rem] border border-border/40 bg-card/60 p-6 sm:p-8 shadow-sm hover:shadow-md hover:border-violet-500/30 border-l-4 border-l-violet-500"
-      >
-        <div className="mb-4 flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-violet-500/10 text-violet-500">
-            {finalIcon}
-          </div>
-          <h2 className="text-base font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">
-            {displayTitle}
-          </h2>
-        </div>
-        <FormulaCard body={section.body} sectionTitle={section.title} parentContent={parentContent} />
-      </section>
-    );
-  }
-
-  return (
-    <section 
-      id={section.id} 
-      className={cn(
-        "w-full min-w-0 max-w-full rounded-[2rem] border border-border/40 bg-card/60 p-6 sm:p-8 shadow-sm hover:shadow-md transition-all duration-300 mb-6 last:mb-0 border-l-4",
-        finalColorClasses.border
-      )}
-    >
-      <div className="mb-4 flex items-center gap-3">
-        <div className="p-2 rounded-xl bg-background border border-border/30 shadow-sm flex items-center justify-center">
-          {finalIcon}
-        </div>
-        <h2 className={cn("text-base sm:text-lg font-extrabold tracking-tight", finalColorClasses.text)}>
-          {displayTitle}
-        </h2>
-      </div>
-      <div className="space-y-2">
-        {renderMarkdownBody(section.body, section.kind, density, isDark)}
-      </div>
-    </section>
-  );
-}
-
 function ComparisonCard({ group, density, isDark }: { group: ComparisonGroup; density: Density; isDark: boolean }) {
   const leftLabel = group.left.title;
   const rightLabel = group.right.title;
 
   return (
-    <section className="w-full mb-6 last:mb-0 rounded-[2rem] border border-border/40 bg-card/60 p-6 sm:p-8 shadow-sm hover:shadow-md transition-all duration-300 border-l-4 border-l-emerald-500">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
-          <ListChecks className="h-5 w-5" />
-        </div>
-        <h2 className="text-base sm:text-lg font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">
-          Comparison: Advantages & Disadvantages
-        </h2>
-      </div>
+    <div className="w-full rounded-2xl border border-border/40 bg-card p-4 sm:p-5 shadow-sm transition-all duration-200">
       <div className="grid gap-5 md:grid-cols-2">
         {[{ label: leftLabel, section: group.left }, { label: rightLabel, section: group.right }].map(({ label, section }) => {
           const isDisadvantage = section.title.toLowerCase().includes("disadv") || label.toLowerCase().includes("disadv");
@@ -619,7 +798,321 @@ function ComparisonCard({ group, density, isDark }: { group: ComparisonGroup; de
           );
         })}
       </div>
-    </section>
+    </div>
+  );
+}
+
+function getGroupKey(item: MarkdownGroup, index: number): string {
+  if ("type" in item) {
+    return "group5"; // comparison group goes to Applications/Comparison
+  }
+  
+  const kind = item.kind;
+  if (kind === "introduction" || kind === "definition" || kind === "concepts") {
+    return "group1";
+  }
+  if (kind === "characteristics") {
+    return "group2";
+  }
+  if (kind === "formula") {
+    return "group3";
+  }
+  if (kind === "examples") {
+    return "group4";
+  }
+  if (kind === "applications") {
+    return "group5";
+  }
+  if (kind === "summary") {
+    return "group6";
+  }
+  if (kind === "questions") {
+    return "questions";
+  }
+  
+  return "group1"; // Fallback to group1 (Introduction) instead of "default"
+}
+
+function getGroupForKey(key: string) {
+  switch (key) {
+    case "group1":
+      return {
+        title: "Introduction",
+        icon: <Compass className="w-5 h-5 text-sky-500" />,
+        border: "border-l-sky-500",
+        text: "text-sky-600 dark:text-sky-400",
+        isStandalone: false,
+      };
+    case "group2":
+      return {
+        title: "Characteristics",
+        icon: <Sliders className="w-5 h-5 text-pink-500" />,
+        border: "border-l-pink-500",
+        text: "text-pink-600 dark:text-pink-400",
+        isStandalone: false,
+      };
+    case "group3":
+      return {
+        title: "Formula",
+        icon: <FunctionSquare className="w-5 h-5 text-violet-500" />,
+        border: "border-l-violet-500",
+        text: "text-violet-600 dark:text-violet-400",
+        isStandalone: false,
+      };
+    case "group4":
+      return {
+        title: "Example",
+        icon: <BookOpen className="w-5 h-5 text-orange-500" />,
+        border: "border-l-orange-500",
+        text: "text-orange-600 dark:text-orange-400",
+        isStandalone: false,
+      };
+    case "group5":
+      return {
+        title: "Applications",
+        icon: <Sparkles className="w-5 h-5 text-emerald-500" />,
+        border: "border-l-emerald-500",
+        text: "text-emerald-600 dark:text-emerald-400",
+        isStandalone: false,
+      };
+    case "group6":
+      return {
+        title: "Summary",
+        icon: <CheckCircle2 className="w-5 h-5 text-amber-500" />,
+        border: "border-l-amber-500",
+        text: "text-amber-600 dark:text-amber-400",
+        isStandalone: false,
+      };
+    case "questions":
+      return {
+        title: "Suggested Questions",
+        icon: <HelpCircle className="w-5 h-5 text-teal-500" />,
+        border: "border-l-teal-500",
+        text: "text-teal-600 dark:text-teal-400",
+        isStandalone: true,
+      };
+    default:
+      return {
+        title: "Introduction",
+        icon: <Compass className="w-5 h-5 text-sky-500" />,
+        border: "border-l-sky-500",
+        text: "text-sky-600 dark:text-sky-400",
+        isStandalone: false,
+      };
+  }
+}
+
+function AccordionGroup({
+  groupKey,
+  title,
+  icon,
+  borderClass,
+  textClass,
+  items,
+  isExpanded,
+  onToggle,
+  density,
+  isDark,
+  parentContent
+}: {
+  groupKey: string;
+  title: string;
+  icon: React.ReactNode;
+  borderClass: string;
+  textClass: string;
+  items: MarkdownGroup[];
+  isExpanded: boolean;
+  onToggle: () => void;
+  density: Density;
+  isDark: boolean;
+  parentContent: string;
+}) {
+  let hasRenderedFormulaCard = false;
+
+  return (
+    <div className={cn(
+      "w-full rounded-[2rem] border border-border/40 bg-card/60 shadow-sm overflow-hidden transition-all duration-300 border-l-4",
+      borderClass,
+      isExpanded ? "shadow-md" : ""
+    )}>
+      {/* Accordion Header */}
+      <div 
+        onClick={onToggle}
+        className="flex items-center justify-between p-5 sm:p-6 cursor-pointer select-none hover:bg-secondary/20 transition-colors"
+      >
+        <div className="flex items-center gap-3.5">
+          <div className="p-2 rounded-xl bg-background border border-border/30 shadow-sm flex items-center justify-center">
+            {icon}
+          </div>
+          <h2 className={cn("text-base sm:text-[17px] font-extrabold tracking-tight", textClass)}>
+            {title}
+          </h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest bg-secondary/50 px-2.5 py-1 rounded-lg border border-border/30">
+            {items.length} {items.length === 1 ? "Section" : "Sections"}
+          </span>
+          <ChevronDown className={cn(
+            "w-5 h-5 text-muted-foreground transition-transform duration-300",
+            isExpanded ? "rotate-180" : ""
+          )} />
+        </div>
+      </div>
+
+      {/* Accordion Content */}
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+          >
+            <div className="border-t border-border/30 p-4 sm:p-5 space-y-4 bg-secondary/[0.03]">
+              {items.map((item, idx) => {
+                if ("type" in item) {
+                  return <ComparisonCard key={item.id} group={item} density={density} isDark={isDark} />;
+                }
+
+                const colorClasses = getSectionColorClasses(item.kind);
+                const sectionIcon = getSectionIcon(item.kind);
+                const displayTitle = item.title || "Context";
+                const showSubheading = item.title && item.level > 1;
+
+                if (item.kind === "formula") {
+                  const formulaData = parseFormulaBody(item.body, item.title);
+                  let remainingBody = item.body;
+                  
+                  if (formulaData.formula) {
+                    const escapedFormula = formulaData.formula.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                    const mathBlockRegex = new RegExp(`\\$\\$\\s*${escapedFormula}\\s*\\$\\$\\n*`, 'g');
+                    remainingBody = remainingBody.replace(mathBlockRegex, '');
+                    
+                    const inlineRegex = new RegExp(`\\$${escapedFormula}\\$\\n*`, 'g');
+                    remainingBody = remainingBody.replace(inlineRegex, '');
+                  }
+                  
+                  remainingBody = remainingBody.replace(/^(?:\*\*)?where\s*:?\s*(?:\*\*)?[\s\S]*?(?=\n\n|\n[#*]|$)/im, '').trim();
+
+                  const shouldRenderCard = !hasRenderedFormulaCard && formulaData.formula;
+                  if (shouldRenderCard) {
+                    hasRenderedFormulaCard = true;
+                  }
+
+                  return (
+                    <div key={item.id} className="space-y-4">
+                      {showSubheading && (
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-1.5 rounded-lg bg-violet-500/10 text-violet-500">
+                            {sectionIcon}
+                          </div>
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                            {displayTitle}
+                          </h3>
+                        </div>
+                      )}
+                      {shouldRenderCard && (
+                        <FormulaCard body={item.body} sectionTitle={item.title} parentContent={parentContent} />
+                      )}
+                      {remainingBody.trim() && (
+                        <div className={cn(showSubheading ? "pl-0 sm:pl-6" : "pl-0")}>
+                          {renderMarkdownBody(remainingBody, item.kind, density, isDark)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={item.id} className="space-y-2 pb-4 border-b border-border/20 last:border-none last:pb-0">
+                    {showSubheading && (
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-lg bg-background border border-border/30 shadow-sm flex items-center justify-center">
+                          {sectionIcon}
+                        </div>
+                        <h3 className={cn("text-[15px] font-bold tracking-tight", colorClasses.text)}>
+                          {displayTitle}
+                        </h3>
+                      </div>
+                    )}
+                    <div className={cn(showSubheading ? "pl-0 sm:pl-6" : "pl-0")}>
+                      {renderMarkdownBody(item.body, item.kind, density, isDark)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function StandaloneCard({
+  groupKey,
+  title,
+  icon,
+  borderClass,
+  textClass,
+  items,
+  density,
+  isDark,
+  parentContent
+}: {
+  groupKey: string;
+  title: string;
+  icon: React.ReactNode;
+  borderClass: string;
+  textClass: string;
+  items: MarkdownGroup[];
+  density: Density;
+  isDark: boolean;
+  parentContent: string;
+}) {
+  return (
+    <div className={cn(
+      "w-full rounded-[2rem] border border-border/40 bg-card/60 p-5 sm:p-6 shadow-sm border-l-4 transition-all duration-300 hover:shadow-md",
+      borderClass
+    )}>
+      <div className="mb-4 flex items-center gap-3.5">
+        <div className="p-2 rounded-xl bg-background border border-border/30 shadow-sm flex items-center justify-center">
+          {icon}
+        </div>
+        <h2 className={cn("text-base sm:text-[17px] font-extrabold tracking-tight", textClass)}>
+          {title}
+        </h2>
+      </div>
+      <div className="space-y-4">
+        {items.map((item) => {
+          if ("type" in item) {
+            return <ComparisonCard key={item.id} group={item} density={density} isDark={isDark} />;
+          }
+
+          const sectionIcon = getSectionIcon(item.kind);
+          const colorClasses = getSectionColorClasses(item.kind);
+          const showSubheading = item.title && item.level > 1;
+
+          return (
+            <div key={item.id} className="space-y-2 pb-4 border-b border-border/20 last:border-none last:pb-0">
+              {showSubheading && (
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-background border border-border/30 shadow-sm flex items-center justify-center">
+                    {sectionIcon}
+                  </div>
+                  <h3 className={cn("text-[15px] font-bold tracking-tight", colorClasses.text)}>
+                    {item.title}
+                  </h3>
+                </div>
+              )}
+              <div className={cn(showSubheading ? "pl-0 sm:pl-6" : "pl-0")}>
+                {renderMarkdownBody(item.body, item.kind, density, isDark)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -628,20 +1121,91 @@ export function TutorMarkdownRenderer({ content, className, density = "regular" 
   const isDark = theme === "dark";
 
   const normalizedStr = useMemo(() => normalizeContent(content), [content]);
-  const groups = useMemo(() => groupSections(splitIntoSections(normalizedStr)), [normalizedStr]);
+  const rawGroups = useMemo(() => groupSections(splitIntoSections(normalizedStr)), [normalizedStr]);
+
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ group1: true });
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const groupedData = useMemo(() => {
+    const buckets: Record<string, MarkdownGroup[]> = {
+      group1: [],
+      group2: [],
+      group3: [],
+      group4: [],
+      group5: [],
+      group6: [],
+      questions: [],
+    };
+
+    rawGroups.forEach((item, index) => {
+      const key = getGroupKey(item, index);
+      if (!buckets[key]) {
+        buckets[key] = [];
+      }
+      buckets[key].push(item);
+    });
+
+    return buckets;
+  }, [rawGroups]);
 
   if (!normalizedStr.trim()) {
     return null;
   }
 
+  const groupKeys = ["group1", "group2", "group3", "group4", "group5", "group6", "questions"];
+
   return (
     <div className={cn("space-y-6 max-w-4xl mx-auto w-full", className)}>
-      {groups.map((group) => {
-        if ("type" in group) {
-          return <ComparisonCard key={group.id} group={group} density={density} isDark={isDark} />;
+      {groupKeys.map((key) => {
+        const items = groupedData[key] || [];
+        const validItems = items.filter(item => {
+          if ("type" in item) return true;
+          return item.body?.trim()?.length > 0;
+        });
+
+        if (validItems.length === 0) return null;
+
+        const groupMeta = getGroupForKey(key);
+
+        if (groupMeta.isStandalone) {
+          return (
+            <StandaloneCard
+              key={key}
+              groupKey={key}
+              title={groupMeta.title}
+              icon={groupMeta.icon}
+              borderClass={groupMeta.border}
+              textClass={groupMeta.text}
+              items={validItems}
+              density={density}
+              isDark={isDark}
+              parentContent={normalizedStr}
+            />
+          );
         }
 
-        return <SectionCard key={group.id} section={group} density={density} isDark={isDark} parentContent={normalizedStr} />;
+        return (
+          <AccordionGroup
+            key={key}
+            groupKey={key}
+            title={groupMeta.title}
+            icon={groupMeta.icon}
+            borderClass={groupMeta.border}
+            textClass={groupMeta.text}
+            items={validItems}
+            isExpanded={!!expandedGroups[key]}
+            onToggle={() => toggleGroup(key)}
+            density={density}
+            isDark={isDark}
+            parentContent={normalizedStr}
+          />
+        );
       })}
 
       <style>{`
@@ -652,13 +1216,14 @@ export function TutorMarkdownRenderer({ content, className, density = "regular" 
           border: 1px solid rgba(120, 119, 198, 0.12);
           border-radius: 1.25rem;
           overflow-x: auto;
-          display: flex;
-          justify-content: center;
-          align-items: center;
+          overflow-y: hidden;
+          width: 100%;
+          text-align: center;
           box-shadow: inset 0 2px 4px 0 rgba(0,0,0,0.02);
         }
         .tutor-markdown .katex {
           font-size: 1.05em;
+          white-space: nowrap;
         }
         .tutor-markdown blockquote {
           margin: 1rem 0;
