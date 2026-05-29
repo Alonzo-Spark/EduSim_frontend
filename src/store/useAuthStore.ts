@@ -38,6 +38,7 @@ interface AuthState {
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
   verifyEmail: (token: string) => Promise<boolean>;
   setHasHydrated: (hydrated: boolean) => void;
+  devLogin: () => void;
 }
 
 const authStorage =
@@ -183,6 +184,21 @@ export const useAuthStore = create<AuthState>()(
           set({ isAuthenticated: false, user: null, refreshToken: null });
           syncLegacyToken(null);
           return false;
+        }
+
+        if (token === "dev-mock-token") {
+          set({
+            user: {
+              id: "dev-user-id",
+              name: "Developer Admin",
+              email: "dev@edusim.local",
+              role: "teacher",
+              is_email_verified: true,
+              is_mobile_verified: true,
+            },
+            isAuthenticated: true,
+          });
+          return true;
         }
 
         try {
@@ -335,6 +351,26 @@ export const useAuthStore = create<AuthState>()(
           toast.error(error.message || "Verification failed or token expired");
           return false;
         }
+      },
+
+      devLogin: () => {
+        const devUser: User = {
+          id: "dev-user-id",
+          name: "Developer Admin",
+          email: "dev@edusim.local",
+          role: "teacher",
+          is_email_verified: true,
+          is_mobile_verified: true,
+        };
+        set({
+          user: devUser,
+          token: "dev-mock-token",
+          refreshToken: "dev-mock-refresh-token",
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        syncLegacyToken("dev-mock-token");
+        toast.success("Bypassed authentication! Welcome Developer Admin.");
       },
     }),
     {

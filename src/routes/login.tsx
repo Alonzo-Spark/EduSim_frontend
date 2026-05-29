@@ -18,7 +18,8 @@ import {
   Loader2,
   Sparkles,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  Terminal
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,6 +44,7 @@ function Login() {
     forgotPassword, 
     resetPassword, 
     verifyEmail,
+    devLogin,
     isLoading 
   } = useAuthStore();
 
@@ -207,6 +209,11 @@ function Login() {
       toast.success("Welcome back! Signed in with Google.");
       navigate({ to: "/dashboard" });
     }
+  };
+
+  const handleDevLogin = () => {
+    devLogin();
+    navigate({ to: "/dashboard" });
   };
 
   return (
@@ -424,6 +431,19 @@ function Login() {
             ) : (
               <motion.div key="signin" className="space-y-6">
                 <div className="space-y-1"><h3 className="text-2xl font-black text-white">Access EduSim</h3><p className="text-xs text-muted-foreground">Sign in to continue your learning journey</p></div>
+                
+                {/* Developer Quick-Bypass Mode */}
+                <button
+                  type="button"
+                  onClick={handleDevLogin}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-600/20 to-pink-600/20 hover:from-amber-500/35 hover:via-orange-600/35 hover:to-pink-600/35 border border-amber-500/30 hover:border-amber-400 text-amber-200 font-extrabold text-sm flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(245,158,11,0.08)] hover:shadow-[0_0_25px_rgba(245,158,11,0.25)] transition-all duration-300 relative group overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:animate-[shimmer_1.5s_infinite]" />
+                  <Terminal className="w-4.5 h-4.5 text-amber-400 group-hover:rotate-6 transition-transform duration-300" />
+                  <span>Developer Quick Bypass</span>
+                  <span className="absolute top-1 right-2 text-[8px] tracking-widest font-mono text-amber-400/80 uppercase font-medium bg-amber-500/10 px-1.5 py-0.5 rounded-full border border-amber-500/20">DEV ONLY</span>
+                </button>
+
                 <button onClick={handleGoogleLogin} className="w-full py-3.5 rounded-2xl bg-white text-gray-900 font-bold text-sm flex items-center justify-center gap-3"><Chrome className="w-4 h-4" /> Continue with Google</button>
                 <div className="flex items-center gap-3"><div className="flex-1 h-[1px] bg-white/5" /><span className="text-[10px] text-muted-foreground font-mono">OR</span><div className="flex-1 h-[1px] bg-white/5" /></div>
                 <div className="grid grid-cols-2 p-1 rounded-2xl bg-[#0a0f28] border border-white/10">
@@ -483,6 +503,9 @@ function Login() {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes orbit { from { transform: rotate(0deg) translateY(-100px) translateX(-50%); } to { transform: rotate(360deg) translateY(-100px) translateX(-50%); } }
         @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes shimmer {
+          100% { transform: translateX(100%); }
+        }
       `}</style>
     </div>
   );
