@@ -8,9 +8,11 @@ interface BaseBodyConfig {
   isStatic?:    boolean;
   restitution?: number;   // bounciness  [0 – 1]
   friction?:    number;   // surface friction
+  frictionAir?: number;   // air resistance / drag
   density?:     number;   // kg / px²
   angle?:       number;   // radians, initial rotation
   label?:       string;   // debug / query identifier
+  texture?:     string;   // SVG/image texture path
 }
 
 export interface CircleBodyConfig extends BaseBodyConfig {
@@ -45,14 +47,30 @@ export function createBody(config: BodyConfig): Matter.Body {
     label       = config.type,
   } = config;
 
+  // Use nullish coalescing so frictionAir=0 is respected (not treated as falsy like JS default= would do)
+  const frictionAir = config.frictionAir ?? 0.01;
+
   const options: Matter.IChamferableBodyDefinition = {
     isStatic,
     restitution,
     friction,
+    frictionAir,
     density,
     angle,
     label,
   };
+
+  if (config.texture) {
+    const desiredWidth = config.type === 'circle' ? config.radius * 2 : config.width;
+    const desiredHeight = config.type === 'circle' ? config.radius * 2 : config.height;
+    options.render = {
+      sprite: {
+        texture: config.texture,
+        xScale: desiredWidth / 900,
+        yScale: desiredHeight / 900,
+      }
+    };
+  }
 
   switch (config.type) {
     case 'circle':

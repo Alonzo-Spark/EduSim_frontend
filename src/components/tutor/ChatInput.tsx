@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, Mic } from "lucide-react";
+import { Send, Mic } from "lucide-react";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -35,26 +35,18 @@ export function ChatInput({ onSend, disabled, focus = false }: ChatInputProps) {
   };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-50 flex flex-col items-center justify-end pointer-events-none pb-6">
-      <div className="w-full max-w-[900px] px-4 pointer-events-auto">
-        <div className="relative flex flex-col rounded-[24px] border border-white/20 bg-background/70 shadow-[0_10px_40px_rgba(0,0,0,0.2)] backdrop-blur-3xl overflow-hidden p-2">
+    <div className="absolute bottom-0 left-0 right-0 z-50 flex flex-col items-center justify-end pointer-events-none pb-3 sm:pb-6">
+      <div className="w-full max-w-[1600px] px-2 sm:px-4 md:px-6 pointer-events-auto">
+        <div className="relative flex flex-col rounded-[22px] sm:rounded-[26px] border border-border bg-card shadow-[0_4px_20px_rgba(112,181,255,0.06)] backdrop-blur-3xl overflow-hidden p-1.5 sm:p-2 transition-all hover:border-primary/45">
           
-          <div className="flex items-end gap-2 px-2">
-            <button
-              type="button"
-              aria-label="Attach file"
-              className="mb-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
-            >
-              <Paperclip className="h-4.5 w-4.5" />
-            </button>
-
+          <div className="flex items-end gap-1.5 sm:gap-2 px-1 sm:px-2">
             <textarea
               ref={taRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask the tutor..."
-              className="min-h-[44px] w-full resize-none border-0 bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 custom-scrollbar"
+              className="min-h-[40px] sm:min-h-[44px] w-full resize-none border-0 bg-transparent px-1.5 py-2.5 text-sm sm:text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-0 custom-scrollbar"
               rows={1}
             />
 
@@ -62,7 +54,7 @@ export function ChatInput({ onSend, disabled, focus = false }: ChatInputProps) {
               <button
                 type="button"
                 aria-label="Voice input"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+                className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground hover:scale-105 active:scale-95"
               >
                 <Mic className="h-5 w-5" />
               </button>
@@ -75,15 +67,15 @@ export function ChatInput({ onSend, disabled, focus = false }: ChatInputProps) {
                   }
                 }}
                 disabled={disabled || !text.trim()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-[0_4px_12px_rgba(112,181,255,0.3)] transition-all duration-200 hover:scale-105 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none hover:bg-primary/90"
               >
-                <Send className="h-4.5 w-4.5 ml-1" />
+                <Send className="h-4 w-4 sm:h-4.5 sm:w-4.5 ml-0.5 sm:ml-1" />
               </button>
             </div>
           </div>
 
-          <div className="text-center pb-1">
-            <span className="text-[11px] text-muted-foreground/60 font-medium">Press Enter to send</span>
+          <div className="text-center pb-0.5">
+            <span className="text-[10px] sm:text-[11px] text-muted-foreground/45 font-medium">Press Enter to send</span>
           </div>
         </div>
       </div>

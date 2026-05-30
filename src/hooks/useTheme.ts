@@ -1,28 +1,19 @@
-import { useState, useEffect } from "react";
-
-type Theme = "light" | "dark";
+import { useEffect } from "react";
 
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      const saved = window.localStorage.getItem("edusim-theme");
-      if (saved === "light" || saved === "dark") return saved;
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    }
-    return "dark"; // Default for SSR
-  });
+  const theme = "light";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     
     const root = window.document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(theme);
-    window.localStorage.setItem("edusim-theme", theme);
-  }, [theme]);
+    root.classList.remove("dark");
+    root.classList.add("light");
+    window.localStorage.setItem("edusim-theme", "light");
+  }, []);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+    // Theme toggle disabled to maintain minimalist light theme
   };
 
   return { theme, toggleTheme };

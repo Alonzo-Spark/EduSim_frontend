@@ -79,6 +79,7 @@ export class RuntimeStore {
     this.metadata.set(obj.id, {
       label: obj.metadata?.label,
       educationalTags: obj.metadata?.educationalTags ?? [],
+      customData: obj.metadata?.customData ?? {},
     });
     this.notify('objectAdded', obj);
   }

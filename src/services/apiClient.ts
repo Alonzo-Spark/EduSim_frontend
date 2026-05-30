@@ -57,7 +57,8 @@ export async function fetchJsonWithRetry<T = JsonValue>(url: string, options: Ap
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const timeout = createTimeoutSignal(signal, timeoutMs);
+    const resolvedSignal = signal ?? undefined;
+    const timeout = createTimeoutSignal(resolvedSignal, timeoutMs);
 
     try {
       logApiEvent(scope, 'request:start', { url, attempt: attempt + 1 });
@@ -66,7 +67,12 @@ export async function fetchJsonWithRetry<T = JsonValue>(url: string, options: Ap
       const data = raw ? (JSON.parse(raw) as T) : ({} as T);
 
       if (!response.ok) {
-        const errorMessage = (data as Record<string, unknown>)?.detail || (data as Record<string, unknown>)?.error || `HTTP ${response.status}`;
+        const detail = (data as Record<string, unknown>)?.detail;
+        const errorMessage = Array.isArray(detail)
+          ? detail
+              .map((item) => (typeof item === 'object' && item && 'msg' in item ? String((item as Record<string, unknown>).msg) : String(item)))
+              .join(', ')
+          : detail || (data as Record<string, unknown>)?.error || `HTTP ${response.status}`;
         if (attempt < retries && isRetryableStatus(response.status)) {
           lastError = new Error(String(errorMessage));
           await sleep(retryDelayMs * (attempt + 1));
@@ -82,7 +88,7 @@ export async function fetchJsonWithRetry<T = JsonValue>(url: string, options: Ap
       const isAbort = error instanceof DOMException && error.name === 'AbortError';
       const isTimeout = error instanceof DOMException && error.name === 'TimeoutError';
 
-      if ((isAbort || isTimeout) && signal?.aborted) {
+      if ((isAbort || isTimeout) && resolvedSignal?.aborted) {
         throw error;
       }
 

@@ -49,12 +49,12 @@ function SettingsPage() {
 
             {/* Appearance Section */}
             <section className="space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-accent flex items-center gap-2">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-primary flex items-center gap-2">
                 <Moon className="w-4 h-4" /> Appearance
               </h3>
               <div className="p-4 rounded-2xl bg-secondary/50 border border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-accent/10 text-accent">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
                     <Sliders className="w-4 h-4" />
                   </div>
                   <div>
@@ -88,8 +88,8 @@ function SettingsPage() {
 
           <div className="bg-destructive/5 p-6 border-t border-destructive/20 flex items-center justify-between">
             <div>
-              <p className="text-sm font-bold text-red-400">Danger Zone</p>
-              <p className="text-xs text-red-400/60">Once you delete your account, there is no going back.</p>
+              <p className="text-sm font-bold text-destructive">Danger Zone</p>
+              <p className="text-xs text-destructive/80">Once you delete your account, there is no going back.</p>
             </div>
             <Button variant="destructive" className="rounded-xl px-6">
               <LogOut className="w-4 h-4 mr-2" /> Logout

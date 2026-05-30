@@ -49,7 +49,7 @@ export function AssetInspector({ assetName, onClose }: AssetInspectorProps) {
           {/* Basic Info */}
           <section className="prop-section">
             <h3>Basic Information</h3>
-            <PropertyRow label="Name" value={assetName} />
+            <PropertyRow label="Name" value={assetName || ""} />
             <PropertyRow label="Category" value={asset.category} />
             <PropertyRow label="Image Path" value={asset.image} code />
           </section>

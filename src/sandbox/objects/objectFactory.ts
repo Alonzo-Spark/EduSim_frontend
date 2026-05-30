@@ -51,9 +51,11 @@ export function createObject(config: ObjectConfig): RuntimeObject {
       isStatic:    config.isStatic,
       restitution: config.restitution,
       friction:    config.friction,
+      frictionAir: config.frictionAir,
       density:     config.density,
       angle:       config.angle,
       label:       config.label ?? config.id,
+      texture:     config.texture,
     };
 
     if (config.type === 'circle') {
@@ -63,6 +65,7 @@ export function createObject(config: ObjectConfig): RuntimeObject {
   })();
 
   const body = createBody(bodyConfig);
+  (body as any).objectId = config.id;
 
   // ── 2. Rendering ───────────────────────────────────────────────────────────
   const spriteConfig: SpriteConfig = (() => {
@@ -72,6 +75,7 @@ export function createObject(config: ObjectConfig): RuntimeObject {
       strokeWidth:  config.strokeWidth,
       alpha:        config.alpha,
       cornerRadius: config.cornerRadius,
+      texture:      config.texture,
     };
 
     if (config.type === 'circle') {

@@ -22,7 +22,7 @@ interface AssetCardProps {
  * Individual asset card component
  */
 function AssetCard({ asset, onSelect }: AssetCardProps) {
-  const name = asset.name || Object.keys(asset).find(k => asset[k] === asset.image)?.split('/').pop()?.replace(/\.[^/.]+$/, '');
+  const name = asset.name || Object.keys(asset).find(k => (asset as any)[k] === asset.image)?.split('/').pop()?.replace(/\.[^/.]+$/, '');
   const dims = useAssetDimensions(name || '');
 
   return (

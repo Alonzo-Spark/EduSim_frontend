@@ -3,10 +3,11 @@ import { Rnd } from 'react-rnd';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AssetCategory } from './AssetCategory';
 import { assetsRegistry, type AssetDefinition } from '../../config/assetsRegistry';
+import { useAssetStore } from '../../store/assetStore';
 
 interface FloatingAssetPanelProps {
   onAssetDrop?: (asset: AssetDefinition, canvasX: number, canvasY: number) => void;
-  canvasRef?: React.RefObject<HTMLDivElement>;
+  canvasRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 // ─── Shared constants ─────────────────────────────────────────────────────────
@@ -40,16 +41,62 @@ export function FloatingAssetPanel({ onAssetDrop, canvasRef }: FloatingAssetPane
   const rndRef       = useRef<Rnd | null>(null);
   const scrollRef    = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef(0);
-  // Drag-guard: record pointer position on mousedown to distinguish
-  // a panel reposition drag from an intentional click on the pill.
   const dragGuardRef = useRef<{ x: number; y: number } | null>(null);
+  // Tracks which suggested asset we're currently scrolled to (cycles on banner click)
+  const cycleIdxRef  = useRef(0);
+
+  const compiledAssets = useAssetStore((state) => state.assets);
+  const suggestedAssets = useAssetStore((state) => state.suggestedAssets);
+  const suggestedTopic  = useAssetStore((state) => state.suggestedTopic);
+
+  // Build a Set for O(1) lookup used by AssetCategory / AssetCard
+  const suggestedSet = useMemo(
+    () => new Set<string>(suggestedAssets),
+    [suggestedAssets]
+  );
+
+  const mappedCompiledRegistry = useMemo(() => {
+    const baseRegistry = { ...assetsRegistry };
+    if (compiledAssets && compiledAssets.length > 0) {
+      const definitions: AssetDefinition[] = compiledAssets.map((asset) => {
+        let emoji = '🪐';
+        if (asset.category === 'Mechanics') emoji = '⚙️';
+        else if (asset.category === 'Optics') emoji = '🔍';
+        else if (asset.category === 'Electricity') emoji = '⚡';
+        
+        return {
+          id: asset.id,
+          name: asset.name,
+          emoji,
+          category: asset.category || 'Compiled',
+          tags: ['compiled', asset.name.toLowerCase()],
+          spawnType: asset.id.includes('block') || asset.id.includes('rect') ? 'rectangle' : 'circle',
+          spawnConfig: {
+            radius: 24,
+            width: 48,
+            height: 48,
+            density: 0.002,
+            restitution: 0.6,
+            friction: 0.1,
+            fillColor: 0x818cf8,
+            strokeColor: 0xc7d2fe
+          }
+        };
+      });
+      return {
+        '✨ Compiled': definitions,
+        ...assetsRegistry
+      };
+    }
+    return baseRegistry;
+  }, [compiledAssets]);
 
   // ── Search filter ────────────────────────────────────────────────────────────
   const filteredRegistry = useMemo(() => {
-    if (!search.trim()) return assetsRegistry;
+    if (!search.trim()) return mappedCompiledRegistry;
     const q = search.toLowerCase();
-    const result: typeof assetsRegistry = {};
-    for (const [cat, assets] of Object.entries(assetsRegistry)) {
+    const result: Record<string, AssetDefinition[]> = {};
+    for (const [cat, assets] of Object.entries(mappedCompiledRegistry)) {
       const filtered = assets.filter(a =>
         a.name.toLowerCase().includes(q) ||
         a.category.toLowerCase().includes(q) ||
@@ -58,11 +105,11 @@ export function FloatingAssetPanel({ onAssetDrop, canvasRef }: FloatingAssetPane
       if (filtered.length > 0) result[cat] = filtered;
     }
     return result;
-  }, [search]);
+  }, [search, mappedCompiledRegistry]);
 
   const totalAssets = useMemo(() =>
-    Object.values(assetsRegistry).reduce((sum, arr) => sum + arr.length, 0),
-  []);
+    Object.values(mappedCompiledRegistry).reduce((sum, arr) => sum + arr.length, 0),
+  [mappedCompiledRegistry]);
 
   // ── Collapse / Expand ────────────────────────────────────────────────────────
   const toggle = useCallback(() => {
@@ -83,6 +130,73 @@ export function FloatingAssetPanel({ onAssetDrop, canvasRef }: FloatingAssetPane
     }
     toggle();
   }, [toggle]);
+
+  // Reset cycle index whenever the suggestion list changes
+  useEffect(() => {
+    cycleIdxRef.current = 0;
+  }, [suggestedAssets]);
+
+  // Scroll to the next suggested asset card in a round-robin cycle
+  const scrollToNextSuggestion = useCallback(() => {
+    if (!scrollRef.current || suggestedAssets.length === 0) return;
+
+    const container = scrollRef.current;
+    const idx = cycleIdxRef.current % suggestedAssets.length;
+    const targetId = suggestedAssets[idx];
+
+    // Find the card by data-asset-id inside the panel scroll container only
+    const card = container.querySelector(
+      `[data-asset-id="${targetId}"]`
+    ) as HTMLElement | null;
+
+    if (card) {
+      // ── Vertical scroll: move the panel's own scrollable div ──────────────
+      // Get card's top relative to the scroll container
+      const containerRect = container.getBoundingClientRect();
+      const cardRect      = card.getBoundingClientRect();
+      const cardTopRelative = cardRect.top - containerRect.top + container.scrollTop;
+      // Center the card vertically in the panel
+      const targetScrollTop = cardTopRelative - container.clientHeight / 2 + cardRect.height / 2;
+      container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+
+      // ── Horizontal scroll: move the category row that contains this card ──
+      // The card sits inside a flex row div (the scrollable category strip)
+      const row = card.parentElement as HTMLElement | null;
+      if (row && row.scrollWidth > row.clientWidth) {
+        const rowRect  = row.getBoundingClientRect();
+        const cardLeft = cardRect.left - rowRect.left + row.scrollLeft;
+        // Center the card horizontally in the row
+        const targetScrollLeft = cardLeft - row.clientWidth / 2 + cardRect.width / 2;
+        row.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+      }
+
+      // ── Brief highlight flash ──────────────────────────────────────────────
+      const prevOutline      = card.style.outline;
+      const prevOutlineOffset = card.style.outlineOffset;
+      card.style.outline      = '2px solid rgba(167,139,250,1)';
+      card.style.outlineOffset = '2px';
+      setTimeout(() => {
+        card.style.outline      = prevOutline;
+        card.style.outlineOffset = prevOutlineOffset;
+      }, 900);
+    }
+
+    // Advance to next for next click
+    cycleIdxRef.current = (idx + 1) % suggestedAssets.length;
+  }, [suggestedAssets]);
+
+  // Auto-expand + scroll to first suggestion whenever suggestedAssets changes
+  useEffect(() => {
+    if (suggestedAssets.length === 0) return;
+    // Expand the panel if collapsed
+    setCollapsed(false);
+    // Give the panel a tick to render before scrolling
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = 0;
+      }
+    }, 80);
+  }, [suggestedAssets]);
 
   // Restore scroll position after expanding
   useEffect(() => {
@@ -342,6 +456,82 @@ export function FloatingAssetPanel({ onAssetDrop, canvasRef }: FloatingAssetPane
                   </div>
                 </div>
 
+                {/* AI Suggestion Banner */}
+                {suggestedAssets.length > 0 && (
+                  <div
+                    onClick={scrollToNextSuggestion}
+                    style={{
+                      margin: '0 14px 6px',
+                      padding: '7px 10px',
+                      background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(168,85,247,0.15))',
+                      border: '1px solid rgba(139,92,246,0.4)',
+                      borderRadius: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      flexShrink: 0,
+                      cursor: 'pointer',
+                      transition: 'background 0.15s, border-color 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLDivElement).style.background =
+                        'linear-gradient(135deg, rgba(124,58,237,0.32), rgba(168,85,247,0.26))';
+                      (e.currentTarget as HTMLDivElement).style.borderColor =
+                        'rgba(167,139,250,0.7)';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLDivElement).style.background =
+                        'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(168,85,247,0.15))';
+                      (e.currentTarget as HTMLDivElement).style.borderColor =
+                        'rgba(139,92,246,0.4)';
+                    }}
+                    title={`Click to scroll to suggested asset ${(cycleIdxRef.current % suggestedAssets.length) + 1} of ${suggestedAssets.length}`}
+                  >
+                    <span style={{ fontSize: 13, flexShrink: 0 }}>✨</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: '#c4b5fd',
+                        letterSpacing: '0.04em',
+                        fontFamily: "'Inter', sans-serif",
+                      }}>
+                        AI SUGGESTED{suggestedTopic ? ` · ${suggestedTopic.toUpperCase()}` : ''}
+                      </div>
+                      <div style={{
+                        fontSize: 9,
+                        color: '#7c6fcd',
+                        fontFamily: "'Inter', sans-serif",
+                        marginTop: 1,
+                      }}>
+                        {suggestedAssets.length} asset{suggestedAssets.length !== 1 ? 's' : ''} highlighted
+                        &nbsp;·&nbsp;
+                        <span style={{ color: '#a78bfa' }}>click to jump →</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        useAssetStore.getState().clearSuggestedAssets();
+                      }}
+                      title="Clear suggestions"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#7c6fcd',
+                        fontSize: 14,
+                        lineHeight: 1,
+                        padding: '2px 4px',
+                        borderRadius: 4,
+                        flexShrink: 0,
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
                 {/* Tip */}
                 <div style={{ padding: '0 14px 4px', flexShrink: 0 }}>
                   <span style={{ fontSize: 9.5, color: '#475569', fontStyle: 'italic' }}>
@@ -371,6 +561,7 @@ export function FloatingAssetPanel({ onAssetDrop, canvasRef }: FloatingAssetPane
                         name={cat}
                         assets={assets}
                         onDragStart={handleDragStart}
+                        suggestedIds={suggestedSet.size > 0 ? suggestedSet : undefined}
                       />
                     ))
                   )}

@@ -2,7 +2,7 @@
 // Hook that exposes the asset registry with optional search/filter helpers.
 
 import { useMemo } from 'react';
-import { assetsRegistry, type AssetDefinition } from '../config/assetsRegistry';
+import { assetsRegistry, type AssetDefinition } from '../../config/assetsRegistry';
 
 interface UseAssetRegistryReturn {
   registry: Record<string, AssetDefinition[]>;

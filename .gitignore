@@ -62,6 +62,9 @@ coverage/
 # Misc
 dist/
 build/
+assets/
+public/
+archive/
 
 # Ignore lock files only if you intentionally don't want them tracked
 # Uncomment if you don't want lockfiles in git

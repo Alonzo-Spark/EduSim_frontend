@@ -21,28 +21,28 @@ const TYPE_META: Record<SearchResult["type"], { label: string; singular: string;
   topic: {
     label: "Topics",
     singular: "Topic",
-    accent: "text-emerald-300",
+    accent: "text-emerald-600 font-bold",
     border: "border-emerald-500/30",
     bg: "bg-emerald-500/10",
   },
   chapter: {
     label: "Chapters",
     singular: "Chapter",
-    accent: "text-amber-300",
+    accent: "text-amber-600 font-bold",
     border: "border-amber-500/30",
     bg: "bg-amber-500/10",
   },
   subject: {
     label: "Subjects",
     singular: "Subject",
-    accent: "text-sky-300",
+    accent: "text-primary font-bold",
     border: "border-sky-500/30",
     bg: "bg-sky-500/10",
   },
   class: {
     label: "Classes",
     singular: "Class",
-    accent: "text-violet-300",
+    accent: "text-violet-600 font-bold",
     border: "border-violet-500/30",
     bg: "bg-violet-500/10",
   },
@@ -142,7 +142,7 @@ export function GlobalSearch() {
             setIsOpen(false);
             const topic = query.trim();
             setQuery("");
-            router.navigate({ to: "/tutor", search: { topic }, state: { prompt: `Explain ${topic}` } });
+            (router as any).navigate({ to: "/tutor", search: { topic }, state: { prompt: `Explain ${topic}` } });
           }
           break;
         case "Escape":
@@ -211,7 +211,7 @@ export function GlobalSearch() {
 
     // Also include a helpful prompt when possible
     const prompt = item.topic ? `Explain ${item.topic}` : undefined;
-    router.navigate({ to: "/tutor", search: params, state: prompt ? { prompt } : undefined });
+    (router as any).navigate({ to: "/tutor", search: params, state: prompt ? { prompt } : undefined });
   };
 
   const groupedSuggestions = TYPE_ORDER.map((type) => ({
@@ -233,7 +233,7 @@ export function GlobalSearch() {
         }}
         className={`glass-strong rounded-full flex items-center px-6 py-3.5 gap-4 transition-all duration-300 border ${
           isOpen
-            ? "border-primary shadow-[0_0_40px_rgba(99,102,241,0.25)] bg-background"
+            ? "border-primary shadow-[0_0_40px_rgba(112,181,255,0.25)] bg-background"
             : "border-border hover:border-primary/40 hover:shadow-lg bg-background/60"
         }`}
       >
@@ -331,7 +331,7 @@ export function GlobalSearch() {
                                   }`}>
                                     {renderHighlightedText(formatResultDisplay(item), query)}
                                   </p>
-                                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold mt-0.5 truncate opacity-80">
+                                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-bold mt-0.5 truncate">
                                     {renderHighlightedText(formatResultSubtext(item), query)}
                                   </p>
                                 </div>

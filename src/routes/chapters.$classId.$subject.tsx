@@ -46,7 +46,7 @@ function ChaptersPage() {
             }}
           >
             <Card delay={i * 0.02}>
-              <div className="text-xs text-cyan-400 mb-2">CHAPTER</div>
+              <div className="text-xs font-bold text-primary mb-2">CHAPTER</div>
 
               <div className="text-lg font-bold mb-2">{chapter.name}</div>
 
