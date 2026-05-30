@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, X, ChevronLeft, ChevronRight, BookOpen, Settings, Play, Info, Search, Minimize2, Maximize2, Pin, PinOff,
@@ -25,6 +25,13 @@ import { RuntimeObserver } from '../../ai/runtimeObserver';
 import { useExplanationEngine } from '../../ai/explanationEngine';
 import { FloatingAssetPanel } from '../../components/AssetLibrary/FloatingAssetPanel';
 import { physicsEventBus } from '../../ai/physicsEventBus';
+
+import { useGuidedModeStore } from '../../store/guidedModeStore';
+import { InteractiveGuideModal } from './InteractiveGuideModal';
+import { BuildGuidePanel } from './BuildGuidePanel';
+import { AssistedModePanel } from './AssistedModePanel';
+import { ChallengePanel } from './ChallengePanel';
+import { SandboxValidationState } from '../utils/guidedValidation';
 import { getApiUrl } from '../../config/api';
 
 
@@ -116,8 +123,8 @@ async function buildScene(
   // ── Static boundaries ─────────────────────────────────────────────────────
   addStatic(createObject({
     id: 'ground', type: 'rectangle',
-    x: W / 2, y: H - 40, width: 5000, height: 28,
-    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1,
+    x: W / 2, y: H - 124, width: 5000, height: 28,
+    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x5b5fff, strokeWidth: 2.5,
   }));
   addStatic(createObject({
     id: 'wall-l', type: 'rectangle',
@@ -277,6 +284,8 @@ const StepCard: React.FC<StepCardProps> = ({ num, title, description, type }) =>
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const SandboxCanvas: React.FC = () => {
+  const { mode, isOpen, activeStep, guideData, highlightedAsset, setIsOpen, setActiveStep } = useGuidedModeStore();
+
   const mountRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<SandboxRuntime | null>(null);
   const storeRef = useRef<RuntimeStore | null>(null);
@@ -303,6 +312,28 @@ export const SandboxCanvas: React.FC = () => {
   const [tutorPinned, setTutorPinned] = useState(false);
   const [tutorMaximized, setTutorMaximized] = useState(false);
   const [activeTab, setActiveTab] = useState<'explanation' | 'effects' | 'formula'>('explanation');
+const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
+const [propertyVersion, setPropertyVersion] = useState(0);
+
+
+  // Memoized sandbox validation state to prevent excessive recalculations and infinite render loops in guide panels
+  const currentValidationState = useMemo<SandboxValidationState>(() => {
+    return {
+      bodies: storeRef.current ? storeRef.current.getAllObjects().map(o => ({
+        id: o.id,
+        isStatic: o.body.isStatic,
+        mass: o.body.mass,
+        velocity: o.body.velocity,
+      })) : [],
+      constraints: constraintRegRef.current ? constraintRegRef.current.getAll().map(c => ({
+        id: c.id,
+        type: c.type,
+      })) : [],
+      gravityMode: gravityMode,
+      gravityPreset: gravity,
+      running: running,
+    };
+  }, [ready, bodyCount, propertyVersion, gravityMode, gravity, running]);
 
   const handleResizeLeft = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
@@ -366,7 +397,6 @@ export const SandboxCanvas: React.FC = () => {
   }, [tutorWidth, tutorHeight]);
 
   // Modular Switchable Gravity System states
-  const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
   const [gConstant, setGConstant] = useState(0.0012);
   const [radialDebug, setRadialDebug] = useState(true);
 
@@ -470,6 +500,14 @@ export const SandboxCanvas: React.FC = () => {
             formula: d.formula || '',
             suggestions: d.concepts || []
           });
+
+          // Load dynamic step-by-step instructions into the Guided Mode store!
+          if (d.simulation_guide && d.simulation_guide.is_buildable) {
+            const store = useGuidedModeStore.getState();
+            store.setMode('guided');
+            store.setGuideData(d.simulation_guide);
+            store.setIsOpen(true);
+          }
         } else {
           throw new Error(json.detail || 'Unknown error from backend');
         }
@@ -524,9 +562,157 @@ export const SandboxCanvas: React.FC = () => {
     }
   };
 
+  const handleAutoBuild = useCallback(async (spawnConfig: any) => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const creg = constraintRegRef.current;
+    const store = storeRef.current;
+    const el = mountRef.current;
+    if (!rt || !ia || !creg || !el || !store || !ready) return;
+
+    // Pausing simulation clock and clearing canvas state
+    rt.pause();
+    store.reset();
+    simTimeRef.current = 0;
+
+    // Dynamic clean elements
+    const burnOverlay = document.getElementById('example-burn-overlay');
+    if (burnOverlay) burnOverlay.remove();
+    const energyOverlay = document.getElementById('example-energy-overlay');
+    if (energyOverlay) energyOverlay.remove();
+
+    // Rebuild standard borders
+    const dyn = await buildScene(rt, el, ia, creg, store);
+    dynRef.current = dyn;
+    setBodyCount(dyn.length);
+    setSelected(null);
+
+    // Spawn custom bodies
+    const { createObject } = await import('../objects/objectFactory');
+    const spawnedBodiesMap = new Map<string, any>();
+
+    if (spawnConfig.bodies && Array.isArray(spawnConfig.bodies)) {
+      const uidCount: Record<string, number> = {};
+      const getUniqueId = (prefix: string) => {
+        uidCount[prefix] = (uidCount[prefix] || 0) + 1;
+        return `${prefix}-${uidCount[prefix]}-${Math.random().toString(36).substr(2, 4)}`;
+      };
+
+      for (const bodyCfg of spawnConfig.bodies) {
+        const type = bodyCfg.type || 'circle';
+        const isStatic = bodyCfg.isStatic ?? false;
+        const rest = bodyCfg.restitution ?? 0.6;
+        const fillString = bodyCfg.fillColor || '0x6366f1';
+        const fillColor = parseInt(fillString.replace('0x', ''), 16);
+
+        const base = {
+          x: bodyCfg.x,
+          y: bodyCfg.y,
+          restitution: rest,
+          friction: 0.1,
+          density: 0.002,
+          isStatic,
+          fillColor,
+          strokeColor: fillColor,
+          strokeWidth: 2.5
+        };
+
+        const obj = type === 'circle'
+          ? createObject({
+              id: bodyCfg.id || getUniqueId('circle'),
+              type: 'circle',
+              radius: bodyCfg.radius || 20,
+              ...base
+            })
+          : createObject({
+              id: bodyCfg.id || getUniqueId('rect'),
+              type: 'rectangle',
+              width: bodyCfg.width || 40,
+              height: bodyCfg.height || 40,
+              cornerRadius: 8,
+              ...base
+            });
+
+        // Set custom mass if explicitly asked by the tutor config
+        if (bodyCfg.mass !== undefined && obj.body) {
+          const Matter = await import('matter-js');
+          Matter.Body.setMass(obj.body, bodyCfg.mass);
+        }
+
+        rt.renderer.getViewport().addChild(obj.display);
+        rt.physics.addBodies(obj.body);
+        rt.sync.register(obj.id, obj.body, obj.display);
+        ia.selection.register(obj);
+        store.addObject(obj);
+        dynRef.current.push(obj.body);
+
+        spawnedBodiesMap.set(bodyCfg.id, obj);
+      }
+      setBodyCount(dynRef.current.length);
+    }
+
+    // Spawn custom constraints
+    if (spawnConfig.constraints && Array.isArray(spawnConfig.constraints)) {
+      const { createConstraint } = await import('../constraints/constraintFactory');
+      const constUidCount: Record<string, number> = {};
+      const getUniqueConstId = (prefix: string) => {
+        constUidCount[prefix] = (constUidCount[prefix] || 0) + 1;
+        return `${prefix}-${constUidCount[prefix]}`;
+      };
+
+      for (const constCfg of spawnConfig.constraints) {
+        const type = constCfg.type || 'rope';
+        const bodyAObj = spawnedBodiesMap.get(constCfg.bodyIdA);
+        const bodyBObj = spawnedBodiesMap.get(constCfg.bodyIdB);
+        if (!bodyAObj || !bodyBObj) continue;
+
+        const stiffness = constCfg.stiffness ?? (type === 'spring' ? 0.02 : 0.9);
+        const damping = constCfg.damping ?? 0.01;
+        const length = constCfg.length ?? Math.hypot(
+          bodyAObj.body.position.x - bodyBObj.body.position.x,
+          bodyAObj.body.position.y - bodyBObj.body.position.y
+        );
+
+        creg.add(createConstraint({
+          id: constCfg.id || getUniqueConstId('constraint'),
+          type: type as any,
+          bodyA: bodyAObj.body,
+          bodyB: bodyBObj.body,
+          length,
+          stiffness,
+          damping
+        }));
+      }
+    }
+
+    // Set gravity preset
+    if (spawnConfig.gravityPreset) {
+      changeGravity(spawnConfig.gravityPreset);
+    }
+    if (spawnConfig.gravityMode) {
+      handleModeChange(spawnConfig.gravityMode);
+    }
+
+    // Apply initial forces
+    if (spawnConfig.forces && Array.isArray(spawnConfig.forces)) {
+      const Matter = await import('matter-js');
+      for (const forceCfg of spawnConfig.forces) {
+        const bodyObj = spawnedBodiesMap.get(forceCfg.bodyId);
+        if (bodyObj && forceCfg.vector) {
+          Matter.Body.applyForce(bodyObj.body, bodyObj.body.position, forceCfg.vector);
+        }
+      }
+    }
+
+    // Always pause simulation on auto-build start so student can inspect
+    rt.pause();
+    store.setRuntimeState('paused');
+    setRunning(false);
+  }, [ready, changeGravity, handleModeChange]);
+
   const propertyControllerRef = useRef<PropertyController | null>(null);
   const observerRef = useRef<RuntimeObserver | null>(null);
-  const [propertyVersion, setPropertyVersion] = useState(0);
+
   const [telemetryTick, setTelemetryTick] = useState(0);
   const simTimeRef = useRef(0);
   const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
@@ -1348,7 +1534,7 @@ export const SandboxCanvas: React.FC = () => {
     }
   }, [ready, gravityMode, gConstant, radialDebug]);
 
-  const handleModeChange = (mode: 'linear' | 'radial') => {
+  function handleModeChange(mode: 'linear' | 'radial') {
     setGravityMode(mode);
     const rt = runtimeRef.current;
     if (rt) {
@@ -1360,7 +1546,7 @@ export const SandboxCanvas: React.FC = () => {
         });
       }
     }
-  };
+  }
 
   const handleCameraChange = useCallback((newZoom: number, newPanX: number, newPanY: number) => {
     setZoom(newZoom);
@@ -1547,10 +1733,10 @@ export const SandboxCanvas: React.FC = () => {
     dynRef.current.forEach((b) => Matter.Body.applyForce(b, b.position, { x: fx * b.mass, y: 0 }));
   }, [ready]);
 
-  const changeGravity = (preset: GravityPreset) => {
+  function changeGravity(preset: GravityPreset) {
     setGravity(preset);
     propertyControllerRef.current?.updateGlobalGravity(GRAVITY_VALUES[preset]);
-  };
+  }
 
   const changeSpeed = (val: number) => {
     setSpeed(val);
@@ -2317,6 +2503,69 @@ export const SandboxCanvas: React.FC = () => {
         <h1 style={S.title}>EduSim Sandbox</h1>
         <p style={S.subtitle}>Drag · Select · Control</p>
 
+        {/* Premium Level/Mode Selection Toolbar */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          background: 'rgba(15, 23, 42, 0.45)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '14px',
+          padding: '8px',
+          marginBottom: '16px',
+          boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.03)'
+        }}>
+          <span style={{ fontSize: '9px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '4px' }}>
+            Choose Learning Mode
+          </span>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {[
+              { id: 'guided', label: 'Guided', color: '#6366f1', activeBg: 'rgba(99, 102, 241, 0.15)', activeBorder: 'rgba(99, 102, 241, 0.35)', activeText: '#a5b4fc', emoji: '🤖' },
+              { id: 'assisted', label: 'Assisted', color: '#10b981', activeBg: 'rgba(16, 185, 129, 0.15)', activeBorder: 'rgba(16, 185, 129, 0.35)', activeText: '#6ee7b7', emoji: '🧭' },
+              { id: 'challenge', label: 'Challenge', color: '#fbbf24', activeBg: 'rgba(251, 191, 36, 0.15)', activeBorder: 'rgba(251, 191, 36, 0.35)', activeText: '#fde047', emoji: '🏆' }
+            ].map((lvl) => {
+              const isActive = mode === lvl.id;
+              return (
+                <button
+                  key={lvl.id}
+                  onClick={() => {
+                    useGuidedModeStore.getState().setMode(lvl.id as any);
+                    if (lvl.id === 'guided' && useGuidedModeStore.getState().guideData) {
+                      useGuidedModeStore.getState().setIsOpen(true);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    padding: '8px 4px',
+                    borderRadius: '10px',
+                    border: isActive ? `1.5px solid ${lvl.activeBorder}` : '1.5px solid rgba(255,255,255,0.04)',
+                    background: isActive ? lvl.activeBg : 'transparent',
+                    color: isActive ? lvl.activeText : '#64748b',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    transition: 'all 0.25s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) e.currentTarget.style.border = '1.5px solid rgba(255,255,255,0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) e.currentTarget.style.border = '1.5px solid rgba(255,255,255,0.04)';
+                  }}
+                >
+                  <span style={{ fontSize: '14px' }}>{lvl.emoji}</span>
+                  <span style={{ fontSize: '10px', fontWeight: 800 }}>{lvl.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Premium Tab Toggles */}
         <div style={{
           display: 'flex',
@@ -2399,7 +2648,19 @@ export const SandboxCanvas: React.FC = () => {
 
             <Sep label="Controls" />
             <div style={S.row}>
-              <button style={{ ...S.btn, ...S.btnPrimary, flex: 1 }} onClick={togglePlay} disabled={!ready}>
+              <button 
+                id="play-pause-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnPrimary, 
+                  flex: 1,
+                  border: (highlightedAsset === 'play-btn') ? '2px solid rgb(34, 211, 238)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'play-btn') ? '0 0 15px rgba(34, 211, 238, 0.75)' : 'none',
+                  transition: 'all 0.3s ease'
+                }} 
+                onClick={togglePlay} 
+                disabled={!ready}
+              >
                 {running ? '⏸ Pause' : '▶ Resume'}
               </button>
               <button style={{ ...S.btn, ...S.btnGhost }} onClick={handleReset} disabled={!ready} title="Reset">↺</button>
@@ -2470,13 +2731,31 @@ export const SandboxCanvas: React.FC = () => {
               style={S.row}
             >
               <button
-                style={{ ...S.btn, ...S.btnIndigo, flex: 1, cursor: ready ? 'grab' : 'not-allowed' }}
+                id="spawn-rect-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnIndigo, 
+                  flex: 1, 
+                  cursor: ready ? 'grab' : 'not-allowed',
+                  border: (highlightedAsset === 'rectangle' || highlightedAsset === 'shape-toolbox') ? '2px solid rgb(52, 211, 153)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'rectangle' || highlightedAsset === 'shape-toolbox') ? '0 0 15px rgba(52, 211, 153, 0.75)' : 'none',
+                  transition: 'all 0.35s ease'
+                }}
                 disabled={!ready}
                 onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnShape('rectangle'); }}
                 onPointerDown={onPanelPointerDown('rectangle')}
               >▪ Rectangle</button>
               <button
-                style={{ ...S.btn, ...S.btnEmerald, flex: 1, cursor: ready ? 'grab' : 'not-allowed' }}
+                id="spawn-circle-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnEmerald, 
+                  flex: 1, 
+                  cursor: ready ? 'grab' : 'not-allowed',
+                  border: (highlightedAsset === 'circle' || highlightedAsset === 'shape-toolbox') ? '2px solid rgb(52, 211, 153)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'circle' || highlightedAsset === 'shape-toolbox') ? '0 0 15px rgba(52, 211, 153, 0.75)' : 'none',
+                  transition: 'all 0.35s ease'
+                }}
                 disabled={!ready}
                 onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnShape('circle'); }}
                 onPointerDown={onPanelPointerDown('circle')}
@@ -2487,14 +2766,17 @@ export const SandboxCanvas: React.FC = () => {
               style={{ ...S.row, marginTop: -2 }}
             >
               <button
+                id="spawn-pendulum-rope-btn"
                 style={{
                   ...S.btn,
                   width: '100%',
                   cursor: ready ? 'grab' : 'not-allowed',
-                  background: 'rgba(99,102,241,0.13)',
-                  color: '#a5b4fc',
-                  borderColor: 'rgba(99,102,241,0.28)',
+                  background: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? 'rgba(245, 158, 11, 0.2)' : 'rgba(99,102,241,0.13)',
+                  color: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '#fbbf24' : '#a5b4fc',
+                  borderColor: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '#f59e0b' : 'rgba(99,102,241,0.28)',
+                  boxShadow: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.65)' : 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  transition: 'all 0.35s ease'
                 }}
                 disabled={!ready}
                 onClick={() => {
@@ -2516,19 +2798,51 @@ export const SandboxCanvas: React.FC = () => {
               style={{ ...S.row, flexWrap: 'wrap' }}
             >
               <button
-                style={{ ...S.btn, ...S.btnIndigo, flex: '1 1 45%', cursor: ready ? 'grab' : 'not-allowed', padding: '7px 4px', fontSize: 11 }}
+                id="spawn-pivot-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnIndigo, 
+                  flex: '1 1 45%', 
+                  cursor: ready ? 'grab' : 'not-allowed', 
+                  padding: '7px 4px', 
+                  fontSize: 11,
+                  border: (highlightedAsset === 'pivot' || highlightedAsset === 'constraints-toolbox') ? '2px solid rgb(245, 158, 11)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'pivot' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.75)' : 'none',
+                  transition: 'all 0.35s ease'
+                }}
                 disabled={!ready}
                 onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('pivot'); }}
                 onPointerDown={onPanelPointerDown('pivot')}
               >📌 Pivot</button>
               <button
-                style={{ ...S.btn, ...S.btnEmerald, flex: '1 1 45%', cursor: ready ? 'grab' : 'not-allowed', padding: '7px 4px', fontSize: 11 }}
+                id="spawn-spring-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnEmerald, 
+                  flex: '1 1 45%', 
+                  cursor: ready ? 'grab' : 'not-allowed', 
+                  padding: '7px 4px', 
+                  fontSize: 11,
+                  border: (highlightedAsset === 'spring' || highlightedAsset === 'constraints-toolbox') ? '2px solid rgb(245, 158, 11)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'spring' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.75)' : 'none',
+                  transition: 'all 0.35s ease'
+                }}
                 disabled={!ready}
                 onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('spring'); }}
                 onPointerDown={onPanelPointerDown('spring')}
               >🌀 Spring</button>
               <button
-                style={{ ...S.btn, ...S.btnSky, width: '100%', cursor: ready ? 'grab' : 'not-allowed', marginTop: 4 }}
+                id="spawn-rope-chain-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnSky, 
+                  width: '100%', 
+                  cursor: ready ? 'grab' : 'not-allowed', 
+                  marginTop: 4,
+                  border: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '2px solid rgb(245, 158, 11)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.75)' : 'none',
+                  transition: 'all 0.35s ease'
+                }}
                 disabled={!ready}
                 onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('rope'); }}
                 onPointerDown={onPanelPointerDown('rope')}
@@ -4222,6 +4536,51 @@ export const SandboxCanvas: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Dynamic Sandbox Validation State & Level Panels rendering */}
+        {(() => {
+          return (
+            <>
+              {/* Onboarding Interactive Guide Modal for Guided Mode */}
+              <AnimatePresence>
+                {mode === 'guided' && isOpen && (
+                  <InteractiveGuideModal
+                    isOpen={isOpen}
+                    onClose={() => setIsOpen(false)}
+                    activeStep={activeStep}
+                    setActiveStep={setActiveStep}
+                    onLoadTemplate={handleSelectExample}
+                    aiGuideData={guideData}
+                    onAutoBuild={handleAutoBuild}
+                  />
+                )}
+              </AnimatePresence>
+
+              {/* Dynamic Level Panels rendering based on mode */}
+              <AnimatePresence>
+                {mode === 'guided' && guideData && !isOpen && (
+                  <BuildGuidePanel
+                    validationState={currentValidationState}
+                    onAutoBuild={handleAutoBuild}
+                    onReset={handleReset}
+                  />
+                )}
+                {mode === 'assisted' && (
+                  <AssistedModePanel
+                    validationState={currentValidationState}
+                    onReset={handleReset}
+                  />
+                )}
+                {mode === 'challenge' && (
+                  <ChallengePanel
+                    validationState={currentValidationState}
+                    onReset={handleReset}
+                  />
+                )}
+              </AnimatePresence>
+            </>
+          );
+        })()}
       </div>
 
       {/* ── Right panel ─────────────────────────────────────── */}
