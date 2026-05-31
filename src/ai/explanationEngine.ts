@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { physicsEventBus, PhysicsEvent } from './physicsEventBus';
 import { generateInsight, ExplanationInsight } from './insightGenerator';
-import { getApiUrl } from "@/config/api";
+import { getApiUrl } from '../config/api';
 
 export interface ExplanationQueueItem {
   id: string;

@@ -86,3 +86,26 @@ export type SimulationState = {
   gravity?: number;
   timeScale?: number;
 };
+
+export interface SimulationMeta {
+  id: string;
+  title: string;
+  topic: string;
+  difficulty: "beginner" | "intermediate" | "advanced";
+}
+
+export interface SimulationEnvironment {
+  gravity: { x: number; y: number };
+  friction: number;
+  air_resistance: number;
+  background?: string;
+}
+
+export interface SimulationDSL {
+  meta: SimulationMeta;
+  environment: SimulationEnvironment;
+  objects: any[];
+  interactions: any[];
+  equations?: string[];
+}
+

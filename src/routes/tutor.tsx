@@ -9,7 +9,6 @@ import ChatWorkspace from "@/components/tutor/ChatWorkspace";
 import { TutorService, TutorAnalysisResponse } from "@/services/TutorService";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useCurriculumTopic } from "@/hooks/useCurriculumTopic";
-import { FloatingSimulationWorkspaceOverlay } from "@/components/simulation/FloatingSimulationWorkspaceOverlay";
 
 // Define search params for the route
 export const Route = createFileRoute("/tutor")({
@@ -29,8 +28,7 @@ function TutorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { setTutorResponse, simulationGenerated, simulationData, resetGenerationState } =
-    useSimulationStore();
+  const { setTutorResponse } = useSimulationStore();
 
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
 
@@ -128,26 +126,6 @@ function TutorPage() {
           />
         </div>
       </div>
-
-      {/* Embedded high-fidelity overlay satisfying explicit floating sandbox constraints */}
-      <FloatingSimulationWorkspaceOverlay
-        isOpen={simulationGenerated}
-        onClose={resetGenerationState}
-        simulation={
-          simulationData
-            ? {
-                dsl: simulationData,
-                metadata: {
-                  subject: searchParams.subject,
-                  topic: searchParams.topic,
-                  chapter: searchParams.chapter,
-                  class_name: searchParams.class_name,
-                },
-                title: `${searchParams.topic} - ${searchParams.subject}`,
-              }
-            : undefined
-        }
-      />
 
       {/* Global Error Toast */}
       {error && (

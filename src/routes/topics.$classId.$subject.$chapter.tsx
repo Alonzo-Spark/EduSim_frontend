@@ -4,8 +4,6 @@ import { getClass } from "@/data/curriculum";
 import { PageWrapper } from "@/components/Card";
 import { Crumbs } from "@/components/Crumbs";
 import { Play, Sparkles } from "lucide-react";
-import { useState } from "react";
-import { FloatingSimulationWorkspaceOverlay } from "@/components/simulation/FloatingSimulationWorkspaceOverlay";
 
 export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
   beforeLoad: ({ params }) => {
@@ -39,19 +37,11 @@ export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
 function TopicsPage() {
   const { c, s, chapter, classId, subjectId } = Route.useLoaderData();
   const navigate = useNavigate();
-  
-  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-  const [selectedTopic, setSelectedTopic] = useState<any>(null);
 
   const handleGenerateSimulation = (topic: any) => {
-    setSelectedTopic({
-      ...topic,
-      classId,
-      subject: subjectId,
-      chapter: chapter.name,
-      title: topic.name
+    navigate({
+      to: "/simulation-generator",
     });
-    setIsOverlayOpen(true);
   };
 
   return (
@@ -126,12 +116,6 @@ function TopicsPage() {
           </motion.div>
         ))}
       </div>
-
-      <FloatingSimulationWorkspaceOverlay 
-        isOpen={isOverlayOpen} 
-        onClose={() => setIsOverlayOpen(false)}
-        simulation={selectedTopic}
-      />
     </PageWrapper>
   );
 }
