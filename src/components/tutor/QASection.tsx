@@ -123,24 +123,24 @@ export default function QASection({ topic, formulas }: QASectionProps) {
     <div className="w-full space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center border border-white/10">
-            <BookOpen className="w-5 h-5 text-violet-300" />
+          <div className="w-10 h-10 rounded-full bg-violet-50 flex items-center justify-center border border-violet-150 shadow-sm">
+            <BookOpen className="w-5 h-5 text-violet-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">Practice Q&A</h2>
-            <p className="text-sm text-muted-foreground">Question {currentIndex + 1} of {questions.length}</p>
+            <h2 className="text-2xl font-black tracking-tight text-slate-800">Practice Q&A</h2>
+            <p className="text-xs font-semibold text-slate-400">Question {currentIndex + 1} of {questions.length}</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Score</p>
-          <p className="text-xl font-black text-violet-400">{score}/{questions.length}</p>
+          <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Score</p>
+          <p className="text-xl font-black text-violet-600">{score}/{questions.length}</p>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
+      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
         <div 
-          className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-500" 
+          className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-500" 
           style={{ width: `${progressPercent}%` }} 
         />
       </div>
@@ -151,11 +151,15 @@ export default function QASection({ topic, formulas }: QASectionProps) {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
-          className={`rounded-3xl border border-white/10 bg-white/5 p-8 transition-all duration-300 ${
-            isSubmitted ? (isCorrect ? 'border-green-500/30 bg-green-500/5 shadow-[0_0_30px_rgba(34,197,94,0.1)]' : 'border-red-500/30 bg-red-500/5 shadow-[0_0_30px_rgba(239,68,68,0.1)]') : 'shadow-xl'
+          className={`rounded-3xl border p-8 transition-all duration-300 ${
+            isSubmitted 
+              ? (isCorrect 
+                  ? 'border-green-200 bg-green-50/20 shadow-[0_8px_30px_rgba(34,197,94,0.04)]' 
+                  : 'border-red-200 bg-red-50/20 shadow-[0_8px_30px_rgba(239,68,68,0.04)]') 
+              : 'border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)]'
           }`}
         >
-          <h3 className="text-xl font-semibold leading-relaxed text-foreground/90 whitespace-pre-wrap">
+          <h3 className="text-lg font-bold leading-relaxed text-slate-800 whitespace-pre-wrap">
             {currentQ.question}
           </h3>
 
@@ -167,14 +171,14 @@ export default function QASection({ topic, formulas }: QASectionProps) {
                     key={opt}
                     onClick={() => handleSelectOption(opt)}
                     disabled={isSubmitted}
-                    className={`p-4 rounded-xl border text-left font-medium transition-all ${
+                    className={`p-4 rounded-xl border text-left font-semibold text-sm transition-all duration-200 ${
                       answers[currentQ.id] === opt
-                        ? 'border-violet-500 bg-violet-500/20 text-white'
-                        : 'border-white/10 bg-white/5 text-foreground/80 hover:bg-white/10 hover:border-white/20'
+                        ? 'border-violet-500 bg-violet-50 text-violet-700 shadow-sm'
+                        : 'border-slate-100 bg-slate-50/40 text-slate-600 hover:bg-slate-100/50 hover:text-slate-800'
                     } ${isSubmitted ? 'cursor-not-allowed opacity-80' : ''} ${
-                      isSubmitted && opt === currentQ.correctAnswer ? 'border-green-500 bg-green-500/20 text-white shadow-[0_0_15px_rgba(34,197,94,0.2)]' : ''
+                      isSubmitted && opt === currentQ.correctAnswer ? 'border-green-500 bg-green-50 text-green-700 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : ''
                     } ${
-                      isSubmitted && answers[currentQ.id] === opt && opt !== currentQ.correctAnswer ? 'border-red-500 bg-red-500/20 text-white shadow-[0_0_15px_rgba(239,68,68,0.2)]' : ''
+                      isSubmitted && answers[currentQ.id] === opt && opt !== currentQ.correctAnswer ? 'border-red-500 bg-red-50 text-red-700 shadow-[0_0_15px_rgba(239,68,68,0.1)]' : ''
                     }`}
                   >
                     {opt}
@@ -191,7 +195,7 @@ export default function QASection({ topic, formulas }: QASectionProps) {
                   onChange={(e) => handleTextChange(e.target.value)}
                   disabled={isSubmitted}
                   placeholder="Type your answer..."
-                  className="w-full sm:max-w-md bg-black/20 border border-white/10 rounded-xl px-5 py-4 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50 text-lg"
+                  className="w-full sm:max-w-md bg-slate-50 border border-slate-200 rounded-xl px-5 py-4 focus:outline-none focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-50 text-slate-850 text-lg"
                 />
               </div>
             )}
@@ -200,7 +204,7 @@ export default function QASection({ topic, formulas }: QASectionProps) {
               <button
                 onClick={handleSubmit}
                 disabled={!answers[currentQ.id]}
-                className="mt-8 rounded-xl bg-violet-600 hover:bg-violet-500 px-8 py-3 font-bold text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="mt-8 rounded-xl bg-violet-600 hover:bg-violet-500 px-8 py-3 font-bold text-white shadow-md shadow-violet-600/15 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
               >
                 Submit Answer
               </button>
@@ -211,19 +215,19 @@ export default function QASection({ topic, formulas }: QASectionProps) {
                 className="mt-8"
               >
                 <div className={`p-5 rounded-2xl border ${
-                  isCorrect ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'
+                  isCorrect ? 'bg-green-50 border-green-150 text-green-800' : 'bg-red-50 border-red-150 text-red-800'
                 }`}>
                   <div className="flex items-start gap-4">
                     {isCorrect ? (
-                      <CheckCircle2 className="w-6 h-6 text-green-400 mt-0.5" />
+                      <CheckCircle2 className="w-6 h-6 text-green-500 mt-0.5" />
                     ) : (
-                      <XCircle className="w-6 h-6 text-red-400 mt-0.5" />
+                      <XCircle className="w-6 h-6 text-red-500 mt-0.5" />
                     )}
                     <div>
-                      <p className={`text-lg font-bold ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                      <p className={`text-lg font-bold ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
                         {isCorrect ? 'Correct!' : 'Incorrect'}
                       </p>
-                      <p className="mt-2 text-foreground/80 leading-relaxed">
+                      <p className="mt-2 text-slate-700 font-normal leading-relaxed text-sm">
                         {currentQ.explanation}
                       </p>
                     </div>
@@ -233,14 +237,14 @@ export default function QASection({ topic, formulas }: QASectionProps) {
                 {currentIndex < questions.length - 1 ? (
                   <button
                     onClick={handleNext}
-                    className="mt-6 flex items-center gap-2 rounded-xl bg-white text-black hover:bg-white/90 px-8 py-3 font-bold shadow-xl transition-all"
+                    className="mt-6 flex items-center gap-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 px-8 py-3 font-bold shadow-md transition-all active:scale-95"
                   >
                     Next Question <ArrowRight className="w-4 h-4" />
                   </button>
                 ) : (
-                  <div className="mt-8 flex flex-col items-center justify-center p-8 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border border-violet-500/30 rounded-2xl text-center shadow-lg">
-                    <h4 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400 mb-2">🎉 Practice Complete!</h4>
-                    <p className="text-lg text-violet-200/90 mb-6">You scored <span className="font-bold text-white">{score}</span> out of <span className="font-bold text-white">{questions.length}</span></p>
+                  <div className="mt-8 flex flex-col items-center justify-center p-8 bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl text-center shadow-lg shadow-violet-100/10">
+                    <h4 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-indigo-650 mb-2">🎉 Practice Complete!</h4>
+                    <p className="text-base text-slate-600 font-semibold mb-6">You scored <span className="font-extrabold text-violet-600">{score}</span> out of <span className="font-extrabold text-slate-800">{questions.length}</span></p>
                     <button
                       onClick={() => {
                         setCurrentIndex(0);
@@ -248,7 +252,7 @@ export default function QASection({ topic, formulas }: QASectionProps) {
                         setSubmitted({});
                         setScore(0);
                       }}
-                      className="px-8 py-3 rounded-xl bg-white text-violet-900 font-bold hover:bg-violet-100 transition-all shadow-xl hover:shadow-violet-500/20 active:scale-95"
+                      className="px-8 py-3 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 shadow-md shadow-violet-600/15 transition-all active:scale-95 cursor-pointer"
                     >
                       Retry Practice
                     </button>

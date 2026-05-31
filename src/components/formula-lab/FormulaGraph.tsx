@@ -43,7 +43,13 @@ const FormulaGraph: React.FC<{
     return points;
   }, [formula]);
 
-  if (!formula) return <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 text-sm text-muted-foreground">Graph will appear when a formula is selected.</div>;
+  if (!formula) {
+    return (
+      <div className="rounded-3xl border border-slate-100 bg-white/80 p-6 text-sm text-slate-400 text-center font-medium shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+        Graph will appear when a formula is selected.
+      </div>
+    );
+  }
 
   const controls = Array.isArray(formula.controls) ? formula.controls : [];
   const anatomy = Array.isArray(formula.anatomy) ? formula.anatomy : [];
@@ -56,29 +62,31 @@ const FormulaGraph: React.FC<{
 
   if (data.length === 0) {
     return (
-      <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 text-center">
-        <p className="text-sm text-muted-foreground">This formula does not have enough variables or data configured to generate a live graph.</p>
+      <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center text-slate-400 font-medium shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+        This formula does not have enough variables or data configured to generate a live graph.
       </div>
     );
   }
 
   return (
-    <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl space-y-4">
+    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground">Live Graph</p>
-          <h3 className="mt-2 text-xl font-bold">{yLabel} vs {xLabel}</h3>
+          <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Live Graph</p>
+          <h3 className="mt-1 text-lg font-black text-slate-800 tracking-tight">{yLabel} vs {xLabel}</h3>
         </div>
-        <div className="text-xs text-muted-foreground">{title}</div>
+        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded">
+          {title}
+        </div>
       </div>
       <div className="h-[320px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 20, left: 10, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-            <XAxis dataKey="x" stroke="rgba(255,255,255,0.5)" tickLine={false} />
-            <YAxis stroke="rgba(255,255,255,0.5)" tickLine={false} />
-            <Tooltip contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16 }} />
-            <Line type="monotone" dataKey="y" stroke="#8b5cf6" strokeWidth={3} dot={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.03)" />
+            <XAxis dataKey="x" stroke="rgba(15,23,42,0.4)" tickLine={false} tick={{ fontSize: 11, fontWeight: 500 }} />
+            <YAxis stroke="rgba(15,23,42,0.4)" tickLine={false} tick={{ fontSize: 11, fontWeight: 500 }} />
+            <Tooltip contentStyle={{ backgroundColor: "rgba(255, 255, 255, 0.98)", border: "1px solid rgba(241, 245, 249, 1)", borderRadius: 16, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05)" }} labelStyle={{ fontWeight: "bold", color: "#1e293b" }} itemStyle={{ color: "#7c3aed" }} />
+            <Line type="monotone" dataKey="y" stroke="#7c3aed" strokeWidth={3.5} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
