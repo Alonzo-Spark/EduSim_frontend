@@ -13,7 +13,7 @@ import { getAllExamples } from '../examples/registry/exampleRegistry';
 import { loadExample } from '../examples/loader/loadExample';
 import type { SandboxRuntime } from '../engine/runtime';
 import type { RuntimeObject } from '../types/RuntimeObject';
-import type { Body } from 'matter-js';
+import Matter, { type Body } from 'matter-js';
 import { ConstraintRegistry } from '../constraints/constraintRegistry';
 import type { ConstraintRenderer } from '../constraints/constraintRenderer';
 import type { GravityRenderer } from '../gravity/gravityRenderer';
@@ -127,12 +127,17 @@ async function buildScene(
   addStatic(createObject({
     id: 'wall-l', type: 'rectangle',
     x: -8, y: H / 2, width: 16, height: 5000,
-    isStatic: true, alpha: 0, strokeWidth: 0,
+    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x5b5fff, strokeWidth: 2.5,
   }));
   addStatic(createObject({
     id: 'wall-r', type: 'rectangle',
     x: W + 8, y: H / 2, width: 16, height: 5000,
-    isStatic: true, alpha: 0, strokeWidth: 0,
+    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x5b5fff, strokeWidth: 2.5,
+  }));
+  addStatic(createObject({
+    id: 'wall-t', type: 'rectangle',
+    x: W / 2, y: -8, width: 5000, height: 16,
+    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x5b5fff, strokeWidth: 2.5,
   }));
 
   return dynamic;
@@ -311,7 +316,148 @@ export const SandboxCanvas: React.FC = () => {
   const [tutorMaximized, setTutorMaximized] = useState(false);
   const [activeTab, setActiveTab] = useState<'explanation' | 'effects' | 'formula'>('explanation');
 const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
-const [propertyVersion, setPropertyVersion] = useState(0);
+  const [boundaryMode, setBoundaryMode] = useState<'screen' | 'custom' | 'none'>('screen');
+  const [customWidth, setCustomWidth] = useState(1200);
+  const [customHeight, setCustomHeight] = useState(800);
+  const [boundaryThickness] = useState(28);
+  const [propertyVersion, setPropertyVersion] = useState(0);
+
+  const boundaryModeRef = useRef(boundaryMode);
+  const customWidthRef = useRef(customWidth);
+  const customHeightRef = useRef(customHeight);
+  const gravityModeRef = useRef(gravityMode);
+
+  useEffect(() => { boundaryModeRef.current = boundaryMode; }, [boundaryMode]);
+  useEffect(() => { customWidthRef.current = customWidth; }, [customWidth]);
+  useEffect(() => { customHeightRef.current = customHeight; }, [customHeight]);
+  useEffect(() => { gravityModeRef.current = gravityMode; }, [gravityMode]);
+
+  const repositionBoundaries = useCallback(async (
+    W: number,
+    H: number
+  ) => {
+    const store = storeRef.current;
+    if (!store) return;
+
+    const Matter = await import('matter-js');
+    const ground = store.getObject('ground');
+    const wallL = store.getObject('wall-l');
+    const wallR = store.getObject('wall-r');
+    const wallT = store.getObject('wall-t');
+
+    const mode = boundaryModeRef.current;
+    const cW = customWidthRef.current;
+    const cH = customHeightRef.current;
+    const thickness = boundaryThickness;
+    const isRadial = gravityModeRef.current === 'radial';
+
+    // 1. Calculate the active boundary positions in the baseline world space
+    let targetGround = { x: W / 2, y: H - 40, width: 5000, height: thickness, visible: true, collides: true };
+    let targetWallL = { x: -8, y: H / 2, width: 16, height: 5000, visible: false, collides: true };
+    let targetWallR = { x: W + 8, y: H / 2, width: 16, height: 5000, visible: false, collides: true };
+    let targetWallT = { x: W / 2, y: -8, width: 5000, height: 16, visible: false, collides: true };
+
+    if (mode === 'none' || isRadial) {
+      // Disable collisions and hide
+      targetGround.collides = false; targetGround.visible = false;
+      targetWallL.collides = false;  targetWallL.visible = false;
+      targetWallR.collides = false;  targetWallR.visible = false;
+      targetWallT.collides = false;  targetWallT.visible = false;
+    } else if (mode === 'screen') {
+      // Fit to baseline screen dimensions (W, H) in world space
+      targetGround.x = W / 2;
+      targetGround.y = H - 40;
+      targetGround.width = W + 1000;
+      targetGround.visible = true;
+
+      targetWallL.x = -8;
+      targetWallL.y = H / 2;
+      targetWallL.height = H + 1000;
+      targetWallL.visible = true;
+
+      targetWallR.x = W + 8;
+      targetWallR.y = H / 2;
+      targetWallR.height = H + 1000;
+      targetWallR.visible = true;
+
+      targetWallT.x = W / 2;
+      targetWallT.y = -8;
+      targetWallT.width = W + 1000;
+      targetWallT.visible = true;
+    } else if (mode === 'custom') {
+      // Center the custom box in baseline world space
+      const centerX = W / 2;
+      const centerY = H / 2;
+      const minX = centerX - cW / 2;
+      const maxX = centerX + cW / 2;
+      const minY = centerY - cH / 2;
+      const maxY = centerY + cH / 2;
+
+      targetGround.x = centerX;
+      targetGround.y = maxY - thickness / 2;
+      targetGround.width = cW;
+      targetGround.visible = true;
+
+      targetWallL.x = minX + 8;
+      targetWallL.y = centerY;
+      targetWallL.height = cH;
+      targetWallL.visible = true;
+
+      targetWallR.x = maxX - 8;
+      targetWallR.y = centerY;
+      targetWallR.height = cH;
+      targetWallR.visible = true;
+
+      targetWallT.x = centerX;
+      targetWallT.y = minY + 8;
+      targetWallT.width = cW;
+      targetWallT.visible = true;
+    }
+
+    // 2. Apply updates to the Matter.js bodies and PixiJS graphics
+    const updateBodyAndDisplay = (obj: any, target: typeof targetGround) => {
+      if (!obj) return;
+      
+      // Update Matter body
+      Matter.Body.setPosition(obj.body, { x: target.x, y: target.y });
+      
+      // Update collision filter
+      obj.body.collisionFilter.category = target.collides ? 0x0001 : 0x0000;
+      obj.body.collisionFilter.mask = target.collides ? 0xFFFF : 0x0000;
+
+      // Update Pixi display
+      obj.display.x = target.x;
+      obj.display.y = target.y;
+      obj.display.visible = target.visible;
+
+      if (obj.body.parts && obj.body.parts[0]) {
+        if (obj.display.children && obj.display.children[0]) {
+          const gfx = obj.display.children[0];
+          if (obj.id === 'ground') {
+            gfx.scale.x = target.width / 5000;
+            gfx.alpha = target.visible ? 0.95 : 0;
+          } else if (obj.id === 'wall-l' || obj.id === 'wall-r') {
+            gfx.scale.y = target.height / 5000;
+            gfx.alpha = target.visible ? 0.65 : 0;
+          } else if (obj.id === 'wall-t') {
+            gfx.scale.x = target.width / 5000;
+            gfx.alpha = target.visible ? 0.65 : 0;
+          }
+        }
+      }
+    };
+
+    updateBodyAndDisplay(ground, targetGround);
+    updateBodyAndDisplay(wallL, targetWallL);
+    updateBodyAndDisplay(wallR, targetWallR);
+    updateBodyAndDisplay(wallT, targetWallT);
+
+    // Force PIXI rendering tick
+    const rt = runtimeRef.current;
+    if (rt) {
+      rt.renderer.getApp().render();
+    }
+  }, [boundaryThickness]);
 
 
   // Memoized sandbox validation state to prevent excessive recalculations and infinite render loops in guide panels
@@ -1017,7 +1163,7 @@ const [propertyVersion, setPropertyVersion] = useState(0);
           // Crucially, this only triggers if the click drag actually started ON the canvas.
           if (!isPanning && e.buttons === 1 && !spacePressedRef.current && dragStartedOnCanvas) {
             const activeGrabbedBody = drag.getMouseConstraint()?.body;
-            if (!activeGrabbedBody) {
+            if (!activeGrabbedBody || activeGrabbedBody.isStatic) {
               const dx = e.clientX - startPointerX;
               const dy = e.clientY - startPointerY;
               if (Math.hypot(dx, dy) > 5) {
@@ -1304,46 +1450,28 @@ const [propertyVersion, setPropertyVersion] = useState(0);
     const el = mountRef.current;
     if (!el || !ready) return;
 
-    let resizeObserver: ResizeObserver | null = null;
-
-    import('matter-js').then((Matter) => {
-      resizeObserver = new ResizeObserver((entries) => {
-        const store = storeRef.current;
-        if (!store) return;
-
-        for (const entry of entries) {
-          const W = entry.contentRect.width || el.clientWidth;
-          const H = entry.contentRect.height || el.clientHeight;
-
-          const ground = store.getObject('ground');
-          const wallR = store.getObject('wall-r');
-          const wallL = store.getObject('wall-l');
-
-          if (ground) {
-            Matter.Body.setPosition(ground.body, { x: W / 2, y: H - 40 });
-            ground.display.x = W / 2;
-            ground.display.y = H - 40;
-          }
-          if (wallR) {
-            Matter.Body.setPosition(wallR.body, { x: W + 8, y: H / 2 });
-            wallR.display.x = W + 8;
-            wallR.display.y = H / 2;
-          }
-          if (wallL) {
-            Matter.Body.setPosition(wallL.body, { x: -8, y: H / 2 });
-            wallL.display.x = -8;
-            wallL.display.y = H / 2;
-          }
-        }
-      });
-
-      resizeObserver.observe(el);
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const W = entry.contentRect.width || el.clientWidth;
+        const H = entry.contentRect.height || el.clientHeight;
+        repositionBoundaries(W, H);
+      }
     });
 
+    resizeObserver.observe(el);
+
     return () => {
-      resizeObserver?.disconnect();
+      resizeObserver.disconnect();
     };
-  }, [ready]);
+  }, [ready, repositionBoundaries]);
+
+  // Dynamically reposition static borders when state options (mode, custom size) change
+  useEffect(() => {
+    const el = mountRef.current;
+    if (el && ready) {
+      repositionBoundaries(el.clientWidth, el.clientHeight);
+    }
+  }, [boundaryMode, customWidth, customHeight, ready, repositionBoundaries]);
 
   // ── Controls ───────────────────────────────────────────────────────────────
 
@@ -1503,42 +1631,18 @@ const [propertyVersion, setPropertyVersion] = useState(0);
   // Synchronize React states reactively to the underlying modular GravitySystem
   useEffect(() => {
     const rt = runtimeRef.current;
-    if (rt && ready) {
+    const el = mountRef.current;
+    if (rt && ready && el) {
       rt.gravitySystem.setMode(gravityMode);
       rt.gravitySystem.getRadialGravity().setConfig({
         gravitationalConstant: gConstant,
         debug: radialDebug,
       });
 
-      // Dynamically toggle static boundaries visibility & collisions based on gravity mode
-      const store = storeRef.current;
-      if (store) {
-        const ground = store.getObject('ground');
-        const wallR = store.getObject('wall-r');
-        const wallL = store.getObject('wall-l');
-        const isRadial = gravityMode === 'radial';
-
-        if (ground) {
-          ground.display.visible = !isRadial;
-          ground.body.collisionFilter = isRadial
-            ? { group: -1, category: 0, mask: 0 }
-            : { group: 0, category: 1, mask: 4294967295 };
-        }
-        if (wallR) {
-          wallR.display.visible = !isRadial;
-          wallR.body.collisionFilter = isRadial
-            ? { group: -1, category: 0, mask: 0 }
-            : { group: 0, category: 1, mask: 4294967295 };
-        }
-        if (wallL) {
-          wallL.display.visible = !isRadial;
-          wallL.body.collisionFilter = isRadial
-            ? { group: -1, category: 0, mask: 0 }
-            : { group: 0, category: 1, mask: 4294967295 };
-        }
-      }
+      // Synchronize boundaries dynamically!
+      repositionBoundaries(el.clientWidth, el.clientHeight);
     }
-  }, [ready, gravityMode, gConstant, radialDebug]);
+  }, [ready, gravityMode, gConstant, radialDebug, repositionBoundaries]);
 
   function handleModeChange(mode: 'linear' | 'radial') {
     setGravityMode(mode);
@@ -1554,10 +1658,15 @@ const [propertyVersion, setPropertyVersion] = useState(0);
     }
   }
 
+
+
   const handleCameraChange = useCallback((newZoom: number, newPanX: number, newPanY: number) => {
     setZoom(newZoom);
     setPanX(newPanX);
     setPanY(newPanY);
+    zoomRef.current = newZoom;
+    panXRef.current = newPanX;
+    panYRef.current = newPanY;
 
     const rt = runtimeRef.current;
     if (!rt) return;
@@ -1569,6 +1678,8 @@ const [propertyVersion, setPropertyVersion] = useState(0);
 
     // Apply translation panning
     vp.position.set(newPanX, newPanY);
+
+
 
     // Synchronize physics mouse constraint scale and offset
     const drag = interactionRef.current?.drag;
@@ -1588,7 +1699,7 @@ const [propertyVersion, setPropertyVersion] = useState(0);
         }
       }
     }
-  }, []);
+  }, [repositionBoundaries]);
 
   const handleReset = useCallback(async () => {
     const rt = runtimeRef.current;
@@ -1622,6 +1733,9 @@ const [propertyVersion, setPropertyVersion] = useState(0);
     setBodyCount(dyn.length);
     setSelected(null);
 
+    // Sync boundaries
+    repositionBoundaries(el.clientWidth, el.clientHeight);
+
     // Restore correct gravity behaviors based on active mode
     if (gravityMode === 'linear') {
       ia.controls.setGravity(GRAVITY_VALUES[gravity]);
@@ -1632,7 +1746,7 @@ const [propertyVersion, setPropertyVersion] = useState(0);
       rt.start();
       store.setRuntimeState('running');
     }
-  }, [ready, running, gravity, speed, gravityMode, handleCameraChange]);
+  }, [ready, running, gravity, speed, gravityMode, handleCameraChange, repositionBoundaries]);
 
   const handleSelectExample = useCallback(async (exampleId: string) => {
     const rt = runtimeRef.current;
@@ -2369,9 +2483,11 @@ const [propertyVersion, setPropertyVersion] = useState(0);
       e.preventDefault();
       setAssetDragOver(false);
       const asset = JSON.parse(raw) as import('../../config/assetsRegistry').AssetDefinition;
-      const canvasX = e.clientX - r.left;
-      const canvasY = e.clientY - r.top;
-      handleAssetDrop(asset, canvasX, canvasY);
+      const cssX = e.clientX - r.left;
+      const cssY = e.clientY - r.top;
+      const worldX = (cssX - panXRef.current) / zoomRef.current;
+      const worldY = (cssY - panYRef.current) / zoomRef.current;
+      handleAssetDrop(asset, worldX, worldY);
     };
 
     window.addEventListener('dragover', handleDragOver);
@@ -2416,9 +2532,11 @@ const [propertyVersion, setPropertyVersion] = useState(0);
         // Query body under cursor for constraints
         const dragType = panelDragRef.current;
         if (over && dragType && ['pivot', 'spring', 'rope'].includes(dragType)) {
-          const canvasX = e.clientX - r.left;
-          const canvasY = e.clientY - r.top;
-          const queryPoint = { x: canvasX, y: canvasY };
+          const cssX = e.clientX - r.left;
+          const cssY = e.clientY - r.top;
+          const worldX = (cssX - panXRef.current) / zoomRef.current;
+          const worldY = (cssY - panYRef.current) / zoomRef.current;
+          const queryPoint = { x: worldX, y: worldY };
           const bodies = dynRef.current;
 
           import('matter-js').then((Matter) => {
@@ -2458,18 +2576,20 @@ const [propertyVersion, setPropertyVersion] = useState(0);
       // Only drop if released over the canvas
       if (e.clientX >= r.left && e.clientX <= r.right &&
         e.clientY >= r.top && e.clientY <= r.bottom) {
-        const canvasX = e.clientX - r.left;
-        const canvasY = e.clientY - r.top;
+        const cssX = e.clientX - r.left;
+        const cssY = e.clientY - r.top;
+        const worldX = (cssX - panXRef.current) / zoomRef.current;
+        const worldY = (cssY - panYRef.current) / zoomRef.current;
         if (['pivot', 'spring', 'rope'].includes(type)) {
-          spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', canvasX, canvasY, hoveredBody);
+          spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', worldX, worldY, hoveredBody);
         } else if (type === 'pendulum-rope') {
-          spawnPendulumRope(canvasX, canvasY);
+          spawnPendulumRope(worldX, worldY);
         } else if (type === 'sun') {
-          spawnStar(canvasX, canvasY);
+          spawnStar(worldX, worldY);
         } else if (type === 'planet') {
-          spawnOrbitingPlanet(canvasX, canvasY);
+          spawnOrbitingPlanet(worldX, worldY);
         } else {
-          spawnAt(type as 'circle' | 'rectangle', canvasX, canvasY);
+          spawnAt(type as 'circle' | 'rectangle', worldX, worldY);
         }
       }
     };
@@ -2898,6 +3018,105 @@ const [propertyVersion, setPropertyVersion] = useState(0);
               />
               <span style={{ fontSize: 11, color: '#818cf8', minWidth: 30, textAlign: 'right' }}>{speed.toFixed(1)}×</span>
             </div>
+
+            <Sep label="Simulation Boundary" />
+            <div style={{ ...S.gravRow, gap: 4, display: 'flex', marginBottom: 8 }}>
+              <button
+                style={{
+                  ...S.gravBtn,
+                  ...(boundaryMode === 'screen' ? S.gravActive : {}),
+                  flex: 1,
+                  fontSize: 10,
+                  padding: '6px 2px',
+                  borderRadius: 6,
+                  cursor: ready ? 'pointer' : 'not-allowed',
+                }}
+                onClick={() => setBoundaryMode('screen')}
+                disabled={!ready}
+                title="Lock boundary dynamically to the visible screen viewport"
+              >
+                💻 Screen
+              </button>
+              <button
+                style={{
+                  ...S.gravBtn,
+                  ...(boundaryMode === 'custom' ? S.gravActive : {}),
+                  flex: 1,
+                  fontSize: 10,
+                  padding: '6px 2px',
+                  borderRadius: 6,
+                  cursor: ready ? 'pointer' : 'not-allowed',
+                }}
+                onClick={() => setBoundaryMode('custom')}
+                disabled={!ready}
+                title="Use adjustable width and height bounding box"
+              >
+                📏 Custom Box
+              </button>
+              <button
+                style={{
+                  ...S.gravBtn,
+                  ...(boundaryMode === 'none' ? S.gravActive : {}),
+                  flex: 1,
+                  fontSize: 10,
+                  padding: '6px 2px',
+                  borderRadius: 6,
+                  cursor: ready ? 'pointer' : 'not-allowed',
+                }}
+                onClick={() => setBoundaryMode('none')}
+                disabled={!ready}
+                title="Infinite space with no boundaries"
+              >
+                🌌 Open Space
+              </button>
+            </div>
+
+            {boundaryMode === 'custom' && (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                marginBottom: 12,
+                padding: '8px 10px',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: 10
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#94a3b8' }}>
+                    <span>Box Width</span>
+                    <span style={{ fontFamily: 'monospace', color: '#818cf8', fontWeight: 'bold' }}>{customWidth}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={400}
+                    max={2500}
+                    step={50}
+                    value={customWidth}
+                    disabled={!ready}
+                    onChange={(e) => setCustomWidth(parseInt(e.target.value))}
+                    style={{ width: '100%', accentColor: '#6366f1', height: 4, cursor: 'pointer' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#94a3b8' }}>
+                    <span>Box Height</span>
+                    <span style={{ fontFamily: 'monospace', color: '#818cf8', fontWeight: 'bold' }}>{customHeight}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={300}
+                    max={1600}
+                    step={50}
+                    value={customHeight}
+                    disabled={!ready}
+                    onChange={(e) => setCustomHeight(parseInt(e.target.value))}
+                    style={{ width: '100%', accentColor: '#6366f1', height: 4, cursor: 'pointer' }}
+                  />
+                </div>
+              </div>
+            )}
 
             <Sep label="Constraint Tuning" />
             {storeRef.current && storeRef.current.getAllConstraints().length > 0 ? (
