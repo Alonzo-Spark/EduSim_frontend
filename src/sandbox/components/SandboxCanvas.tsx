@@ -334,7 +334,10 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
 
   const repositionBoundaries = useCallback(async (
     W: number,
-    H: number
+    H: number,
+    currentZoom: number = zoomRef.current,
+    currentPanX: number = panXRef.current,
+    currentPanY: number = panYRef.current
   ) => {
     const store = storeRef.current;
     if (!store) return;
@@ -364,25 +367,34 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
       targetWallR.collides = false;  targetWallR.visible = false;
       targetWallT.collides = false;  targetWallT.visible = false;
     } else if (mode === 'screen') {
-      // Fit to baseline screen dimensions (W, H) in world space
-      targetGround.x = W / 2;
-      targetGround.y = H - 40;
-      targetGround.width = W + 1000;
+      // Dynamic: Locked to screen edges in world space
+      const minX = -currentPanX / currentZoom;
+      const maxX = (W - currentPanX) / currentZoom;
+      const minY = -currentPanY / currentZoom;
+      const maxY = (H - currentPanY) / currentZoom;
+
+      // Ground (at bottom edge of screen)
+      targetGround.x = (minX + maxX) / 2;
+      targetGround.y = maxY - thickness / 2;
+      targetGround.width = maxX - minX + 1000;
       targetGround.visible = true;
 
-      targetWallL.x = -8;
-      targetWallL.y = H / 2;
-      targetWallL.height = H + 1000;
+      // Left Wall
+      targetWallL.x = minX + 8;
+      targetWallL.y = (minY + maxY) / 2;
+      targetWallL.height = maxY - minY + 1000;
       targetWallL.visible = true;
 
-      targetWallR.x = W + 8;
-      targetWallR.y = H / 2;
-      targetWallR.height = H + 1000;
+      // Right Wall
+      targetWallR.x = maxX - 8;
+      targetWallR.y = (minY + maxY) / 2;
+      targetWallR.height = maxY - minY + 1000;
       targetWallR.visible = true;
 
-      targetWallT.x = W / 2;
-      targetWallT.y = -8;
-      targetWallT.width = W + 1000;
+      // Top Wall (Ceiling)
+      targetWallT.x = (minX + maxX) / 2;
+      targetWallT.y = minY + 8;
+      targetWallT.width = maxX - minX + 1000;
       targetWallT.visible = true;
     } else if (mode === 'custom') {
       // Center the custom box in baseline world space
@@ -1679,8 +1691,11 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
     // Apply translation panning
     vp.position.set(newPanX, newPanY);
 
-
-
+    // Synchronize boundaries dynamically!
+    const el = mountRef.current;
+    if (el) {
+      repositionBoundaries(el.clientWidth, el.clientHeight, newZoom, newPanX, newPanY);
+    }
     // Synchronize physics mouse constraint scale and offset
     const drag = interactionRef.current?.drag;
     if (drag) {
@@ -3019,104 +3034,6 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
               <span style={{ fontSize: 11, color: '#818cf8', minWidth: 30, textAlign: 'right' }}>{speed.toFixed(1)}×</span>
             </div>
 
-            <Sep label="Simulation Boundary" />
-            <div style={{ ...S.gravRow, gap: 4, display: 'flex', marginBottom: 8 }}>
-              <button
-                style={{
-                  ...S.gravBtn,
-                  ...(boundaryMode === 'screen' ? S.gravActive : {}),
-                  flex: 1,
-                  fontSize: 10,
-                  padding: '6px 2px',
-                  borderRadius: 6,
-                  cursor: ready ? 'pointer' : 'not-allowed',
-                }}
-                onClick={() => setBoundaryMode('screen')}
-                disabled={!ready}
-                title="Lock boundary dynamically to the visible screen viewport"
-              >
-                💻 Screen
-              </button>
-              <button
-                style={{
-                  ...S.gravBtn,
-                  ...(boundaryMode === 'custom' ? S.gravActive : {}),
-                  flex: 1,
-                  fontSize: 10,
-                  padding: '6px 2px',
-                  borderRadius: 6,
-                  cursor: ready ? 'pointer' : 'not-allowed',
-                }}
-                onClick={() => setBoundaryMode('custom')}
-                disabled={!ready}
-                title="Use adjustable width and height bounding box"
-              >
-                📏 Custom Box
-              </button>
-              <button
-                style={{
-                  ...S.gravBtn,
-                  ...(boundaryMode === 'none' ? S.gravActive : {}),
-                  flex: 1,
-                  fontSize: 10,
-                  padding: '6px 2px',
-                  borderRadius: 6,
-                  cursor: ready ? 'pointer' : 'not-allowed',
-                }}
-                onClick={() => setBoundaryMode('none')}
-                disabled={!ready}
-                title="Infinite space with no boundaries"
-              >
-                🌌 Open Space
-              </button>
-            </div>
-
-            {boundaryMode === 'custom' && (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-                marginBottom: 12,
-                padding: '8px 10px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                borderRadius: 10
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#94a3b8' }}>
-                    <span>Box Width</span>
-                    <span style={{ fontFamily: 'monospace', color: '#818cf8', fontWeight: 'bold' }}>{customWidth}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={400}
-                    max={2500}
-                    step={50}
-                    value={customWidth}
-                    disabled={!ready}
-                    onChange={(e) => setCustomWidth(parseInt(e.target.value))}
-                    style={{ width: '100%', accentColor: '#6366f1', height: 4, cursor: 'pointer' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#94a3b8' }}>
-                    <span>Box Height</span>
-                    <span style={{ fontFamily: 'monospace', color: '#818cf8', fontWeight: 'bold' }}>{customHeight}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={300}
-                    max={1600}
-                    step={50}
-                    value={customHeight}
-                    disabled={!ready}
-                    onChange={(e) => setCustomHeight(parseInt(e.target.value))}
-                    style={{ width: '100%', accentColor: '#6366f1', height: 4, cursor: 'pointer' }}
-                  />
-                </div>
-              </div>
-            )}
 
             <Sep label="Constraint Tuning" />
             {storeRef.current && storeRef.current.getAllConstraints().length > 0 ? (
@@ -3434,7 +3351,14 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
         }}
       >
         <div style={S.dotGrid} />
-        <div ref={mountRef} style={S.mount} />
+        <div
+          ref={mountRef}
+          style={{
+            ...S.mount,
+            bottom: bottomPanelOpen ? 110 : 0,
+            transition: 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        />
 
         {/* Viewport Control HUD removed as requested - zoom/pan is controlled directly by the mouse wheel and dragging */}
 
