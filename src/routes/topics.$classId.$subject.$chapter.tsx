@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, notFound, redirect } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { getClass } from "@/data/curriculum";
+import { CurriculumService } from "@/services/curriculumService";
 import { PageWrapper } from "@/components/Card";
 import { Crumbs } from "@/components/Crumbs";
 import { Play, Sparkles } from "lucide-react";
@@ -20,19 +20,25 @@ export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
     }
   },
   component: TopicsPage,
-  loader: ({ params }) => {
-    const c = getClass(Number(params.classId));
-    if (!c) throw notFound();
+  loader: async ({ params }) => {
+    try {
+      const classes = await CurriculumService.getClasses();
+      const c = classes.find((cls) => cls.id === Number(params.classId));
+      if (!c) throw notFound();
 
-    const s = c.subjects.find((sub) => sub.id === params.subject);
-    if (!s) throw notFound();
+      const subjects = await CurriculumService.getSubjects(Number(params.classId));
+      const s = subjects.find((sub) => sub.code === params.subject || sub.id === params.subject);
+      if (!s) throw notFound();
 
-    if (!Array.isArray(s.chapters)) throw notFound();
+      const chapters = await CurriculumService.getChapters(s.id);
+      const chapter = chapters.find((ch) => ch.name === params.chapter);
+      if (!chapter) throw notFound();
 
-    const chapter = s.chapters.find((ch) => ch.name === params.chapter);
-    if (!chapter) throw notFound();
-
-    return { c, s, chapter, classId: params.classId, subjectId: params.subject };
+      const topics = await CurriculumService.getTopics(chapter.id);
+      return { c, s, chapter: { ...chapter, topics }, classId: params.classId, subjectId: params.subject };
+    } catch {
+      throw notFound();
+    }
   },
 });
 

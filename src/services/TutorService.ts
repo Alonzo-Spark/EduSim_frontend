@@ -1,5 +1,6 @@
 import { getApiUrl } from "@/config/api";
 import { joinUrl } from "@/utils/urlUtils";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export interface TutorAnalysisResponse {
   success: boolean;
@@ -23,13 +24,31 @@ export interface TutorAnalysisResponse {
 const API_BASE = getApiUrl("");
 
 export const TutorService = {
-  analyzeQuery: async (query: string, signal?: AbortSignal): Promise<TutorAnalysisResponse> => {
+  analyzeQuery: async (
+    query: string, 
+    context?: { class_name?: string; subject?: string; chapter?: string; topic?: string },
+    signal?: AbortSignal
+  ): Promise<TutorAnalysisResponse> => {
+    const body = {
+      query,
+      class_name: context?.class_name,
+      subject: context?.subject,
+      chapter: context?.chapter,
+      topic: context?.topic
+    };
+    
+    const token = useAuthStore.getState().token;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     const response = await fetch(joinUrl(API_BASE, "/api/tutor/analyze"), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query }),
+      headers,
+      body: JSON.stringify(body),
       signal,
     });
 

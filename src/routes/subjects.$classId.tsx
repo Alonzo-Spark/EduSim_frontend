@@ -1,22 +1,28 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { getClass, type ClassInfo } from "@/data/curriculum";
+import { CurriculumService } from "@/services/curriculumService";
 import { Card, PageWrapper } from "@/components/Card";
 import { Crumbs } from "@/components/Crumbs";
 import * as Icons from "lucide-react";
 
 export const Route = createFileRoute("/subjects/$classId")({
   component: SubjectsPage,
-  loader: ({ params }) => {
-    const c = getClass(Number(params.classId));
-    if (!c) throw notFound();
-    return c;
+  loader: async ({ params }) => {
+    try {
+      const classes = await CurriculumService.getClasses();
+      const c = classes.find((cls) => cls.id === Number(params.classId));
+      if (!c) throw notFound();
+      const subjects = await CurriculumService.getSubjects(Number(params.classId));
+      return { classInfo: c, subjects };
+    } catch {
+      throw notFound();
+    }
   },
   notFoundComponent: () => <div className="glass rounded-3xl p-8">Class not found.</div>,
   errorComponent: ({ error }) => <div className="glass rounded-3xl p-8">{error.message}</div>,
 });
 
 function SubjectsPage() {
-  const c = Route.useLoaderData() as ClassInfo;
+  const { classInfo: c, subjects } = Route.useLoaderData();
   return (
     <PageWrapper>
       <Crumbs items={[{ label: "Home", to: "/" }, { label: c.name }]} />
@@ -25,9 +31,8 @@ function SubjectsPage() {
       </h1>
       <p className="text-muted-foreground mb-8">{c.description}</p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {c.subjects.map((s, i) => {
-          const Icon = (Icons as any)[s.icon] ?? Icons.BookOpen;
-          const chapterCount = Array.isArray(s.chapters) ? s.chapters.length : s.chapters;
+        {subjects.map((s, i) => {
+          const Icon = (Icons as any)[s.icon || "BookOpen"] ?? Icons.BookOpen;
           return (
             <Link
               key={s.id}
@@ -41,7 +46,7 @@ function SubjectsPage() {
                 <h3 className="text-xl font-bold mb-1">{s.name}</h3>
                 <p className="text-sm text-muted-foreground mb-4">{s.description}</p>
                 <div className="text-xs font-mono font-bold text-primary">
-                  {chapterCount} CHAPTERS
+                  VIEW CHAPTERS
                 </div>
               </Card>
             </Link>

@@ -1,21 +1,30 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { getSubject, getClass } from "@/data/curriculum";
+import { CurriculumService } from "@/services/curriculumService";
 import { Card, PageWrapper } from "@/components/Card";
 import { Crumbs } from "@/components/Crumbs";
 
 export const Route = createFileRoute("/chapters/$classId/$subject")({
   component: ChaptersPage,
-  loader: ({ params }) => {
-    const c = getClass(Number(params.classId));
-    const s = getSubject(Number(params.classId), params.subject);
-    if (!c || !s) throw notFound();
-    return { c, s };
+  loader: async ({ params }) => {
+    try {
+      const classes = await CurriculumService.getClasses();
+      const c = classes.find((cls) => cls.id === Number(params.classId));
+      if (!c) throw notFound();
+
+      const subjects = await CurriculumService.getSubjects(Number(params.classId));
+      const s = subjects.find((sub) => sub.code === params.subject || sub.id === params.subject);
+      if (!s) throw notFound();
+
+      const chapters = await CurriculumService.getChapters(s.id);
+      return { c, s, chapters };
+    } catch {
+      throw notFound();
+    }
   },
 });
 
 function ChaptersPage() {
-  const { c, s } = Route.useLoaderData();
-  const chapters = Array.isArray(s.chapters) ? s.chapters : [];
+  const { c, s, chapters } = Route.useLoaderData();
   const chapterCount = chapters.length;
 
   return (

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, X } from "lucide-react";
+import { getApiUrl } from "@/config/api";
 
 interface Chapter {
   title: string;
@@ -13,8 +14,6 @@ const SAMPLE_CHAPTERS: Chapter[] = [
   { title: "Chapter 3: Plant Kingdom", sections: ["3.1 Overview", "3.2 Key Concepts", "3.3 Summary"] },
 ];
 
-import { CLASSES } from "@/data/curriculum";
-
 interface Props {
   subject?: string;
   topic?: string | null;
@@ -24,45 +23,18 @@ interface Props {
 
 export function TextbookResourcesPanel({ subject = "Biology", topic = null, open, onClose }: Props) {
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
-  // derive resources from curriculum data when topic prop provided
-  const deriveResources = (topic?: string | null) => {
-    if (!topic) return null;
-    const q = topic.toLowerCase();
-    const matches: { title: string; type: string; url?: string; source?: string }[] = [];
+  const [topicResources, setTopicResources] = useState<any[] | null>(null);
 
-    for (const cls of CLASSES) {
-      for (const subj of cls.subjects) {
-        const chapters = subj.chapters && Array.isArray(subj.chapters) ? subj.chapters as any[] : [];
-        for (const ch of chapters) {
-          if ((ch.name || "").toLowerCase().includes(q)) {
-            matches.push({ title: `${ch.name} - ${subj.name}`, type: "Chapter PDF", url: `#` });
-          }
-          const topics = ch.topics || [];
-          for (const t of topics) {
-            if ((t.name || "").toLowerCase().includes(q)) {
-              matches.push({ title: `${t.name} — ${ch.name}`, type: "Notes", url: `#` });
-              matches.push({ title: `${t.name} — Practice Questions`, type: "Practice", url: `#` });
-              matches.push({ title: `${t.name} — Intro Video`, type: "Video", url: `https://www.youtube.com/results?search_query=${encodeURIComponent(t.name)}` });
-            }
-          }
-        }
-      }
+  useEffect(() => {
+    if (topic && open) {
+      fetch(getApiUrl(`/api/curriculum/search?q=${encodeURIComponent(topic)}`))
+        .then((res) => res.json())
+        .then((data) => setTopicResources(data))
+        .catch((err) => console.error("Failed to fetch topic resources", err));
+    } else {
+      setTopicResources(null);
     }
-
-    // dedupe
-    const uniq: typeof matches = [];
-    const seen = new Set<string>();
-    for (const m of matches) {
-      if (!seen.has(m.title + m.type)) {
-        seen.add(m.title + m.type);
-        uniq.push(m);
-      }
-    }
-
-    return uniq.slice(0, 12);
-  };
-
-  const topicResources = deriveResources(topic ?? null);
+  }, [topic, open]);
 
   return (
     <AnimatePresence>

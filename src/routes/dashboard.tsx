@@ -2,7 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Card, PageWrapper } from "@/components/Card";
-import { CLASSES } from "@/data/curriculum";
+import { useQuery } from "@tanstack/react-query";
+import { CurriculumService } from "@/services/curriculumService";
 import { 
   Sparkles, 
   BookOpen, 
@@ -42,6 +43,11 @@ function Dashboard() {
     { subject: "Gravitation", progress: 40, grade: "Class 9", lastActive: "1 day ago" },
     { subject: "Light & Optics", progress: 10, grade: "Class 10", lastActive: "3 days ago" },
   ];
+
+  const { data: classes = [], isLoading } = useQuery({
+    queryKey: ["classes"],
+    queryFn: CurriculumService.getClasses,
+  });
 
   return (
     <PageWrapper>
@@ -212,18 +218,22 @@ function Dashboard() {
       {/* Curriculum Class Selector Section */}
       <section className="mt-6">
         <h2 className="text-2xl font-bold mb-6 tracking-tight font-sans text-foreground">Explore Curriculum</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {CLASSES.map((c, i) => (
-            <Link key={c.id} to="/subjects/$classId" params={{ classId: String(c.id) }}>
-              <Card delay={i * 0.04} className="border border-border bg-card shadow-sm hover:border-primary/50">
-                <div className="text-xs text-primary font-mono font-bold mb-2">CLASS</div>
-                <div className="text-3xl font-extrabold text-foreground mb-2">{c.id}</div>
-                <p className="text-xs text-muted-foreground line-clamp-2">{c.description}</p>
-                <div className="mt-3 text-xs text-muted-foreground font-semibold">{c.subjects.length} subjects</div>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="text-muted-foreground p-4">Loading curriculum...</div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {classes.map((c, i) => (
+              <Link key={c.id} to="/subjects/$classId" params={{ classId: String(c.id) }}>
+                <Card delay={i * 0.04} className="border border-border bg-card shadow-sm hover:border-primary/50">
+                  <div className="text-xs text-primary font-mono font-bold mb-2">CLASS</div>
+                  <div className="text-3xl font-extrabold text-foreground mb-2">{c.id}</div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{c.description}</p>
+                  <div className="mt-3 text-xs text-muted-foreground font-semibold">View Subjects</div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
     </PageWrapper>

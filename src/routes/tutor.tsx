@@ -62,7 +62,13 @@ function TutorPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await TutorService.analyzeQuery(query, controller.signal);
+      const contextArgs = {
+        class_name: searchParams.class_name,
+        subject: searchParams.subject,
+        chapter: searchParams.chapter,
+        topic: searchParams.topic
+      };
+      const response = await TutorService.analyzeQuery(query, contextArgs, controller.signal);
       if (response.success) {
         setTutorData(response.data);
         setTutorResponse(response.data); // Sync with store for FAB
