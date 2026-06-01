@@ -31,6 +31,7 @@ import { InteractiveGuideModal } from './InteractiveGuideModal';
 import { BuildGuidePanel } from './BuildGuidePanel';
 import { SandboxValidationState } from '../utils/guidedValidation';
 import { getApiUrl } from '../../config/api';
+import { useSimulationStore } from '../../store/useSimulationStore';
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -288,6 +289,7 @@ const StepCard: React.FC<StepCardProps> = ({ num, title, description, type }) =>
 
 export const SandboxCanvas: React.FC = () => {
   const { mode, isOpen, activeStep, guideData, highlightedAsset, setIsOpen, setActiveStep } = useGuidedModeStore();
+  const { isMaximized, setMaximized } = useSimulationStore();
 
   const mountRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<SandboxRuntime | null>(null);
@@ -2742,6 +2744,22 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
                 {running ? '⏸ Pause' : '▶ Resume'}
               </button>
               <button style={{ ...S.btn, ...S.btnGhost }} onClick={handleReset} disabled={!ready} title="Reset">↺</button>
+              <button
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnGhost,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 38,
+                  height: 38,
+                  padding: 0
+                }}
+                onClick={() => setMaximized(!isMaximized)}
+                title={isMaximized ? "Exit Full Window" : "Full Window Mode"}
+              >
+                {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
             </div>
 
             {/* Tutor Explanation Toggle */}

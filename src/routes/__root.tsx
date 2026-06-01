@@ -6,6 +6,7 @@ import { Navbar } from "@/components/layout/Navbar";
 
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useSimulationStore } from "@/store/useSimulationStore";
 import "katex/dist/katex.min.css";
 
 import appCss from "../styles.css?url";
@@ -90,9 +91,18 @@ function RootComponent() {
   const routerState = useRouterState();
   const { isCollapsed } = useSidebarStore();
   const { isAuthenticated, checkAuth } = useAuthStore();
+  const { isMaximized } = useSimulationStore();
   const navigate = useNavigate();
   const [isDesktop, setIsDesktop] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+
+  const pathname = normalizePathname(routerState.location.pathname);
+
+  useEffect(() => {
+    if (!pathname.startsWith("/sandbox")) {
+      useSimulationStore.getState().setMaximized(false);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     const updateDesktop = () => setIsDesktop(window.innerWidth >= 1024);
@@ -116,7 +126,6 @@ function RootComponent() {
     };
   }, [checkAuth]);
 
-  const pathname = normalizePathname(routerState.location.pathname);
   const isRootRoute = pathname === "/";
   const isLandingOrAuthPage = pathname === "/login" || pathname === "/signup";
   const isAuthPage = pathname === "/login" || pathname === "/signup" || pathname === "/forgot-password" || pathname === "/reset-password";
@@ -163,12 +172,12 @@ function RootComponent() {
   
   return (
     <div className="flex min-h-screen w-full relative bg-background text-foreground overflow-hidden">
-      <Sidebar />
+      {!isMaximized && <Sidebar />}
       
       <motion.main 
         initial={false}
         animate={{ 
-          paddingLeft: isDesktop ? (isCollapsed ? 72 : 240) : 0
+          paddingLeft: isDesktop ? (isMaximized ? 0 : (isCollapsed ? 72 : 240)) : 0
         }}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
         className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden relative w-full"
