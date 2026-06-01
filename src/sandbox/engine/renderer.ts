@@ -75,8 +75,18 @@ export class PixiRenderer {
 
     if (this.app) {
       const canvas = this.app.canvas as HTMLCanvasElement;
-      canvas.parentNode?.removeChild(canvas);
-      this.app.destroy(true, { children: true, texture: true });
+      if (canvas.parentNode) {
+        canvas.parentNode.removeChild(canvas);
+      }
+      try {
+        if (this.app.stage) {
+          this.app.stage.destroy({ children: true });
+        }
+        // In PixiJS v8, app.destroy takes ViewSystemDestroyOptions (e.g. removeView)
+        this.app.destroy({ removeView: true });
+      } catch (err) {
+        console.warn('[PixiRenderer] Safe app.destroy caught PixiJS internal error:', err);
+      }
       this.app = null;
     }
   }
