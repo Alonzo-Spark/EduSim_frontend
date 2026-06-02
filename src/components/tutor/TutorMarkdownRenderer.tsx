@@ -8,14 +8,14 @@ import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 import { FormulaCard, parseFormulaBody } from "./FormulaCard";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  AlertTriangle, 
-  CheckCircle2, 
-  ListChecks, 
-  Sparkles, 
-  BookOpen, 
-  FunctionSquare, 
-  Search, 
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ListChecks,
+  Sparkles,
+  BookOpen,
+  FunctionSquare,
+  Search,
   Lightbulb,
   HelpCircle,
   Compass,
@@ -29,14 +29,14 @@ import "katex/dist/katex.min.css";
 const ListDepthContext = React.createContext(0);
 
 type Density = "compact" | "regular" | "spacious";
-type SectionKind = 
-  | "default" 
-  | "concepts" 
-  | "summary" 
-  | "applications" 
-  | "comparison" 
-  | "formula" 
-  | "examples" 
+type SectionKind =
+  | "default"
+  | "concepts"
+  | "summary"
+  | "applications"
+  | "comparison"
+  | "formula"
+  | "examples"
   | "questions"
   | "introduction"
   | "definition"
@@ -74,10 +74,12 @@ const SECTION_KIND_MATCHERS: Array<{ kind: SectionKind; patterns: RegExp[] }> = 
   { kind: "applications", patterns: [/applications?/i, /real world/i, /uses?/i, /industry usage/i] },
   { kind: "comparison", patterns: [/advantages?/i, /disadvantages?/i, /pros and cons/i, /comparison/i] },
   { kind: "formula", patterns: [/formulas?/i, /equations?/i, /mathematics?/i, /expressions?/i, /derivatives?/i, /derivation/i] },
-  { kind: "examples", patterns: [
-    /examples?/i, /worked examples?/i, /practice examples?/i, /illustrations?/i, /numerical/i, /solved/i,
-    /problem/i, /given/i, /substitution/i, /calculation/i, /final answer/i, /interpretation/i, /step-by-step/i
-  ] },
+  {
+    kind: "examples", patterns: [
+      /examples?/i, /worked examples?/i, /practice examples?/i, /illustrations?/i, /numerical/i, /solved/i,
+      /problem/i, /given/i, /substitution/i, /calculation/i, /final answer/i, /interpretation/i, /step-by-step/i
+    ]
+  },
   { kind: "questions", patterns: [/questions?/i, /q&a/i, /questions & answers/i, /suggested questions/i] },
 ];
 
@@ -142,7 +144,7 @@ function normalizeContent(content: unknown): string {
 function mergeFragmentedFormulas(text: string): string {
   const lines = text.split("\n");
   const processed: string[] = [];
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (line && (line.length <= 4 || /^[=\-+−*/=<>≤≥∝()/\\_]+$/.test(line)) && !line.startsWith("#") && !line.startsWith("*")) {
@@ -161,7 +163,7 @@ function mergeFragmentedFormulas(text: string): string {
           break;
         }
       }
-      
+
       if (candidates.length >= 3) {
         let formula = candidates.join(" ");
         if (/^1\s+f\s+=\s+1\s+v\s+[−-]\s+1\s+u$/i.test(formula)) {
@@ -185,11 +187,11 @@ function fixMalformedTables(text: string): string {
   const lines = text.split("\n");
   const processed: string[] = [];
   let tableLines: string[] = [];
-  
+
   const flushTable = () => {
     if (tableLines.length === 0) return;
     const hasDelimiter = tableLines.some(line => /^[|:\s\-]+$/.test(line.trim()) && line.includes("-"));
-    
+
     if (!hasDelimiter && tableLines.length >= 2) {
       const firstRow = tableLines[0].trim();
       const cleanRow = firstRow.replace(/^\||\|$/g, "");
@@ -197,7 +199,7 @@ function fixMalformedTables(text: string): string {
       const delimiterRow = "|" + Array(colsCount).fill("---").join("|") + "|";
       tableLines.splice(1, 0, delimiterRow);
     }
-    
+
     processed.push("");
     processed.push(...tableLines);
     processed.push("");
@@ -208,7 +210,7 @@ function fixMalformedTables(text: string): string {
     const line = lines[i];
     const currentTrimmed = line.trim();
     const isTable = currentTrimmed.startsWith("|") || (currentTrimmed.split("|").length > 2);
-    
+
     if (isTable) {
       tableLines.push(line);
     } else {
@@ -593,12 +595,12 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
       const depth = React.useContext(ListDepthContext);
       const items = React.Children.toArray(children);
       const texts = listItemTexts(children);
-      
+
       const isChipList = depth === 0 && (sectionKind === "concepts" || (texts.length > 0 && texts.length <= 8 && texts.every((text) => countWords(text) <= 4 && text.length <= 32)));
       const isSummaryList = depth === 0 && (sectionKind === "summary" || texts.some((text) => /^([✓✔-]|\d+\.)/.test(text)));
       const isApplicationList = depth === 0 && sectionKind === "applications";
       const isExampleList = depth === 0 && sectionKind === "examples";
- 
+
       if (isChipList) {
         return (
           <div className="my-3 flex flex-wrap gap-2">
@@ -613,7 +615,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
           </div>
         );
       }
- 
+
       if (isApplicationList || isExampleList) {
         const icon = isApplicationList
           ? <Sparkles className="h-4 w-4 text-emerald-500" />
@@ -621,7 +623,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
         const hoverAccent = isApplicationList
           ? "hover:border-emerald-500/30 hover:bg-emerald-500/[0.02]"
           : "hover:border-orange-500/30 hover:bg-orange-500/[0.02]";
- 
+
         return (
           <div className="my-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {texts.map((text, index) => (
@@ -643,11 +645,11 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
           </div>
         );
       }
- 
+
       if (isSummaryList) {
         const accentClasses = "border-amber-500/10 bg-amber-500/[0.01] hover:border-amber-500/30 hover:bg-amber-500/[0.02] text-foreground";
         const icon = <CheckCircle2 className="h-4 w-4 text-amber-500" />;
- 
+
         return (
           <div className="my-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {texts.map((text, index) => (
@@ -663,7 +665,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
           </div>
         );
       }
- 
+
       return (
         <ListDepthContext.Provider value={depth + 1}>
           <ul className={cn("space-y-2 list-none pl-0", depth > 0 ? "pl-5 mt-2" : "my-3")}>
@@ -684,7 +686,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
     },
     li: ({ children }) => {
       const depth = React.useContext(ListDepthContext);
-      
+
       if (depth > 1) {
         return (
           <li className="relative pl-5 text-xs sm:text-sm leading-relaxed text-foreground/80 font-normal my-1">
@@ -693,7 +695,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
           </li>
         );
       }
- 
+
       return (
         <li className="relative flex gap-2.5 rounded-2xl border border-border/40 bg-card px-4 py-3 text-xs sm:text-sm leading-relaxed text-foreground/80 shadow-sm transition-all hover:border-primary/20 hover:bg-secondary/40 my-2">
           <span className="mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[8px] font-bold text-primary">
@@ -732,7 +734,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
           </code>
         );
       }
- 
+
       return (
         <code className="block overflow-x-auto rounded-2xl border border-border/40 bg-secondary/35 px-4 py-3.5 font-mono text-[13px] leading-relaxed text-foreground shadow-inner">
           {children}
@@ -806,7 +808,7 @@ function getGroupKey(item: MarkdownGroup, index: number): string {
   if ("type" in item) {
     return "group5"; // comparison group goes to Applications/Comparison
   }
-  
+
   const kind = item.kind;
   if (kind === "introduction" || kind === "definition" || kind === "concepts") {
     return "group1";
@@ -829,7 +831,7 @@ function getGroupKey(item: MarkdownGroup, index: number): string {
   if (kind === "questions") {
     return "questions";
   }
-  
+
   return "group1"; // Fallback to group1 (Introduction) instead of "default"
 }
 
@@ -936,7 +938,7 @@ function AccordionGroup({
       isExpanded ? "shadow-md" : ""
     )}>
       {/* Accordion Header */}
-      <div 
+      <div
         onClick={onToggle}
         className="flex items-center justify-between p-5 sm:p-6 cursor-pointer select-none hover:bg-secondary/20 transition-colors"
       >
@@ -982,16 +984,16 @@ function AccordionGroup({
                 if (item.kind === "formula") {
                   const formulaData = parseFormulaBody(item.body, item.title);
                   let remainingBody = item.body;
-                  
+
                   if (formulaData.formula) {
                     const escapedFormula = formulaData.formula.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
                     const mathBlockRegex = new RegExp(`\\$\\$\\s*${escapedFormula}\\s*\\$\\$\\n*`, 'g');
                     remainingBody = remainingBody.replace(mathBlockRegex, '');
-                    
+
                     const inlineRegex = new RegExp(`\\$${escapedFormula}\\$\\n*`, 'g');
                     remainingBody = remainingBody.replace(inlineRegex, '');
                   }
-                  
+
                   remainingBody = remainingBody.replace(/^(?:\*\*)?where\s*:?\s*(?:\*\*)?[\s\S]*?(?=\n\n|\n[#*]|$)/im, '').trim();
 
                   const shouldRenderCard = !hasRenderedFormulaCard && formulaData.formula;

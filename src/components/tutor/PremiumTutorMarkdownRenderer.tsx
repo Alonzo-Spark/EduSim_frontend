@@ -12,6 +12,92 @@ import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 import { FormulaCard } from "./FormulaCard";
 
+
+export function transformAdvantagesTable(body: string): string {
+  if (!body.includes("Advantages") && !body.includes("Disadvantages")) return body;
+
+  const lines = body.split("\n");
+  const newLines: string[] = [];
+  
+  let currentTable: string[] = [];
+  
+  const flushTable = () => {
+    if (currentTable.length === 0) return;
+    
+    let isAdvTable = false;
+    let advText = "";
+    let disadvText = "";
+    
+    for (const line of currentTable) {
+      if (line.match(/\|\s*TYPE\s*\|\s*DESCRIPTION\s*\|/i)) {
+         isAdvTable = true;
+      } else if (line.match(/\|\s*-+\s*\|\s*-+\s*\|/)) {
+         // skip
+      } else if (line.trim().startsWith("|")) {
+         const cells = line.split("|").map(c => c.trim()).filter(c => c);
+         if (cells.length >= 2) {
+            const type = cells[0].replace(/[*:]/g, "");
+            const isDisadv = /disadvantages?/i.test(type);
+            const isAdv = /advantages?/i.test(type) && !isDisadv;
+            if (isAdv) {
+               advText = cells.slice(1).join(" | ");
+               isAdvTable = true;
+            } else if (isDisadv) {
+               disadvText = cells.slice(1).join(" | ");
+               isAdvTable = true;
+            }
+         }
+      }
+    }
+    
+    if (isAdvTable && (advText || disadvText)) {
+      newLines.push("| Advantages | Disadvantages |");
+      newLines.push("|---|---|");
+      newLines.push(`| ${advText || "-"} | ${disadvText || "-"} |`);
+    } else {
+      newLines.push(...currentTable);
+    }
+    
+    currentTable = [];
+  };
+
+  for (const line of lines) {
+    if (line.trim().startsWith("|")) {
+      currentTable.push(line);
+    } else {
+      flushTable();
+      newLines.push(line);
+    }
+  }
+  flushTable();
+  
+  return newLines.join("\n");
+}
+
+export function renderWithLineBreaks(children: React.ReactNode): React.ReactNode {
+  if (typeof children === 'string') {
+    if (!children.includes('%%%BR%%%')) return children;
+    const parts = children.split('%%%BR%%%');
+    return parts.map((part, i) => (
+      <React.Fragment key={i}>
+        {part}
+        {i < parts.length - 1 && <br />}
+      </React.Fragment>
+    ));
+  }
+  if (Array.isArray(children)) {
+    return children.map((child, i) => <React.Fragment key={i}>{renderWithLineBreaks(child)}</React.Fragment>);
+  }
+  if (React.isValidElement(children)) {
+    if (children.props && (children.props as any).children) {
+      return React.cloneElement(children, {
+        ...children.props,
+        children: renderWithLineBreaks((children.props as any).children)
+      } as any);
+    }
+  }
+  return children;
+}
 type Density = "compact" | "regular" | "spacious";
 type SectionKind =
   | "default" | "concept" | "definition" | "formula" | "given_values" | "example"
@@ -83,7 +169,7 @@ function splitIntoSections(content: string): SectionBlock[] {
   };
 
   for (const line of lines) {
-    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
     if (headingMatch) {
       flush();
       currentLevel = headingMatch[1].length as 1 | 2 | 3;
@@ -194,8 +280,8 @@ function renderMarkdownBody(body: string, isDark: boolean, sectionKind: SectionK
     thead: ({ children }) => <thead className="bg-white/[0.03] border-b border-white/5">{children}</thead>,
     tbody: ({ children }) => <tbody className="divide-y divide-white/5">{children}</tbody>,
     tr: ({ children }) => <tr className="transition-colors hover:bg-white/[0.02]">{children}</tr>,
-    th: ({ children }) => <th className="px-6 py-4 font-semibold text-foreground/90">{children}</th>,
-    td: ({ children }) => <td className="px-6 py-4 text-foreground/70 font-light">{children}</td>,
+    th: ({ children }) => <th className="px-6 py-4 font-semibold text-foreground/90">{renderWithLineBreaks(children)}</th>,
+    td: ({ children }) => <td className="px-6 py-4 text-foreground/70 font-light">{renderWithLineBreaks(children)}</td>,
     code: ({ inline, children }: any) => {
       if (inline) {
         return (
@@ -217,9 +303,11 @@ function renderMarkdownBody(body: string, isDark: boolean, sectionKind: SectionK
 
   const preprocessedBody = useMemo(() => {
     let newBody = body;
+    newBody = transformAdvantagesTable(newBody);
     newBody = newBody.replace(/a = v\.e \/ l\.m/g, 'a = \\frac{v \\cdot e}{l \\cdot m}');
     newBody = newBody.replace(/v\.e/g, 'v \\cdot e');
     newBody = newBody.replace(/l\.m/g, 'l \\cdot m');
+    newBody = newBody.replace(/<br\s*\/?>/gi, " %%%BR%%% ");
     return newBody;
   }, [body]);
 

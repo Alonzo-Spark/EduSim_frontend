@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, X, ChevronLeft, ChevronRight, BookOpen, Settings, Play, Info, Search, Minimize2, Maximize2, Pin, PinOff,
@@ -9,12 +9,13 @@ import { useAuthStore } from '../../store/useAuthStore';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
 import { getAllExamples } from '../examples/registry/exampleRegistry';
 import { loadExample } from '../examples/loader/loadExample';
 import type { SandboxRuntime } from '../engine/runtime';
 import type { RuntimeObject } from '../types/RuntimeObject';
-import type { Body } from 'matter-js';
+import Matter, { type Body } from 'matter-js';
 import { ConstraintRegistry } from '../constraints/constraintRegistry';
 import type { ConstraintRenderer } from '../constraints/constraintRenderer';
 import type { GravityRenderer } from '../gravity/gravityRenderer';
@@ -26,7 +27,13 @@ import { RuntimeObserver } from '../../ai/runtimeObserver';
 import { useExplanationEngine } from '../../ai/explanationEngine';
 import { FloatingAssetPanel } from '../../components/AssetLibrary/FloatingAssetPanel';
 import { physicsEventBus } from '../../ai/physicsEventBus';
+
+import { useGuidedModeStore } from '../../store/guidedModeStore';
+import { InteractiveGuideModal } from './InteractiveGuideModal';
+import { BuildGuidePanel } from './BuildGuidePanel';
+import { SandboxValidationState } from '../utils/guidedValidation';
 import { getApiUrl } from '../../config/api';
+import { useSimulationStore } from '../../store/useSimulationStore';
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -117,18 +124,23 @@ async function buildScene(
   // ── Static boundaries ─────────────────────────────────────────────────────
   addStatic(createObject({
     id: 'ground', type: 'rectangle',
-    x: W / 2, y: H - 40, width: 5000, height: 28,
-    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x334155, strokeWidth: 1,
+    x: W / 2, y: H - 124, width: 5000, height: 28,
+    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x5b5fff, strokeWidth: 2.5,
   }));
   addStatic(createObject({
     id: 'wall-l', type: 'rectangle',
     x: -8, y: H / 2, width: 16, height: 5000,
-    isStatic: true, alpha: 0, strokeWidth: 0,
+    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x5b5fff, strokeWidth: 2.5,
   }));
   addStatic(createObject({
     id: 'wall-r', type: 'rectangle',
     x: W + 8, y: H / 2, width: 16, height: 5000,
-    isStatic: true, alpha: 0, strokeWidth: 0,
+    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x5b5fff, strokeWidth: 2.5,
+  }));
+  addStatic(createObject({
+    id: 'wall-t', type: 'rectangle',
+    x: W / 2, y: -8, width: 5000, height: 16,
+    isStatic: true, fillColor: 0x1e293b, strokeColor: 0x5b5fff, strokeWidth: 2.5,
   }));
 
   return dynamic;
@@ -140,20 +152,44 @@ const parseExplanationText = (text: string) => {
   const sections: Record<string, string> = {};
   if (!text) return sections;
 
-  // Standard split by markdown headers
-  const parts = text.split(/(?=###\s*✦?\s*)/gi);
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
+  const lines = text.split('\n');
+  let currentTitle = 'OVERVIEW';
+  let currentBody: string[] = [];
 
-    // Match ### ✦ NAME or ### NAME
-    const match = trimmed.match(/^###\s*✦?\s*([^\n]+)/i);
-    if (match) {
-      const title = match[1].trim().toUpperCase();
-      const content = trimmed.substring(match[0].length).trim();
-      sections[title] = content;
+  const flush = () => {
+    const body = currentBody.join('\n').trim();
+    if (body) {
+      if (sections[currentTitle]) {
+        sections[currentTitle] += '\n\n' + body;
+      } else {
+        sections[currentTitle] = body;
+      }
     }
+    currentBody = [];
+  };
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^(?:#{1,6})\s*✦?\s*(.+)$/i);
+    let matchedTitle = '';
+    
+    if (headingMatch) {
+      matchedTitle = headingMatch[1].trim().replace(/\*+/g, '').replace(/[:\-–—]$/, '').trim().toUpperCase();
+    } else {
+      const boldMatch = line.match(/^\s*\*\*(?:\s*#\s*)?([^*]+?)\*\*\s*[:\-–—]?\s*$/);
+      if (boldMatch) {
+        matchedTitle = boldMatch[1].trim().replace(/[:\-–—]$/, '').trim().toUpperCase();
+      }
+    }
+
+    if (matchedTitle) {
+      flush();
+      currentTitle = matchedTitle;
+      continue;
+    }
+    currentBody.push(line);
   }
+  flush();
+
   return sections;
 };
 
@@ -251,10 +287,19 @@ const StepCard: React.FC<StepCardProps> = ({ num, title, description, type }) =>
           fontWeight: 500
         }}>
           <ReactMarkdown
-            remarkPlugins={[remarkMath]}
+            remarkPlugins={[remarkMath, remarkGfm]}
             rehypePlugins={[rehypeKatex]}
             components={{
               p: ({ node, ...props }: any) => <p style={{ margin: 0 }} {...props} />,
+              ul: ({ node, ...props }: any) => <ul style={{ paddingLeft: 16, margin: '6px 0', listStyleType: 'disc' }} {...props} />,
+              ol: ({ node, ...props }: any) => <ol style={{ paddingLeft: 16, margin: '6px 0', listStyleType: 'decimal' }} {...props} />,
+              li: ({ node, ...props }: any) => <li style={{ marginBottom: 4 }} {...props} />,
+              table: ({ node, ...props }: any) => <div style={{ overflowX: 'auto', margin: '8px 0', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, background: 'rgba(255,255,255,0.02)' }}><table style={{ minWidth: '100%', borderCollapse: 'collapse' }} {...props} /></div>,
+              thead: ({ node, ...props }: any) => <thead style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.1)' }} {...props} />,
+              tbody: ({ node, ...props }: any) => <tbody {...props} />,
+              tr: ({ node, ...props }: any) => <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }} {...props} />,
+              th: ({ node, ...props }: any) => <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'rgba(255,255,255,0.9)' }} {...props} />,
+              td: ({ node, ...props }: any) => <td style={{ padding: '8px 12px', color: 'rgba(255,255,255,0.7)' }} {...props} />,
               code: ({ node, inline, ...props }: any) => (
                 <code style={{
                   background: 'rgba(255,255,255,0.08)',
@@ -278,6 +323,9 @@ const StepCard: React.FC<StepCardProps> = ({ num, title, description, type }) =>
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const SandboxCanvas: React.FC = () => {
+  const { mode, isOpen, activeStep, guideData, highlightedAsset, setIsOpen, setActiveStep } = useGuidedModeStore();
+  const { isMaximized, setMaximized } = useSimulationStore();
+
   const mountRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<SandboxRuntime | null>(null);
   const storeRef = useRef<RuntimeStore | null>(null);
@@ -304,6 +352,181 @@ export const SandboxCanvas: React.FC = () => {
   const [tutorPinned, setTutorPinned] = useState(false);
   const [tutorMaximized, setTutorMaximized] = useState(false);
   const [activeTab, setActiveTab] = useState<'explanation' | 'effects' | 'formula'>('explanation');
+const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
+  const [boundaryMode, setBoundaryMode] = useState<'screen' | 'custom' | 'none'>('screen');
+  const [customWidth, setCustomWidth] = useState(1200);
+  const [customHeight, setCustomHeight] = useState(800);
+  const [boundaryThickness] = useState(28);
+  const [propertyVersion, setPropertyVersion] = useState(0);
+
+  const boundaryModeRef = useRef(boundaryMode);
+  const customWidthRef = useRef(customWidth);
+  const customHeightRef = useRef(customHeight);
+  const gravityModeRef = useRef(gravityMode);
+
+  useEffect(() => { boundaryModeRef.current = boundaryMode; }, [boundaryMode]);
+  useEffect(() => { customWidthRef.current = customWidth; }, [customWidth]);
+  useEffect(() => { customHeightRef.current = customHeight; }, [customHeight]);
+  useEffect(() => { gravityModeRef.current = gravityMode; }, [gravityMode]);
+
+  const repositionBoundaries = useCallback(async (
+    W: number,
+    H: number,
+    currentZoom: number = zoomRef.current,
+    currentPanX: number = panXRef.current,
+    currentPanY: number = panYRef.current
+  ) => {
+    const store = storeRef.current;
+    if (!store) return;
+
+    const Matter = await import('matter-js');
+    const ground = store.getObject('ground');
+    const wallL = store.getObject('wall-l');
+    const wallR = store.getObject('wall-r');
+    const wallT = store.getObject('wall-t');
+
+    const mode = boundaryModeRef.current;
+    const cW = customWidthRef.current;
+    const cH = customHeightRef.current;
+    const thickness = boundaryThickness;
+    const isRadial = gravityModeRef.current === 'radial';
+
+    // 1. Calculate the active boundary positions in the baseline world space
+    let targetGround = { x: W / 2, y: H - 40, width: 5000, height: thickness, visible: true, collides: true };
+    let targetWallL = { x: -8, y: H / 2, width: 16, height: 5000, visible: false, collides: true };
+    let targetWallR = { x: W + 8, y: H / 2, width: 16, height: 5000, visible: false, collides: true };
+    let targetWallT = { x: W / 2, y: -8, width: 5000, height: 16, visible: false, collides: true };
+
+    if (mode === 'none' || isRadial) {
+      // Disable collisions and hide
+      targetGround.collides = false; targetGround.visible = false;
+      targetWallL.collides = false;  targetWallL.visible = false;
+      targetWallR.collides = false;  targetWallR.visible = false;
+      targetWallT.collides = false;  targetWallT.visible = false;
+    } else if (mode === 'screen') {
+      // Dynamic: Locked to screen edges in world space
+      const minX = -currentPanX / currentZoom;
+      const maxX = (W - currentPanX) / currentZoom;
+      const minY = -currentPanY / currentZoom;
+      const maxY = (H - currentPanY) / currentZoom;
+
+      // Ground (at bottom edge of screen)
+      targetGround.x = (minX + maxX) / 2;
+      targetGround.y = maxY - thickness / 2;
+      targetGround.width = maxX - minX + 1000;
+      targetGround.visible = true;
+
+      // Left Wall
+      targetWallL.x = minX + 8;
+      targetWallL.y = (minY + maxY) / 2;
+      targetWallL.height = maxY - minY + 1000;
+      targetWallL.visible = true;
+
+      // Right Wall
+      targetWallR.x = maxX - 8;
+      targetWallR.y = (minY + maxY) / 2;
+      targetWallR.height = maxY - minY + 1000;
+      targetWallR.visible = true;
+
+      // Top Wall (Ceiling)
+      targetWallT.x = (minX + maxX) / 2;
+      targetWallT.y = minY + 8;
+      targetWallT.width = maxX - minX + 1000;
+      targetWallT.visible = true;
+    } else if (mode === 'custom') {
+      // Center the custom box in baseline world space
+      const centerX = W / 2;
+      const centerY = H / 2;
+      const minX = centerX - cW / 2;
+      const maxX = centerX + cW / 2;
+      const minY = centerY - cH / 2;
+      const maxY = centerY + cH / 2;
+
+      targetGround.x = centerX;
+      targetGround.y = maxY - thickness / 2;
+      targetGround.width = cW;
+      targetGround.visible = true;
+
+      targetWallL.x = minX + 8;
+      targetWallL.y = centerY;
+      targetWallL.height = cH;
+      targetWallL.visible = true;
+
+      targetWallR.x = maxX - 8;
+      targetWallR.y = centerY;
+      targetWallR.height = cH;
+      targetWallR.visible = true;
+
+      targetWallT.x = centerX;
+      targetWallT.y = minY + 8;
+      targetWallT.width = cW;
+      targetWallT.visible = true;
+    }
+
+    // 2. Apply updates to the Matter.js bodies and PixiJS graphics
+    const updateBodyAndDisplay = (obj: any, target: typeof targetGround) => {
+      if (!obj) return;
+      
+      // Update Matter body
+      Matter.Body.setPosition(obj.body, { x: target.x, y: target.y });
+      
+      // Update collision filter
+      obj.body.collisionFilter.category = target.collides ? 0x0001 : 0x0000;
+      obj.body.collisionFilter.mask = target.collides ? 0xFFFF : 0x0000;
+
+      // Update Pixi display
+      obj.display.x = target.x;
+      obj.display.y = target.y;
+      obj.display.visible = target.visible;
+
+      if (obj.body.parts && obj.body.parts[0]) {
+        if (obj.display.children && obj.display.children[0]) {
+          const gfx = obj.display.children[0];
+          if (obj.id === 'ground') {
+            gfx.scale.x = target.width / 5000;
+            gfx.alpha = target.visible ? 0.95 : 0;
+          } else if (obj.id === 'wall-l' || obj.id === 'wall-r') {
+            gfx.scale.y = target.height / 5000;
+            gfx.alpha = target.visible ? 0.65 : 0;
+          } else if (obj.id === 'wall-t') {
+            gfx.scale.x = target.width / 5000;
+            gfx.alpha = target.visible ? 0.65 : 0;
+          }
+        }
+      }
+    };
+
+    updateBodyAndDisplay(ground, targetGround);
+    updateBodyAndDisplay(wallL, targetWallL);
+    updateBodyAndDisplay(wallR, targetWallR);
+    updateBodyAndDisplay(wallT, targetWallT);
+
+    // Force PIXI rendering tick
+    const rt = runtimeRef.current;
+    if (rt) {
+      rt.renderer.getApp().render();
+    }
+  }, [boundaryThickness]);
+
+
+  // Memoized sandbox validation state to prevent excessive recalculations and infinite render loops in guide panels
+  const currentValidationState = useMemo<SandboxValidationState>(() => {
+    return {
+      bodies: storeRef.current ? storeRef.current.getAllObjects().map(o => ({
+        id: o.id,
+        isStatic: o.body.isStatic,
+        mass: o.body.mass,
+        velocity: o.body.velocity,
+      })) : [],
+      constraints: constraintRegRef.current ? constraintRegRef.current.getAll().map(c => ({
+        id: c.id,
+        type: c.type,
+      })) : [],
+      gravityMode: gravityMode,
+      gravityPreset: gravity,
+      running: running,
+    };
+  }, [ready, bodyCount, propertyVersion, gravityMode, gravity, running]);
 
   const handleResizeLeft = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
@@ -367,7 +590,6 @@ export const SandboxCanvas: React.FC = () => {
   }, [tutorWidth, tutorHeight]);
 
   // Modular Switchable Gravity System states
-  const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
   const [gConstant, setGConstant] = useState(0.0012);
   const [radialDebug, setRadialDebug] = useState(true);
 
@@ -433,9 +655,11 @@ export const SandboxCanvas: React.FC = () => {
     activeExampleDescription
   );
 
-  const handleAiQuery = async () => {
-    if (!aiPrompt.trim()) return;
+  const handleAiQuery = async (queryOverride?: string) => {
+    const queryToUse = queryOverride !== undefined ? queryOverride : aiPrompt;
+    if (!queryToUse.trim()) return;
     setAiLoading(true);
+    setTutorEnabled(true);
 
     // Clear previous AI asset suggestions on every new query
     useAssetStore.getState().clearSuggestedAssets();
@@ -454,14 +678,14 @@ export const SandboxCanvas: React.FC = () => {
         // 1. Tutor explanation call — correct endpoint
         fetch(getApiUrl('/api/tutor/analyze'), {
           method: 'POST',
-          headers,
-          body: JSON.stringify({ query: aiPrompt })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: queryToUse })
         }),
         // 2. Scene parser call
         fetch(getApiUrl('/api/scene/parse'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_input: aiPrompt })
+          body: JSON.stringify({ user_input: queryToUse })
         }),
       ]);
 
@@ -479,6 +703,20 @@ export const SandboxCanvas: React.FC = () => {
             formula: d.formula || '',
             suggestions: d.concepts || []
           });
+
+          // Load dynamic step-by-step instructions into the Guided Mode store!
+          const guide = d.simulation_guide;
+          if (guide && (guide.is_buildable || (Array.isArray(guide.steps) && guide.steps.length > 0))) {
+            useGuidedModeStore.setState({
+              mode: 'guided',
+              guideData: guide,
+              isOpen: true,
+              activeStep: 1,
+              completedSteps: [],
+              highlightedAsset: null,
+              showMeOverlay: null
+            });
+          }
         } else {
           throw new Error(json.detail || 'Unknown error from backend');
         }
@@ -533,9 +771,157 @@ export const SandboxCanvas: React.FC = () => {
     }
   };
 
+  const handleAutoBuild = useCallback(async (spawnConfig: any) => {
+    const rt = runtimeRef.current;
+    const ia = interactionRef.current;
+    const creg = constraintRegRef.current;
+    const store = storeRef.current;
+    const el = mountRef.current;
+    if (!rt || !ia || !creg || !el || !store || !ready) return;
+
+    // Pausing simulation clock and clearing canvas state
+    rt.pause();
+    store.reset();
+    simTimeRef.current = 0;
+
+    // Dynamic clean elements
+    const burnOverlay = document.getElementById('example-burn-overlay');
+    if (burnOverlay) burnOverlay.remove();
+    const energyOverlay = document.getElementById('example-energy-overlay');
+    if (energyOverlay) energyOverlay.remove();
+
+    // Rebuild standard borders
+    const dyn = await buildScene(rt, el, ia, creg, store);
+    dynRef.current = dyn;
+    setBodyCount(dyn.length);
+    setSelected(null);
+
+    // Spawn custom bodies
+    const { createObject } = await import('../objects/objectFactory');
+    const spawnedBodiesMap = new Map<string, any>();
+
+    if (spawnConfig.bodies && Array.isArray(spawnConfig.bodies)) {
+      const uidCount: Record<string, number> = {};
+      const getUniqueId = (prefix: string) => {
+        uidCount[prefix] = (uidCount[prefix] || 0) + 1;
+        return `${prefix}-${uidCount[prefix]}-${Math.random().toString(36).substr(2, 4)}`;
+      };
+
+      for (const bodyCfg of spawnConfig.bodies) {
+        const type = bodyCfg.type || 'circle';
+        const isStatic = bodyCfg.isStatic ?? false;
+        const rest = bodyCfg.restitution ?? 0.6;
+        const fillString = bodyCfg.fillColor || '0x6366f1';
+        const fillColor = parseInt(fillString.replace('0x', ''), 16);
+
+        const base = {
+          x: bodyCfg.x,
+          y: bodyCfg.y,
+          restitution: rest,
+          friction: 0.1,
+          density: 0.002,
+          isStatic,
+          fillColor,
+          strokeColor: fillColor,
+          strokeWidth: 2.5
+        };
+
+        const obj = type === 'circle'
+          ? createObject({
+              id: bodyCfg.id || getUniqueId('circle'),
+              type: 'circle',
+              radius: bodyCfg.radius || 20,
+              ...base
+            })
+          : createObject({
+              id: bodyCfg.id || getUniqueId('rect'),
+              type: 'rectangle',
+              width: bodyCfg.width || 40,
+              height: bodyCfg.height || 40,
+              cornerRadius: 8,
+              ...base
+            });
+
+        // Set custom mass if explicitly asked by the tutor config
+        if (bodyCfg.mass !== undefined && obj.body) {
+          const Matter = await import('matter-js');
+          Matter.Body.setMass(obj.body, bodyCfg.mass);
+        }
+
+        rt.renderer.getViewport().addChild(obj.display);
+        rt.physics.addBodies(obj.body);
+        rt.sync.register(obj.id, obj.body, obj.display);
+        ia.selection.register(obj);
+        store.addObject(obj);
+        dynRef.current.push(obj.body);
+
+        spawnedBodiesMap.set(bodyCfg.id, obj);
+      }
+      setBodyCount(dynRef.current.length);
+    }
+
+    // Spawn custom constraints
+    if (spawnConfig.constraints && Array.isArray(spawnConfig.constraints)) {
+      const { createConstraint } = await import('../constraints/constraintFactory');
+      const constUidCount: Record<string, number> = {};
+      const getUniqueConstId = (prefix: string) => {
+        constUidCount[prefix] = (constUidCount[prefix] || 0) + 1;
+        return `${prefix}-${constUidCount[prefix]}`;
+      };
+
+      for (const constCfg of spawnConfig.constraints) {
+        const type = constCfg.type || 'rope';
+        const bodyAObj = spawnedBodiesMap.get(constCfg.bodyIdA);
+        const bodyBObj = spawnedBodiesMap.get(constCfg.bodyIdB);
+        if (!bodyAObj || !bodyBObj) continue;
+
+        const stiffness = constCfg.stiffness ?? (type === 'spring' ? 0.02 : 0.9);
+        const damping = constCfg.damping ?? 0.01;
+        const length = constCfg.length ?? Math.hypot(
+          bodyAObj.body.position.x - bodyBObj.body.position.x,
+          bodyAObj.body.position.y - bodyBObj.body.position.y
+        );
+
+        creg.add(createConstraint({
+          id: constCfg.id || getUniqueConstId('constraint'),
+          type: type as any,
+          bodyA: bodyAObj.body,
+          bodyB: bodyBObj.body,
+          length,
+          stiffness,
+          damping
+        }));
+      }
+    }
+
+    // Set gravity preset
+    if (spawnConfig.gravityPreset) {
+      changeGravity(spawnConfig.gravityPreset);
+    }
+    if (spawnConfig.gravityMode) {
+      handleModeChange(spawnConfig.gravityMode);
+    }
+
+    // Apply initial forces
+    if (spawnConfig.forces && Array.isArray(spawnConfig.forces)) {
+      const Matter = await import('matter-js');
+      for (const forceCfg of spawnConfig.forces) {
+        const bodyObj = spawnedBodiesMap.get(forceCfg.bodyId);
+        if (bodyObj && forceCfg.vector) {
+          Matter.Body.applyForce(bodyObj.body, bodyObj.body.position, forceCfg.vector);
+        }
+      }
+    }
+
+    // Always pause simulation on auto-build start so student can inspect
+    rt.pause();
+    store.setRuntimeState('paused');
+    setRunning(false);
+  }, [ready, changeGravity, handleModeChange]);
+
   const propertyControllerRef = useRef<PropertyController | null>(null);
   const observerRef = useRef<RuntimeObserver | null>(null);
-  const [propertyVersion, setPropertyVersion] = useState(0);
+
   const [telemetryTick, setTelemetryTick] = useState(0);
   const simTimeRef = useRef(0);
   const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
@@ -834,7 +1220,7 @@ export const SandboxCanvas: React.FC = () => {
           // Crucially, this only triggers if the click drag actually started ON the canvas.
           if (!isPanning && e.buttons === 1 && !spacePressedRef.current && dragStartedOnCanvas) {
             const activeGrabbedBody = drag.getMouseConstraint()?.body;
-            if (!activeGrabbedBody) {
+            if (!activeGrabbedBody || activeGrabbedBody.isStatic) {
               const dx = e.clientX - startPointerX;
               const dy = e.clientY - startPointerY;
               if (Math.hypot(dx, dy) > 5) {
@@ -1121,46 +1507,28 @@ export const SandboxCanvas: React.FC = () => {
     const el = mountRef.current;
     if (!el || !ready) return;
 
-    let resizeObserver: ResizeObserver | null = null;
-
-    import('matter-js').then((Matter) => {
-      resizeObserver = new ResizeObserver((entries) => {
-        const store = storeRef.current;
-        if (!store) return;
-
-        for (const entry of entries) {
-          const W = entry.contentRect.width || el.clientWidth;
-          const H = entry.contentRect.height || el.clientHeight;
-
-          const ground = store.getObject('ground');
-          const wallR = store.getObject('wall-r');
-          const wallL = store.getObject('wall-l');
-
-          if (ground) {
-            Matter.Body.setPosition(ground.body, { x: W / 2, y: H - 40 });
-            ground.display.x = W / 2;
-            ground.display.y = H - 40;
-          }
-          if (wallR) {
-            Matter.Body.setPosition(wallR.body, { x: W + 8, y: H / 2 });
-            wallR.display.x = W + 8;
-            wallR.display.y = H / 2;
-          }
-          if (wallL) {
-            Matter.Body.setPosition(wallL.body, { x: -8, y: H / 2 });
-            wallL.display.x = -8;
-            wallL.display.y = H / 2;
-          }
-        }
-      });
-
-      resizeObserver.observe(el);
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const W = entry.contentRect.width || el.clientWidth;
+        const H = entry.contentRect.height || el.clientHeight;
+        repositionBoundaries(W, H);
+      }
     });
 
+    resizeObserver.observe(el);
+
     return () => {
-      resizeObserver?.disconnect();
+      resizeObserver.disconnect();
     };
-  }, [ready]);
+  }, [ready, repositionBoundaries]);
+
+  // Dynamically reposition static borders when state options (mode, custom size) change
+  useEffect(() => {
+    const el = mountRef.current;
+    if (el && ready) {
+      repositionBoundaries(el.clientWidth, el.clientHeight);
+    }
+  }, [boundaryMode, customWidth, customHeight, ready, repositionBoundaries]);
 
   // ── Controls ───────────────────────────────────────────────────────────────
 
@@ -1320,44 +1688,20 @@ export const SandboxCanvas: React.FC = () => {
   // Synchronize React states reactively to the underlying modular GravitySystem
   useEffect(() => {
     const rt = runtimeRef.current;
-    if (rt && ready) {
+    const el = mountRef.current;
+    if (rt && ready && el) {
       rt.gravitySystem.setMode(gravityMode);
       rt.gravitySystem.getRadialGravity().setConfig({
         gravitationalConstant: gConstant,
         debug: radialDebug,
       });
 
-      // Dynamically toggle static boundaries visibility & collisions based on gravity mode
-      const store = storeRef.current;
-      if (store) {
-        const ground = store.getObject('ground');
-        const wallR = store.getObject('wall-r');
-        const wallL = store.getObject('wall-l');
-        const isRadial = gravityMode === 'radial';
-
-        if (ground) {
-          ground.display.visible = !isRadial;
-          ground.body.collisionFilter = isRadial
-            ? { group: -1, category: 0, mask: 0 }
-            : { group: 0, category: 1, mask: 4294967295 };
-        }
-        if (wallR) {
-          wallR.display.visible = !isRadial;
-          wallR.body.collisionFilter = isRadial
-            ? { group: -1, category: 0, mask: 0 }
-            : { group: 0, category: 1, mask: 4294967295 };
-        }
-        if (wallL) {
-          wallL.display.visible = !isRadial;
-          wallL.body.collisionFilter = isRadial
-            ? { group: -1, category: 0, mask: 0 }
-            : { group: 0, category: 1, mask: 4294967295 };
-        }
-      }
+      // Synchronize boundaries dynamically!
+      repositionBoundaries(el.clientWidth, el.clientHeight);
     }
-  }, [ready, gravityMode, gConstant, radialDebug]);
+  }, [ready, gravityMode, gConstant, radialDebug, repositionBoundaries]);
 
-  const handleModeChange = (mode: 'linear' | 'radial') => {
+  function handleModeChange(mode: 'linear' | 'radial') {
     setGravityMode(mode);
     const rt = runtimeRef.current;
     if (rt) {
@@ -1369,12 +1713,17 @@ export const SandboxCanvas: React.FC = () => {
         });
       }
     }
-  };
+  }
+
+
 
   const handleCameraChange = useCallback((newZoom: number, newPanX: number, newPanY: number) => {
     setZoom(newZoom);
     setPanX(newPanX);
     setPanY(newPanY);
+    zoomRef.current = newZoom;
+    panXRef.current = newPanX;
+    panYRef.current = newPanY;
 
     const rt = runtimeRef.current;
     if (!rt) return;
@@ -1387,6 +1736,11 @@ export const SandboxCanvas: React.FC = () => {
     // Apply translation panning
     vp.position.set(newPanX, newPanY);
 
+    // Synchronize boundaries dynamically!
+    const el = mountRef.current;
+    if (el) {
+      repositionBoundaries(el.clientWidth, el.clientHeight, newZoom, newPanX, newPanY);
+    }
     // Synchronize physics mouse constraint scale and offset
     const drag = interactionRef.current?.drag;
     if (drag) {
@@ -1405,7 +1759,7 @@ export const SandboxCanvas: React.FC = () => {
         }
       }
     }
-  }, []);
+  }, [repositionBoundaries]);
 
   const handleReset = useCallback(async () => {
     const rt = runtimeRef.current;
@@ -1439,6 +1793,9 @@ export const SandboxCanvas: React.FC = () => {
     setBodyCount(dyn.length);
     setSelected(null);
 
+    // Sync boundaries
+    repositionBoundaries(el.clientWidth, el.clientHeight);
+
     // Restore correct gravity behaviors based on active mode
     if (gravityMode === 'linear') {
       ia.controls.setGravity(GRAVITY_VALUES[gravity]);
@@ -1449,7 +1806,7 @@ export const SandboxCanvas: React.FC = () => {
       rt.start();
       store.setRuntimeState('running');
     }
-  }, [ready, running, gravity, speed, gravityMode, handleCameraChange]);
+  }, [ready, running, gravity, speed, gravityMode, handleCameraChange, repositionBoundaries]);
 
   const handleSelectExample = useCallback(async (exampleId: string) => {
     const rt = runtimeRef.current;
@@ -1556,10 +1913,10 @@ export const SandboxCanvas: React.FC = () => {
     dynRef.current.forEach((b) => Matter.Body.applyForce(b, b.position, { x: fx * b.mass, y: 0 }));
   }, [ready]);
 
-  const changeGravity = (preset: GravityPreset) => {
+  function changeGravity(preset: GravityPreset) {
     setGravity(preset);
     propertyControllerRef.current?.updateGlobalGravity(GRAVITY_VALUES[preset]);
-  };
+  }
 
   const changeSpeed = (val: number) => {
     setSpeed(val);
@@ -2186,9 +2543,11 @@ export const SandboxCanvas: React.FC = () => {
       e.preventDefault();
       setAssetDragOver(false);
       const asset = JSON.parse(raw) as import('../../config/assetsRegistry').AssetDefinition;
-      const canvasX = e.clientX - r.left;
-      const canvasY = e.clientY - r.top;
-      handleAssetDrop(asset, canvasX, canvasY);
+      const cssX = e.clientX - r.left;
+      const cssY = e.clientY - r.top;
+      const worldX = (cssX - panXRef.current) / zoomRef.current;
+      const worldY = (cssY - panYRef.current) / zoomRef.current;
+      handleAssetDrop(asset, worldX, worldY);
     };
 
     window.addEventListener('dragover', handleDragOver);
@@ -2233,9 +2592,11 @@ export const SandboxCanvas: React.FC = () => {
         // Query body under cursor for constraints
         const dragType = panelDragRef.current;
         if (over && dragType && ['pivot', 'spring', 'rope'].includes(dragType)) {
-          const canvasX = e.clientX - r.left;
-          const canvasY = e.clientY - r.top;
-          const queryPoint = { x: canvasX, y: canvasY };
+          const cssX = e.clientX - r.left;
+          const cssY = e.clientY - r.top;
+          const worldX = (cssX - panXRef.current) / zoomRef.current;
+          const worldY = (cssY - panYRef.current) / zoomRef.current;
+          const queryPoint = { x: worldX, y: worldY };
           const bodies = dynRef.current;
 
           import('matter-js').then((Matter) => {
@@ -2275,18 +2636,20 @@ export const SandboxCanvas: React.FC = () => {
       // Only drop if released over the canvas
       if (e.clientX >= r.left && e.clientX <= r.right &&
         e.clientY >= r.top && e.clientY <= r.bottom) {
-        const canvasX = e.clientX - r.left;
-        const canvasY = e.clientY - r.top;
+        const cssX = e.clientX - r.left;
+        const cssY = e.clientY - r.top;
+        const worldX = (cssX - panXRef.current) / zoomRef.current;
+        const worldY = (cssY - panYRef.current) / zoomRef.current;
         if (['pivot', 'spring', 'rope'].includes(type)) {
-          spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', canvasX, canvasY, hoveredBody);
+          spawnConstraintAt(type as 'pivot' | 'spring' | 'rope', worldX, worldY, hoveredBody);
         } else if (type === 'pendulum-rope') {
-          spawnPendulumRope(canvasX, canvasY);
+          spawnPendulumRope(worldX, worldY);
         } else if (type === 'sun') {
-          spawnStar(canvasX, canvasY);
+          spawnStar(worldX, worldY);
         } else if (type === 'planet') {
-          spawnOrbitingPlanet(canvasX, canvasY);
+          spawnOrbitingPlanet(worldX, worldY);
         } else {
-          spawnAt(type as 'circle' | 'rectangle', canvasX, canvasY);
+          spawnAt(type as 'circle' | 'rectangle', worldX, worldY);
         }
       }
     };
@@ -2408,10 +2771,38 @@ export const SandboxCanvas: React.FC = () => {
 
             <Sep label="Controls" />
             <div style={S.row}>
-              <button style={{ ...S.btn, ...S.btnPrimary, flex: 1 }} onClick={togglePlay} disabled={!ready}>
+              <button 
+                id="play-pause-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnPrimary, 
+                  flex: 1,
+                  border: (highlightedAsset === 'play-btn') ? '2px solid rgb(34, 211, 238)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'play-btn') ? '0 0 15px rgba(34, 211, 238, 0.75)' : 'none',
+                  transition: 'all 0.3s ease'
+                }} 
+                onClick={togglePlay} 
+                disabled={!ready}
+              >
                 {running ? '⏸ Pause' : '▶ Resume'}
               </button>
               <button style={{ ...S.btn, ...S.btnGhost }} onClick={handleReset} disabled={!ready} title="Reset">↺</button>
+              <button
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnGhost,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 38,
+                  height: 38,
+                  padding: 0
+                }}
+                onClick={() => setMaximized(!isMaximized)}
+                title={isMaximized ? "Exit Full Window" : "Full Window Mode"}
+              >
+                {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
             </div>
 
             {/* Tutor Explanation Toggle */}
@@ -2479,13 +2870,31 @@ export const SandboxCanvas: React.FC = () => {
               style={S.row}
             >
               <button
-                style={{ ...S.btn, ...S.btnIndigo, flex: 1, cursor: ready ? 'grab' : 'not-allowed' }}
+                id="spawn-rect-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnIndigo, 
+                  flex: 1, 
+                  cursor: ready ? 'grab' : 'not-allowed',
+                  border: (highlightedAsset === 'rectangle' || highlightedAsset === 'shape-toolbox') ? '2px solid rgb(52, 211, 153)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'rectangle' || highlightedAsset === 'shape-toolbox') ? '0 0 15px rgba(52, 211, 153, 0.75)' : 'none',
+                  transition: 'all 0.35s ease'
+                }}
                 disabled={!ready}
                 onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnShape('rectangle'); }}
                 onPointerDown={onPanelPointerDown('rectangle')}
               >▪ Rectangle</button>
               <button
-                style={{ ...S.btn, ...S.btnEmerald, flex: 1, cursor: ready ? 'grab' : 'not-allowed' }}
+                id="spawn-circle-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnEmerald, 
+                  flex: 1, 
+                  cursor: ready ? 'grab' : 'not-allowed',
+                  border: (highlightedAsset === 'circle' || highlightedAsset === 'shape-toolbox') ? '2px solid rgb(52, 211, 153)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'circle' || highlightedAsset === 'shape-toolbox') ? '0 0 15px rgba(52, 211, 153, 0.75)' : 'none',
+                  transition: 'all 0.35s ease'
+                }}
                 disabled={!ready}
                 onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnShape('circle'); }}
                 onPointerDown={onPanelPointerDown('circle')}
@@ -2496,14 +2905,17 @@ export const SandboxCanvas: React.FC = () => {
               style={{ ...S.row, marginTop: -2 }}
             >
               <button
+                id="spawn-pendulum-rope-btn"
                 style={{
                   ...S.btn,
                   width: '100%',
                   cursor: ready ? 'grab' : 'not-allowed',
-                  background: 'rgba(99,102,241,0.13)',
-                  color: '#a5b4fc',
-                  borderColor: 'rgba(99,102,241,0.28)',
+                  background: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? 'rgba(245, 158, 11, 0.2)' : 'rgba(99,102,241,0.13)',
+                  color: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '#fbbf24' : '#a5b4fc',
+                  borderColor: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '#f59e0b' : 'rgba(99,102,241,0.28)',
+                  boxShadow: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.65)' : 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  transition: 'all 0.35s ease'
                 }}
                 disabled={!ready}
                 onClick={() => {
@@ -2525,19 +2937,51 @@ export const SandboxCanvas: React.FC = () => {
               style={{ ...S.row, flexWrap: 'wrap' }}
             >
               <button
-                style={{ ...S.btn, ...S.btnIndigo, flex: '1 1 45%', cursor: ready ? 'grab' : 'not-allowed', padding: '7px 4px', fontSize: 11 }}
+                id="spawn-pivot-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnIndigo, 
+                  flex: '1 1 45%', 
+                  cursor: ready ? 'grab' : 'not-allowed', 
+                  padding: '7px 4px', 
+                  fontSize: 11,
+                  border: (highlightedAsset === 'pivot' || highlightedAsset === 'constraints-toolbox') ? '2px solid rgb(245, 158, 11)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'pivot' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.75)' : 'none',
+                  transition: 'all 0.35s ease'
+                }}
                 disabled={!ready}
                 onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('pivot'); }}
                 onPointerDown={onPanelPointerDown('pivot')}
               >📌 Pivot</button>
               <button
-                style={{ ...S.btn, ...S.btnEmerald, flex: '1 1 45%', cursor: ready ? 'grab' : 'not-allowed', padding: '7px 4px', fontSize: 11 }}
+                id="spawn-spring-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnEmerald, 
+                  flex: '1 1 45%', 
+                  cursor: ready ? 'grab' : 'not-allowed', 
+                  padding: '7px 4px', 
+                  fontSize: 11,
+                  border: (highlightedAsset === 'spring' || highlightedAsset === 'constraints-toolbox') ? '2px solid rgb(245, 158, 11)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'spring' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.75)' : 'none',
+                  transition: 'all 0.35s ease'
+                }}
                 disabled={!ready}
                 onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('spring'); }}
                 onPointerDown={onPanelPointerDown('spring')}
               >🌀 Spring</button>
               <button
-                style={{ ...S.btn, ...S.btnSky, width: '100%', cursor: ready ? 'grab' : 'not-allowed', marginTop: 4 }}
+                id="spawn-rope-chain-btn"
+                style={{ 
+                  ...S.btn, 
+                  ...S.btnSky, 
+                  width: '100%', 
+                  cursor: ready ? 'grab' : 'not-allowed', 
+                  marginTop: 4,
+                  border: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '2px solid rgb(245, 158, 11)' : S.btn.border,
+                  boxShadow: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.75)' : 'none',
+                  transition: 'all 0.35s ease'
+                }}
                 disabled={!ready}
                 onClick={() => { if (didDragRef.current) { didDragRef.current = false; return; } spawnConstraintShape('rope'); }}
                 onPointerDown={onPanelPointerDown('rope')}
@@ -2650,6 +3094,7 @@ export const SandboxCanvas: React.FC = () => {
               />
               <span style={{ fontSize: 11, color: '#818cf8', minWidth: 30, textAlign: 'right' }}>{speed.toFixed(1)}×</span>
             </div>
+
 
             <Sep label="Constraint Tuning" />
             {storeRef.current && storeRef.current.getAllConstraints().length > 0 ? (
@@ -2967,7 +3412,14 @@ export const SandboxCanvas: React.FC = () => {
         }}
       >
         <div style={S.dotGrid} />
-        <div ref={mountRef} style={S.mount} />
+        <div
+          ref={mountRef}
+          style={{
+            ...S.mount,
+            bottom: bottomPanelOpen ? 110 : 0,
+            transition: 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        />
 
         {/* Viewport Control HUD removed as requested - zoom/pan is controlled directly by the mouse wheel and dragging */}
 
@@ -3928,8 +4380,9 @@ export const SandboxCanvas: React.FC = () => {
                                       key={i}
                                       whileHover={{ scale: 1.02, x: 4, background: 'rgba(251, 191, 36, 0.12)' }}
                                       onClick={() => {
-                                        setAiPrompt(`Help me perform the suggested experiment: ${sug}`);
-                                        handleAiQuery();
+                                        const q = `Help me perform the suggested experiment: ${sug}`;
+                                        setAiPrompt(q);
+                                        handleAiQuery(q);
                                       }}
                                       style={{
                                         background: 'rgba(255, 255, 255, 0.02)',
@@ -4053,8 +4506,9 @@ export const SandboxCanvas: React.FC = () => {
                                 <motion.button
                                   whileHover={{ scale: 1.02, background: 'rgba(99, 102, 241, 0.2)' }}
                                   onClick={() => {
-                                    setAiPrompt(`Explain the mathematical equation "${rawFormula}" and its variables in detail.`);
-                                    handleAiQuery();
+                                    const q = `Explain the mathematical equation "${rawFormula}" and its variables in detail.`;
+                                    setAiPrompt(q);
+                                    handleAiQuery(q);
                                   }}
                                   style={{
                                     flex: 1,
@@ -4075,8 +4529,9 @@ export const SandboxCanvas: React.FC = () => {
                                 <motion.button
                                   whileHover={{ scale: 1.02, background: 'rgba(168, 85, 247, 0.2)' }}
                                   onClick={() => {
-                                    setAiPrompt(`Give me some interactive math experiments to test Hookes/Newtons laws in this Sandbox.`);
-                                    handleAiQuery();
+                                    const q = `Give me some interactive math experiments to test Hookes/Newtons laws in this Sandbox.`;
+                                    setAiPrompt(q);
+                                    handleAiQuery(q);
                                   }}
                                   style={{
                                     flex: 1,
@@ -4147,8 +4602,9 @@ export const SandboxCanvas: React.FC = () => {
                     <motion.button
                       whileHover={{ scale: 1.03, boxShadow: '0 0 12px rgba(120, 120, 255, 0.25)' }}
                       onClick={() => {
-                        setAiPrompt("Generate a graph analysis and explain the velocity curves of the active bodies");
-                        handleAiQuery();
+                        const q = "Generate a graph analysis and explain the velocity curves of the active bodies";
+                        setAiPrompt(q);
+                        handleAiQuery(q);
                       }}
                       style={{
                         flex: 1,
@@ -4175,8 +4631,9 @@ export const SandboxCanvas: React.FC = () => {
                     <motion.button
                       whileHover={{ scale: 1.03, boxShadow: '0 0 12px rgba(168, 85, 247, 0.25)' }}
                       onClick={() => {
-                        setAiPrompt("Show me the step-by-step mathematical calculations for the current event");
-                        handleAiQuery();
+                        const q = "Show me the step-by-step mathematical calculations for the current event";
+                        setAiPrompt(q);
+                        handleAiQuery(q);
                       }}
                       style={{
                         flex: 1,
@@ -4231,6 +4688,39 @@ export const SandboxCanvas: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Dynamic Sandbox Validation State & Level Panels rendering */}
+        {(() => {
+          return (
+            <>
+              {/* Onboarding Interactive Guide Modal for Guided Mode */}
+              <AnimatePresence>
+                {mode === 'guided' && isOpen && (
+                  <InteractiveGuideModal
+                    isOpen={isOpen}
+                    onClose={() => setIsOpen(false)}
+                    activeStep={activeStep}
+                    setActiveStep={setActiveStep}
+                    onLoadTemplate={handleSelectExample}
+                    aiGuideData={guideData}
+                    onAutoBuild={handleAutoBuild}
+                  />
+                )}
+              </AnimatePresence>
+
+              {/* Dynamic Level Panels rendering based on mode */}
+              <AnimatePresence>
+                {mode === 'guided' && guideData && !isOpen && (
+                  <BuildGuidePanel
+                    validationState={currentValidationState}
+                    onAutoBuild={handleAutoBuild}
+                    onReset={handleReset}
+                  />
+                )}
+              </AnimatePresence>
+            </>
+          );
+        })()}
       </div>
 
       {/* ── Right panel ─────────────────────────────────────── */}
