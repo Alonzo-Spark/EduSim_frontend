@@ -86,7 +86,8 @@ export const example7_8: SandboxExampleConfig = {
     overlay.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.5)';
 
     overlay.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 6px; color: #60a5fa; font-size: 13px;">📊 Live Energy Telemetry</div>
+      <button id="close-ex78-overlay" style="position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;" title="Close">✕</button>
+      <div style="font-weight: bold; margin-bottom: 6px; color: #60a5fa; font-size: 13px; padding-right: 28px;">📊 Live Energy Telemetry</div>
       <div style="margin-bottom: 12px; color: #94a3b8; font-size: 10.5px; line-height: 1.4;">
         Observe how Kinetic and Potential energy exchange values while the Total Energy stays conserved.
       </div>
@@ -124,6 +125,10 @@ export const example7_8: SandboxExampleConfig = {
     `;
 
     canvasWrap.appendChild(overlay);
+
+    document.getElementById('close-ex78-overlay')?.addEventListener('click', () => {
+      overlay.style.display = overlay.style.display === 'none' ? 'block' : 'none';
+    });
 
     const kVal = document.getElementById('k-val');
     const kBar = document.getElementById('k-bar');
