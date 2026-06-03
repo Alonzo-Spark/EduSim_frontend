@@ -1,10 +1,14 @@
-import React from 'react';
-import SandboxCanvas from './sandbox/components/SandboxCanvas';
+import { RouterProvider } from '@tanstack/react-router';
+import { getRouter } from './router';
+import { Toaster } from 'sonner';
+
+const router = getRouter();
 
 export default function App() {
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
-      <SandboxCanvas />
-    </div>
+    <>
+      <RouterProvider router={router} />
+      <Toaster richColors position="top-right" />
+    </>
   );
 }

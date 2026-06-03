@@ -1,5 +1,5 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts, useRouterState, useNavigate } from "@tanstack/react-router";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
@@ -154,18 +154,7 @@ function RootComponent() {
   if (isLandingOrAuthPage) {
     return (
       <div className="min-h-screen w-full relative bg-background text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar">
-        <AnimatePresence mode="popLayout">
-          <motion.div
-            key={routerState.location.pathname}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="w-full"
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <Outlet />
       </div>
     );
   }
@@ -185,26 +174,11 @@ function RootComponent() {
         <Navbar />
         
         {/* Main Content Scroll Container */}
-        { /* When on tutor route we must avoid page scrolling and let the Tutor page manage its own fixed layout */ }
-        <div className={`flex-1 overflow-x-hidden ${routerState.location.pathname.startsWith('/tutor') || routerState.location.pathname.startsWith('/sandbox') ? 'overflow-hidden p-0' : 'overflow-y-auto pt-28 pb-12 px-4 md:px-10 custom-scrollbar scroll-smooth'}`}>
-          <div className={`mx-auto w-full h-full ${routerState.location.pathname.startsWith('/tutor') || routerState.location.pathname.startsWith('/sandbox') ? 'max-w-none' : 'max-w-[1500px]'}`}>
-            {/* 
-              Directly rendering Outlet here fixes the "manual refresh" bug. 
-              PageTransition was causing component unmounting/remounting issues 
-              that interfered with TanStack Router's internal state.
-            */}
-            <AnimatePresence mode="popLayout">
-              <motion.div
-                key={routerState.location.pathname}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="w-full h-full"
-              >
-                <Outlet />
-              </motion.div>
-            </AnimatePresence>
+        {/* Outlet is rendered directly — no AnimatePresence wrapper to avoid exit-animation
+            blocking the incoming page from becoming visible. */}
+        <div className={`flex-1 overflow-x-hidden ${pathname.startsWith('/tutor') || pathname.startsWith('/sandbox') ? 'overflow-hidden p-0' : 'overflow-y-auto pt-28 pb-12 px-4 md:px-10 custom-scrollbar scroll-smooth'}`}>
+          <div className={`mx-auto w-full ${pathname.startsWith('/tutor') || pathname.startsWith('/sandbox') ? 'h-full max-w-none' : 'max-w-[1500px]'}`}>
+            <Outlet />
           </div>
         </div>
       </motion.main>
