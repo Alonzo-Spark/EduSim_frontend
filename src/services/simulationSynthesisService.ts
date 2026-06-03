@@ -1,4 +1,4 @@
-import type { SimulationDSL } from "@/runtime/dsl";
+import type { SimulationDSL } from "@/types/simulation";
 import { buildEnhancedPrompt, analyzeSimulationPrompt } from "@/services/simulationPromptIntelligence";
 import { getApiUrl } from "@/config/api";
 import { fetchJsonWithRetry, logApiEvent } from "@/services/apiClient";
