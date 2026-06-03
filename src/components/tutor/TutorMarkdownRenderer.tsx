@@ -274,7 +274,8 @@ function sanitizeSectionBody(body: string, title: string): string {
   cleaned = cleaned.replace(/^(\s*)[*•\-\+▪◦⁃‣]\s*[•\-\+▪◦⁃‣\*]?\s+/gm, "$1* ");
 
   // 9. Ensure bullet list items have blank lines preceding them if not already in a list block
-  cleaned = cleaned.replace(/([^\n])\s*(\*\s+)/g, "$1\n\n$2");
+  // Use \n before \* to only match actual line-initial bullets, NOT inline bold closings like **Title:** desc
+  cleaned = cleaned.replace(/([^\n])\n(\s*\*\s+)/g, "$1\n\n$2");
 
   // 10. Ensure markdown headings have blank lines before them
   cleaned = cleaned.replace(/([^\n])\s*(#{1,4}\s+)/g, "$1\n\n$2");
