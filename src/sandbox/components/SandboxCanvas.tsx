@@ -5,6 +5,7 @@ import {
   Zap, TrendingUp, Lightbulb, Eye, LineChart, Cpu, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { useAssetStore } from '../../store/assetStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -630,6 +631,14 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
     useAssetStore.getState().clearSuggestedAssets();
 
     try {
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       // ── Fire both calls in parallel ────────────────────────────────────────
       const [tutorResp, sceneResp] = await Promise.allSettled([
         // 1. Tutor explanation call — correct endpoint

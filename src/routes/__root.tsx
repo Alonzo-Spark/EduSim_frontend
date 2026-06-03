@@ -3,13 +3,44 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+const queryClient = new QueryClient();
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import "katex/dist/katex.min.css";
 
 import appCss from "../styles.css?url";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
+
+// Global fetch interceptor to display backend success/error notifications
+if (typeof window !== "undefined" && !(window as any).__fetchIntercepted__) {
+  (window as any).__fetchIntercepted__ = true;
+  const originalFetch = window.fetch;
+  window.fetch = async function (input, init) {
+    const response = await originalFetch(input, init);
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      try {
+        const clone = response.clone();
+        const data = await clone.json();
+        if (data && typeof data === "object") {
+          if (data.success === true && typeof data.message === "string" && data.message) {
+            toast.success(data.message);
+          } else if (data.success === false && typeof data.message === "string" && data.message) {
+            toast.error(data.message);
+          }
+        }
+      } catch (e) {
+        // Ignored
+      }
+    }
+    return response;
+  };
+}
+
 
 const PUBLIC_ROUTE_ALLOWLIST = new Set([
   "/login",
@@ -69,7 +100,11 @@ export const Route = createRootRoute({
     links: [{ rel: "stylesheet", href: appCss }],
   }),
   shellComponent: RootShell,
-  component: RootComponent,
+  component: () => (
+    <QueryClientProvider client={queryClient}>
+      <RootComponent />
+    </QueryClientProvider>
+  ),
   notFoundComponent: NotFoundComponent,
 });
 
@@ -182,6 +217,7 @@ function RootComponent() {
           </div>
         </div>
       </motion.main>
+      <Toaster />
     </div>
   );
 }

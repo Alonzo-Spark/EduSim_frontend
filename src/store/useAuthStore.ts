@@ -99,7 +99,6 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
             });
             syncLegacyToken(access_token);
-            toast.success("Successfully logged in as Admin!");
             return true;
           } catch (backendError) {
             // Offline/database fail-safe fallback
@@ -119,7 +118,7 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
             });
             syncLegacyToken("admin-token-bypass");
-            toast.success("Successfully logged in as Admin (Demo Mode)!");
+            toast.success("Welcome back!");
             return true;
           }
         }
@@ -162,8 +161,6 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
           syncLegacyToken(access_token);
-
-          toast.success("Successfully logged in!");
           return true;
         } catch (error: any) {
           set({ isLoading: false });
@@ -190,8 +187,6 @@ export const useAuthStore = create<AuthState>()(
           });
 
           console.log("register response", response);
-
-          toast.success("Registration successful! Check console for virtual email activation link.");
           return true;
         } catch (error: any) {
           console.error("register failed", error);
@@ -210,7 +205,7 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
         });
         syncLegacyToken(null);
-        toast.success("Successfully logged out");
+        toast.success("Logged out successfully.");
       },
 
       checkAuth: async () => {
@@ -304,7 +299,6 @@ export const useAuthStore = create<AuthState>()(
             body: JSON.stringify({ country_code: countryCode, mobile_number: mobileNumber }),
           });
           set({ isLoading: false });
-          toast.success("OTP code sent to mobile! Check server logs.");
           return true;
         } catch (error: any) {
           set({ isLoading: false });
@@ -332,8 +326,6 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
           syncLegacyToken(access_token);
-
-          toast.success("Successfully verified mobile OTP!");
           return true;
         } catch (error: any) {
           set({ isLoading: false });
@@ -351,7 +343,6 @@ export const useAuthStore = create<AuthState>()(
             body: JSON.stringify({ email }),
           });
           set({ isLoading: false });
-          toast.success("Password reset instructions sent. Check server logs!");
           return true;
         } catch (error: any) {
           set({ isLoading: false });
@@ -369,7 +360,6 @@ export const useAuthStore = create<AuthState>()(
             body: JSON.stringify({ token, new_password: newPassword }),
           });
           set({ isLoading: false });
-          toast.success("Password reset successful!");
           return true;
         } catch (error: any) {
           set({ isLoading: false });
@@ -387,7 +377,6 @@ export const useAuthStore = create<AuthState>()(
             body: JSON.stringify({ token }),
           });
           set({ isLoading: false });
-          toast.success("Email verified successfully! You can login now.");
           return true;
         } catch (error: any) {
           set({ isLoading: false });
