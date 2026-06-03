@@ -15,7 +15,7 @@ export const Route = createFileRoute("/chapters/$classId/$subject")({
       const s = subjects.find((sub) => sub.code === params.subject || sub.id === params.subject);
       if (!s) throw notFound();
 
-      const chapters = await CurriculumService.getChapters(s.id);
+      const chapters = await CurriculumService.getChapters(s.id, Number(params.classId));
       return { c, s, chapters };
     } catch {
       throw notFound();

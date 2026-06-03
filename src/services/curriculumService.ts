@@ -53,9 +53,11 @@ export const CurriculumService = {
     }));
   },
 
-  getChapters: async (subjectId: string): Promise<DBChapter[]> => {
+  getChapters: async (subjectId: string, classId?: number): Promise<DBChapter[]> => {
     let subject: any = null;
     for (const c of CLASSES) {
+      // If classId is provided, only search within that class
+      if (classId !== undefined && c.id !== classId) continue;
       const s = c.subjects.find(sub => sub.id === subjectId);
       if (s) {
         subject = s;
@@ -72,9 +74,10 @@ export const CurriculumService = {
     }));
   },
 
-  getTopics: async (chapterId: string): Promise<DBTopic[]> => {
+  getTopics: async (chapterId: string, classId?: number): Promise<DBTopic[]> => {
     let chapter: any = null;
     for (const c of CLASSES) {
+      if (classId !== undefined && c.id !== classId) continue;
       for (const s of c.subjects) {
         if (typeof s.chapters !== 'number') {
           const ch = s.chapters.find((chap: any) => chap.name === chapterId);
