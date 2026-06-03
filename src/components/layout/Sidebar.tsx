@@ -20,7 +20,7 @@ interface SidebarItem {
 }
 
 const items: SidebarItem[] = [
-  { to: "/", label: "Home", icon: Home },
+  { to: "/dashboard", label: "Home", icon: Home },
   { to: "/tutor", label: "Tutor", icon: GraduationCap },
   { to: "/sandbox/default", label: "Sandbox", icon: Atom },
   { to: "/profile", label: "Profile", icon: User },
@@ -60,7 +60,7 @@ export function Sidebar() {
         }`}
       >
         <div className="flex items-center h-20 px-5 mb-4 shrink-0">
-          <Link to="/" className="flex items-center gap-3 overflow-hidden">
+          <Link to="/dashboard" className="flex items-center gap-3 overflow-hidden">
             <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-[var(--neon-purple)] to-[var(--neon-blue)] flex items-center justify-center glow-purple">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
@@ -78,7 +78,7 @@ export function Sidebar() {
 
         <nav className="flex flex-col gap-2 flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4">
           {items.map((it) => {
-            const active = it.to === "/" ? (path === "/" || path === "/dashboard") : path.startsWith(it.to);
+            const active = it.to === "/dashboard" ? (path === "/" || path === "/dashboard") : path.startsWith(it.to);
             const Icon = it.icon;
 
             const NavLink = (
