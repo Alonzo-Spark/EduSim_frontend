@@ -1,12 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { 
   Mail, 
   Lock, 
-  Smartphone, 
   KeyRound, 
-  Chrome, 
   Brain,
   Atom,
   Play,
@@ -39,30 +37,17 @@ function Login() {
   const { 
     login, 
     register,
-    sendOtp, 
-    verifyOtp, 
     forgotPassword, 
     resetPassword, 
     verifyEmail,
     isLoading 
   } = (useAuthStore as any)();
 
-  // Tab State: "email" | "otp"
-  const [activeTab, setActiveTab] = useState<"email" | "otp">("email");
-
   // Email form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  
-  // Mobile form state
-  const [countryCode, setCountryCode] = useState("+91");
-  const [mobileNumber, setMobileNumber] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState<string[]>(Array(6).fill(""));
-  const otpInputs = useRef<HTMLInputElement[]>([]);
-  const [countdown, setCountdown] = useState(60);
   
   // Sub-screens
   const [showForgotForm, setShowForgotForm] = useState(false);
@@ -96,15 +81,6 @@ function Login() {
     }
   }, [verify_token, verifyEmail, navigate]);
 
-  // Countdown timer for OTP
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (otpSent && countdown > 0) {
-      timer = setInterval(() => setCountdown(prev => prev - 1), 1000);
-    }
-    return () => clearInterval(timer);
-  }, [otpSent, countdown]);
-
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const normalizedEmail = email.trim().toLowerCase();
@@ -115,59 +91,6 @@ function Login() {
     const success = await login({ email: normalizedEmail, password });
     if (success) {
       navigate({ to: "/dashboard" });
-    }
-  };
-
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mobileNumber) {
-      toast.warning("Please enter your mobile number");
-      return;
-    }
-    const success = await sendOtp(countryCode, mobileNumber);
-    if (success) {
-      setOtpSent(true);
-      setCountdown(60);
-      setTimeout(() => {
-        otpInputs.current[0]?.focus();
-      }, 100);
-    }
-  };
-
-  const handleOtpChange = (element: HTMLInputElement, index: number) => {
-    const value = element.value;
-    if (isNaN(Number(value))) return;
-
-    const newOtp = [...otpCode];
-    newOtp[index] = value.substring(value.length - 1);
-    setOtpCode(newOtp);
-
-    // Auto-focus next input
-    if (value && index < 5) {
-      otpInputs.current[index + 1]?.focus();
-    }
-
-    // Auto-submit when all 6 digits are filled
-    const completedOtp = newOtp.join("");
-    if (completedOtp.length === 6) {
-      triggerOtpVerify(completedOtp);
-    }
-  };
-
-  const triggerOtpVerify = async (completedOtp: string) => {
-    const success = await verifyOtp(mobileNumber, completedOtp);
-    if (success) {
-      navigate({ to: "/dashboard" });
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (countdown > 0) return;
-    const success = await sendOtp(countryCode, mobileNumber);
-    if (success) {
-      setCountdown(60);
-      setOtpCode(Array(6).fill(""));
-      otpInputs.current[0]?.focus();
     }
   };
 
@@ -197,37 +120,6 @@ function Login() {
     const success = await resetPassword(reset_token!, newPassword);
     if (success) {
       navigate({ to: "/login", replace: true, search: CLEAR_LOGIN_SEARCH });
-    }
-  };
-
-  // Simulated Google Auth click
-  const handleGoogleLogin = async () => {
-    toast.info("Simulating Google OAuth connection...");
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    const demoAccount = {
-      name: "Demo Student",
-      email: "student@edusim.local",
-      password: "Password123!",
-    };
-
-    let success = await login({ email: demoAccount.email, password: demoAccount.password });
-
-    if (!success) {
-      const registered = await register({
-        name: demoAccount.name,
-        email: demoAccount.email,
-        password: demoAccount.password,
-      });
-
-      if (registered) {
-        success = await login({ email: demoAccount.email, password: demoAccount.password });
-      }
-    }
-
-    if (success) {
-      toast.success("Welcome back! Signed in with Google.");
-      navigate({ to: "/dashboard" });
     }
   };
 
@@ -353,57 +245,25 @@ function Login() {
                   <h3 className="text-2xl font-black text-foreground">Access EduSim</h3>
                   <p className="text-xs text-muted-foreground">Sign in to continue your learning journey</p>
                 </div>
-                <button onClick={handleGoogleLogin} className="w-full py-3.5 rounded-2xl bg-card border border-border text-foreground font-bold text-sm flex items-center justify-center gap-3 hover:bg-secondary transition-all hover:scale-[1.01] active:scale-[0.99] duration-200">
-                  <Chrome className="w-4 h-4 text-primary" /> Continue with Google
-                </button>
-                <div className="flex items-center gap-3"><div className="flex-1 h-[1px] bg-border" /><span className="text-[10px] text-muted-foreground font-mono">OR</span><div className="flex-1 h-[1px] bg-border" /></div>
-                <div className="grid grid-cols-2 p-1 rounded-2xl bg-secondary border border-border/40">
-                  <button onClick={() => { setActiveTab("email"); setOtpSent(false); }} className={`py-3 rounded-xl text-xs font-semibold transition-all ${activeTab === "email" ? "bg-primary text-white shadow-sm" : "text-muted-foreground"}`}>Email</button>
-                  <button onClick={() => setActiveTab("otp")} className={`py-3 rounded-xl text-xs font-semibold transition-all ${activeTab === "otp" ? "bg-primary text-white shadow-sm" : "text-muted-foreground"}`}>OTP</button>
-                </div>
-                {activeTab === "email" ? (
-                  <form onSubmit={handleEmailLogin} className="space-y-4">
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
-                      <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
-                    </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
-                      <input type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-10 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 text-xs">
-                      <label className="flex items-center gap-2 text-muted-foreground select-none cursor-pointer">
-                        <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-border bg-background text-primary focus:ring-primary" />
-                        Remember me
-                      </label>
-                      <button type="button" onClick={() => setShowForgotForm(true)} className="text-primary hover:underline transition-colors font-medium">Forgot password?</button>
-                    </div>
-                    <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 duration-200">{isLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Sign In"}</button>
-                  </form>
-                ) : (
-                  <div className="space-y-4">
-                    {!otpSent ? (
-                      <form onSubmit={handleSendOtp} className="space-y-4">
-                        <div className="flex gap-2">
-                          <input type="text" value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="w-16 text-center rounded-2xl bg-background border border-border text-sm text-foreground outline-none" />
-                          <div className="relative flex-1">
-                            <Smartphone className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
-                            <input type="tel" placeholder="Mobile Number" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground outline-none placeholder:text-muted-foreground/60" />
-                          </div>
-                        </div>
-                        <button type="submit" className="w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 duration-200">Send OTP</button>
-                      </form>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="flex justify-center gap-2">
-                          {otpCode.map((data, index) => <input key={index} maxLength={1} ref={(el) => { if (el) otpInputs.current[index] = el; }} value={data} onChange={(e) => handleOtpChange(e.target, index)} className="w-11 h-12 text-center rounded-xl bg-background border border-border text-lg font-bold text-foreground outline-none focus:border-primary" />)}
-                        </div>
-                        <button onClick={handleResendOtp} disabled={countdown > 0} className="text-xs text-primary disabled:text-muted-foreground">Resend Code ({countdown}s)</button>
-                      </div>
-                    )}
+                <form onSubmit={handleEmailLogin} className="space-y-4">
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                    <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
                   </div>
-                )}
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                    <input type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-10 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <label className="flex items-center gap-2 text-muted-foreground select-none cursor-pointer">
+                      <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-border bg-background text-primary focus:ring-primary" />
+                      Remember me
+                    </label>
+                    <button type="button" onClick={() => setShowForgotForm(true)} className="text-primary hover:underline transition-colors font-medium">Forgot password?</button>
+                  </div>
+                  <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 duration-200">{isLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Sign In"}</button>
+                </form>
                 <div className="text-center pt-2 text-xs font-medium">
                   <span className="text-muted-foreground">New to EduSim? </span>
                   <Link to="/signup" className="text-primary hover:underline transition-colors font-bold">

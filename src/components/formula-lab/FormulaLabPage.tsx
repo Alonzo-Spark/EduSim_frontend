@@ -287,7 +287,7 @@ const FormulaLabPage: React.FC<Props> = ({
           </div>
           <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">Formula Lab</h1>
           <div className="text-xs text-slate-500 font-semibold">
-            {localFormulas ? `AI Search: "${localFormulas[0]?.topic || topic}"` : topic} • <span className="capitalize">{subject || "physics"}</span> {classId ? `• Class ${classId}` : ""}
+            {localFormulas ? `AI Search: "${localFormulas[0]?.topic || topic}"` : (topic === "new" ? "New Workspace" : topic)} • <span className="capitalize">{subject || "physics"}</span> {classId ? `• Class ${classId}` : ""}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -457,7 +457,7 @@ const FormulaLabPage: React.FC<Props> = ({
                 })
               ) : (
                 <div className="py-12 text-center text-slate-400 text-xs space-y-4">
-                  <p>No formulas found matching filters.</p>
+                  <p>{topic === "new" && !localFormulas && !searchQuery ? "Enter a topic in the search bar above to generate formulas." : "No formulas found matching filters."}</p>
                   {searchQuery.trim() && (
                     <button
                       onClick={() => handleSearchAi()}

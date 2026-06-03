@@ -16,6 +16,11 @@ export function useFormulaLab() {
 
   const loadForTopic = useCallback(
     async (params: LoadParams) => {
+      if (params.topic === "new" || !params.topic) {
+        setFormulas([]);
+        return;
+      }
+
       let contentHash = "";
       if (params.ragContent) {
         let hash = 0;

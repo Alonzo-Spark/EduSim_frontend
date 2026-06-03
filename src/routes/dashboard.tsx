@@ -11,7 +11,6 @@ import {
   Brain, 
   Compass,
   ArrowRight,
-  BookOpenCheck,
   User,
   GraduationCap,
   FlaskConical
@@ -37,12 +36,6 @@ const EMPTY_TUTOR_SEARCH = {
 function Dashboard() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-
-  const mockProgress = [
-    { subject: "Laws of Motion", progress: 75, grade: "Class 9", lastActive: "2 hours ago" },
-    { subject: "Gravitation", progress: 40, grade: "Class 9", lastActive: "1 day ago" },
-    { subject: "Light & Optics", progress: 10, grade: "Class 10", lastActive: "3 days ago" },
-  ];
 
   const { data: classes = [], isLoading } = useQuery({
     queryKey: ["classes"],
@@ -96,10 +89,10 @@ function Dashboard() {
           <Link to="/tutor" search={EMPTY_TUTOR_SEARCH} className="group rounded-2xl border border-border bg-card px-4 py-4 hover:border-primary hover:bg-secondary/40 transition-all shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary transition-colors"><Brain className="w-4 h-4 text-primary" /> AI Tutor</div>
           </Link>
-          <Link to="/formula-lab/$topic" params={{ topic: "laws-of-motion" }} className="group rounded-2xl border border-border bg-card px-4 py-4 hover:border-primary hover:bg-secondary/40 transition-all shadow-sm">
+          <Link to="/formula-lab/$topic" params={{ topic: "new" }} className="group rounded-2xl border border-border bg-card px-4 py-4 hover:border-primary hover:bg-secondary/40 transition-all shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary transition-colors"><Atom className="w-4 h-4 text-primary" /> Formula Lab</div>
           </Link>
-          <Link to="/simulation/$topic" params={{ topic: "laws-of-motion" }} className="group rounded-2xl border border-border bg-card px-4 py-4 hover:border-primary hover:bg-secondary/40 transition-all shadow-sm">
+          <Link to="/sandbox/$simulationId" params={{ simulationId: "new" }} className="group rounded-2xl border border-border bg-card px-4 py-4 hover:border-primary hover:bg-secondary/40 transition-all shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary transition-colors"><FlaskConical className="w-4 h-4 text-primary" /> Simulations</div>
           </Link>
           <Link to="/profile" className="group rounded-2xl border border-border bg-card px-4 py-4 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all shadow-sm">
@@ -109,11 +102,9 @@ function Dashboard() {
       </section>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-        {/* Core Tools Section */}
-        <div className="lg:col-span-2 space-y-8">
-          <h2 className="text-xl font-bold tracking-tight text-foreground">Interactive Modules</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="mb-10 space-y-8">
+        <h2 className="text-xl font-bold tracking-tight text-foreground">Interactive Modules</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
             {/* AI Tutor Card */}
             <Link to="/tutor" search={EMPTY_TUTOR_SEARCH}>
@@ -138,7 +129,7 @@ function Dashboard() {
             </Link>
 
             {/* Formula Lab Card */}
-            <Link to="/formula-lab/$topic" params={{ topic: "laws-of-motion" }}>
+            <Link to="/formula-lab/$topic" params={{ topic: "new" }}>
               <div className="group h-full glass rounded-3xl p-6 border border-border bg-card hover:border-primary/45 hover:bg-secondary/20 transition-all duration-300 relative overflow-hidden flex flex-col justify-between shadow-sm">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full blur-2xl group-hover:bg-primary/10 transition-all duration-500" />
                 <div>
@@ -159,7 +150,7 @@ function Dashboard() {
 
 
             {/* AI Generator Card */}
-            <Link to="/simulation-generator">
+            <Link to="/sandbox/$simulationId" params={{ simulationId: "new" }}>
               <div className="group h-full glass rounded-3xl p-6 border border-border bg-card hover:border-primary/45 hover:bg-secondary/20 transition-all duration-300 relative overflow-hidden flex flex-col justify-between shadow-sm">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full blur-2xl group-hover:bg-amber-500/10 transition-all duration-500" />
                 <div>
@@ -178,41 +169,6 @@ function Dashboard() {
             </Link>
 
           </div>
-        </div>
-
-        {/* Sidebar Panel - Progress Tracker */}
-        <div className="space-y-8">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">Active Topics</h2>
-          </div>
-          
-          <div className="glass rounded-3xl p-6 border border-border bg-card space-y-6 shadow-sm">
-            {mockProgress.map((item, idx) => (
-              <div key={idx} className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <div className="font-semibold text-foreground">{item.subject}</div>
-                  <div className="text-muted-foreground text-xs">{item.lastActive}</div>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <BookOpenCheck className="w-3.5 h-3.5 text-primary" />
-                  {item.grade}
-                </div>
-                <div className="relative pt-1">
-                  <div className="flex mb-1 items-center justify-between text-xs font-mono">
-                    <span className="text-muted-foreground">Mastery Level</span>
-                    <span className="text-primary font-bold">{item.progress}%</span>
-                  </div>
-                  <div className="overflow-hidden h-1.5 text-xs flex rounded-full bg-secondary">
-                    <div 
-                      style={{ width: `${item.progress}%` }} 
-                      className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary rounded-full transition-all duration-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Curriculum Class Selector Section */}
