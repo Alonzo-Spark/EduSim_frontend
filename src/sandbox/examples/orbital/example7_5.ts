@@ -1,158 +1,333 @@
 import * as PIXI from 'pixi.js';
-import * as Matter from 'matter-js';
 import type { SandboxExampleConfig } from '../types/example.types';
-import { physicsEventBus } from '../../../ai/physicsEventBus';
+
+/**
+ * ─── NCERT Example 7.5 ───────────────────────────────────────────────────────
+ * The planet Mars has two moons, Phobos and Deimos.
+ *
+ * (i) Phobos has a period of 7 hours, 39 minutes and an orbital radius
+ *     of 9.4 × 10³ km. Calculate the mass of Mars.
+ *
+ * (ii) Assume Earth and Mars move in circular orbits around the Sun,
+ *      with the Martian orbit being 1.52 times the orbital radius of Earth.
+ *      What is the length of the Martian year in days?
+ * ──────────────────────────────────────────────────────────────────────────────
+ */
+
+const MARS_CENTER_X = 400;
+const MARS_CENTER_Y = 300;
+const PHOBOS_ORBIT_RADIUS_PX = 140;
+
+/** Shared close-button style injected once */
+const CLOSE_BTN_STYLE = `
+  position: absolute; top: 10px; right: 10px;
+  width: 24px; height: 24px; border-radius: 6px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: #94a3b8; font-size: 14px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+`;
+
+function makeOverlayBase(id: string): HTMLDivElement {
+  const el = document.createElement('div');
+  el.id = id;
+  el.style.cssText = `
+    position: absolute; top: 16px; right: 16px;
+    background: rgba(15,23,42,0.9); backdrop-filter: blur(10px);
+    border: 1px solid rgba(248,113,113,0.3); border-radius: 14px;
+    padding: 16px 18px; color: #e2e8f0;
+    font-family: Inter, system-ui, sans-serif; font-size: 11px; line-height: 1.6;
+    width: 320px; z-index: 1000;
+    box-shadow: 0 12px 30px -6px rgba(0,0,0,0.6);
+    max-height: 80vh; overflow-y: auto;
+  `;
+  return el;
+}
 
 export const example7_5: SandboxExampleConfig = {
   metadata: {
     id: 'example-7-5',
-    title: '7.5 Circular Orbit & Orbital Burns',
-    description: "Demonstrates stable circular orbital velocity injection. Use the engine burn controls to apply prograde or retrograde thrust to witness orbital transitions.",
+    title: "7.5 Mars, Phobos & the Martian Year",
+    description:
+      "Demonstrates Kepler's Third Law in two parts: (i) Computing the mass of Mars from Phobos's orbital data, and (ii) Finding the length of the Martian year using the Earth–Mars orbital radius ratio.",
     category: 'Orbital Mechanics',
     educationalNotes: [
-      "Stable circular orbit is reached when centrifugal acceleration perfectly matches gravitational acceleration: v = sqrt(G*M / r).",
-      "Increasing orbital speed (prograde burn) increases kinetic energy, stretching the circular orbit into an ellipse with a higher apoapsis.",
-      "Decreasing orbital speed (retrograde burn) drops the planet into a lower elliptical orbit, descending towards the Sun."
+      "Kepler's Third Law relates orbital period and radius: T² = (4π²/GM) R³.",
+      'Part (i): From T and R of Phobos, we can solve for M_Mars = 4π²R³ / (GT²) ≈ 6.48 × 10²³ kg.',
+      'Part (ii): For two bodies orbiting the same central mass, T₁/T₂ = (R₁/R₂)^(3/2). With R_Mars = 1.52 R_Earth, the Martian year ≈ 684 days.',
+      'Phobos is the larger and closer of Mars\'s two moons, completing an orbit in just ~7.65 hours — faster than Mars rotates!'
     ]
   },
+
   objects: [
     {
-      assetId: 'sun',
-      id: 'example-sun',
-      x: 400,
-      y: 300,
+      assetId: 'mars',
+      id: 'example-mars',
+      x: MARS_CENTER_X,
+      y: MARS_CENTER_Y,
       isStatic: true,
-      mass: 8000,
-      radius: 50
+      mass: 5000,
+      radius: 32
     },
     {
-      assetId: 'earth',
-      id: 'example-earth',
-      x: 400,
-      y: 100, // 200 px above Sun
-      orbitCenterId: 'example-sun',
+      assetId: 'moon',
+      id: 'example-phobos',
+      x: MARS_CENTER_X + PHOBOS_ORBIT_RADIUS_PX,
+      y: MARS_CENTER_Y,
+      orbitCenterId: 'example-mars',
       orbitType: 'circular',
       clockwise: true,
-      mass: 10,
-      radius: 18
+      mass: 3,
+      radius: 8,
+      customData: { density: 0.001 }
     }
   ],
+
   observables: [
-    {
-      objectId: 'example-earth',
-      types: ['velocity', 'force'],
-      label: 'Circular Orbit',
-      color: 0x60a5fa
-    }
+    { objectId: 'example-phobos', types: ['velocity'], label: 'Phobos', color: 0xa3a3a3 }
   ],
+
   overlays: {
     showOrbitPath: true,
     showVelocityVectors: true,
-    showForceVectors: true,
+    showForceVectors: false,
     showInfluenceRadius: false,
     showOrbitalTrail: true
   },
+
   gConstant: 0.0012,
   gravityMode: 'radial',
-  camera: {
-    zoom: 1.0,
-    centerX: 400,
-    centerY: 300
-  },
+  camera: { zoom: 0.85, centerX: MARS_CENTER_X, centerY: MARS_CENTER_Y },
+
   customSetup: async (runtime, store, controller, observables) => {
-    // 1. Draw helper circular target trajectory
     const vp = runtime.renderer.getViewport();
-    const graphics = new PIXI.Graphics();
-    graphics.name = 'example7_5-trajectory';
-    vp.addChild(graphics);
 
-    graphics.circle(400, 300, 200);
-    graphics.stroke({ color: 0x3b82f6, width: 1, alpha: 0.25 });
+    // ── 1. Draw orbit guide ─────────────────────────────────────────────
+    const orbitGuide = new PIXI.Graphics();
+    orbitGuide.name = 'example7_5-orbit-guide';
+    vp.addChild(orbitGuide);
+    orbitGuide.circle(MARS_CENTER_X, MARS_CENTER_Y, PHOBOS_ORBIT_RADIUS_PX);
+    orbitGuide.stroke({ color: 0xf87171, width: 1.2, alpha: 0.25 });
 
-    // 2. Inject floating HTML controller overlay for orbital burns!
+    // ── 2. Canvas annotations ───────────────────────────────────────────
+    const annotations = new PIXI.Container();
+    annotations.name = 'example7_5-annotations';
+    vp.addChild(annotations);
+
+    const marsLabel = new PIXI.Text('Mars (Central Body)', new PIXI.TextStyle({
+      fill: '#f87171', fontSize: 12, fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 'bold',
+    }));
+    marsLabel.anchor.set(0.5, -1.8);
+    marsLabel.position.set(MARS_CENTER_X, MARS_CENTER_Y);
+    annotations.addChild(marsLabel);
+
+    const radiusLine = new PIXI.Graphics();
+    annotations.addChild(radiusLine);
+    radiusLine.moveTo(MARS_CENTER_X, MARS_CENTER_Y);
+    radiusLine.lineTo(MARS_CENTER_X + PHOBOS_ORBIT_RADIUS_PX, MARS_CENTER_Y);
+    radiusLine.stroke({ color: 0xfbbf24, width: 1, alpha: 0.5 });
+
+    const distText = new PIXI.Text('R = 9.4 × 10³ km', new PIXI.TextStyle({
+      fill: '#fbbf24', fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 'bold',
+    }));
+    distText.anchor.set(0.5, 1.8);
+    distText.position.set(MARS_CENTER_X + PHOBOS_ORBIT_RADIUS_PX / 2, MARS_CENTER_Y);
+    annotations.addChild(distText);
+
+    const phobosLabel = new PIXI.Text('Phobos (T = 7h 39m)', new PIXI.TextStyle({
+      fill: '#d4d4d4', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 'bold',
+    }));
+    phobosLabel.anchor.set(0.5, 2.2);
+    annotations.addChild(phobosLabel);
+
+    // ── 3. Inset diagram for Part (ii) ──────────────────────────────────
+    const INSET_X = 120, INSET_Y = 520, EARTH_R = 40, MARS_R = EARTH_R * 1.52;
+    const insetContainer = new PIXI.Container();
+    insetContainer.name = 'example7_5-inset';
+    vp.addChild(insetContainer);
+
+    const insetGfx = new PIXI.Graphics();
+    insetContainer.addChild(insetGfx);
+    insetGfx.circle(INSET_X, INSET_Y, 8);
+    insetGfx.fill({ color: 0xfbbf24, alpha: 0.9 });
+    insetGfx.circle(INSET_X, INSET_Y, EARTH_R);
+    insetGfx.stroke({ color: 0x60a5fa, width: 1, alpha: 0.4 });
+    insetGfx.circle(INSET_X + EARTH_R, INSET_Y, 4);
+    insetGfx.fill({ color: 0x60a5fa, alpha: 0.9 });
+    insetGfx.circle(INSET_X, INSET_Y, MARS_R);
+    insetGfx.stroke({ color: 0xf87171, width: 1, alpha: 0.4 });
+    insetGfx.circle(INSET_X + MARS_R, INSET_Y, 4);
+    insetGfx.fill({ color: 0xf87171, alpha: 0.9 });
+
+    const mkStyle = (fill: string, size: number) => new PIXI.TextStyle({
+      fill, fontSize: size, fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 'bold',
+    });
+
+    const insetTitle = new PIXI.Text('Part (ii): Sun – Earth – Mars', mkStyle('#94a3b8', 9));
+    insetTitle.anchor.set(0.5, 0);
+    insetTitle.position.set(INSET_X, INSET_Y - MARS_R - 18);
+    insetContainer.addChild(insetTitle);
+
+    const earthInsetLabel = new PIXI.Text('Earth (R_E)', mkStyle('#60a5fa', 8));
+    earthInsetLabel.anchor.set(0, 1.5);
+    earthInsetLabel.position.set(INSET_X + EARTH_R + 5, INSET_Y);
+    insetContainer.addChild(earthInsetLabel);
+
+    const marsInsetLabel = new PIXI.Text('Mars (1.52 R_E)', mkStyle('#f87171', 8));
+    marsInsetLabel.anchor.set(0, 1.5);
+    marsInsetLabel.position.set(INSET_X + MARS_R + 5, INSET_Y);
+    insetContainer.addChild(marsInsetLabel);
+
+    const resultLabel = new PIXI.Text('T_Mars ≈ 684 days', mkStyle('#fbbf24', 9));
+    resultLabel.anchor.set(0.5, 0);
+    resultLabel.position.set(INSET_X, INSET_Y + MARS_R + 12);
+    insetContainer.addChild(resultLabel);
+
+    // ── 4. Phobos tracking hook ─────────────────────────────────────────
+    runtime.addHook({
+      id: 'example7_5-label-tracker',
+      beforeStep: () => {
+        const p = store.getObject('example-phobos');
+        if (p) phobosLabel.position.set(p.body.position.x, p.body.position.y);
+      }
+    });
+
+    // ── 5. HTML Overlays — TWO separate panels ──────────────────────────
     const canvasWrap = runtime.renderer.getApp().canvas.parentElement;
     if (!canvasWrap) return;
 
-    // Clean up any existing overlay first
-    const existing = document.getElementById('example-burn-overlay');
-    if (existing) existing.remove();
+    // Clean any existing overlays
+    ['example-burn-overlay', 'example-energy-overlay', 'example-part2-overlay'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
 
-    const overlay = document.createElement('div');
-    overlay.id = 'example-burn-overlay';
-    overlay.style.position = 'absolute';
-    overlay.style.top = '16px';
-    overlay.style.right = '16px';
-    overlay.style.background = 'rgba(15, 23, 42, 0.85)';
-    overlay.style.backdropFilter = 'blur(8px)';
-    overlay.style.border = '1px solid rgba(99, 102, 241, 0.3)';
-    overlay.style.borderRadius = '12px';
-    overlay.style.padding = '14px';
-    overlay.style.color = '#fff';
-    overlay.style.fontFamily = 'Inter, sans-serif';
-    overlay.style.fontSize = '12px';
-    overlay.style.width = '240px';
-    overlay.style.zIndex = '1000';
-    overlay.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.5)';
+    // ═══════════════════════════════════════════════════════════════════
+    // PANEL 1 — Part (i): Mass of Mars
+    // ═══════════════════════════════════════════════════════════════════
+    const panel1 = makeOverlayBase('example-energy-overlay');
+    panel1.innerHTML = `
+      <button id="close-panel1" style="${CLOSE_BTN_STYLE}" title="Close">✕</button>
+      <div style="font-weight: 800; margin-bottom: 8px; color: #fbbf24; font-size: 14px; padding-right: 28px;">
+        🔴 Part (i) — Mass of Mars
+      </div>
+      <div style="color: #94a3b8; font-size: 10px; margin-bottom: 10px; border-bottom: 1px solid rgba(100,116,139,0.3); padding-bottom: 8px;">
+        From Phobos's orbital data, calculate M<sub>Mars</sub>.
+      </div>
 
-    overlay.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 6px; color: #818cf8; font-size: 13px;">🛰️ Flight Controls</div>
-      <div style="margin-bottom: 10px; color: #94a3b8; font-size: 11px; line-height: 1.4;">
-        Apply delta-v engine burns to manipulate the spacecraft's orbital geometry in real-time.
+      <div style="background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.15); border-radius: 8px; padding: 8px 10px; font-size: 10px; margin-bottom: 8px;">
+        <span style="color: #94a3b8;">Given:</span><br>
+        T<sub>Phobos</sub> = 7 h 39 min = 27540 s<br>
+        R<sub>Phobos</sub> = 9.4 × 10<sup>3</sup> km = 9.4 × 10<sup>6</sup> m<br>
+        G = 6.67 × 10<sup>−11</sup> N m² kg<sup>−2</sup>
       </div>
-      <div style="display: flex; gap: 8px;">
-        <button id="prograde-burn-btn" style="flex: 1; padding: 6px 10px; background: #2563eb; border: none; border-radius: 6px; color: #fff; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-          🚀 +Prograde
-        </button>
-        <button id="retrograde-burn-btn" style="flex: 1; padding: 6px 10px; background: #dc2626; border: none; border-radius: 6px; color: #fff; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-          🛑 -Retrograde
-        </button>
+
+      <div style="background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.15); border-radius: 8px; padding: 8px 10px; font-size: 10px; margin-bottom: 8px;">
+        <span style="color: #94a3b8;">Formula:</span> T² = (4π²/GM) R³<br>
+        ⟹ <b>M = 4π² R³ / (G T²)</b>
       </div>
-      <div id="burn-feedback" style="margin-top: 8px; font-size: 10px; text-align: center; color: #10b981; font-weight: bold; height: 12px;"></div>
+
+      <div style="background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.15); border-radius: 8px; padding: 8px 10px; font-size: 10px;">
+        <span style="color: #94a3b8;">Calculation:</span><br>
+        M = 4 × (3.14)² × (9.4 × 10<sup>6</sup>)³ / (6.67 × 10<sup>−11</sup> × (27540)²)<br>
+        M = 4 × 9.87 × 8.30 × 10<sup>20</sup> / (6.67 × 10<sup>−11</sup> × 7.58 × 10<sup>8</sup>)<br>
+        M = 3.277 × 10<sup>22</sup> / 5.059 × 10<sup>−2</sup><br><br>
+        <div style="text-align: center; padding: 6px; background: rgba(251,191,36,0.1); border-radius: 6px;">
+          <span style="color: #fbbf24; font-weight: 800; font-size: 14px;">
+            M<sub>Mars</sub> ≈ 6.48 × 10<sup>23</sup> kg
+          </span>
+        </div>
+      </div>
+
+      <div id="example75-sim-time" style="margin-top: 10px; text-align: center; font-size: 9px; color: #475569;">
+        Simulation running…
+      </div>
     `;
+    canvasWrap.appendChild(panel1);
 
-    canvasWrap.appendChild(overlay);
+    document.getElementById('close-panel1')?.addEventListener('click', () => {
+      panel1.style.display = panel1.style.display === 'none' ? 'block' : 'none';
+    });
 
-    const progradeBtn = document.getElementById('prograde-burn-btn');
-    const retrogradeBtn = document.getElementById('retrograde-burn-btn');
-    const feedback = document.getElementById('burn-feedback');
+    // ═══════════════════════════════════════════════════════════════════
+    // PANEL 2 — Part (ii): Length of Martian Year
+    // ═══════════════════════════════════════════════════════════════════
+    const panel2 = makeOverlayBase('example-part2-overlay');
+    panel2.style.top = 'auto';
+    panel2.style.bottom = '16px';
+    panel2.style.right = '16px';
+    panel2.style.border = '1px solid rgba(96,165,250,0.3)';
+    panel2.innerHTML = `
+      <button id="close-panel2" style="${CLOSE_BTN_STYLE}" title="Close">✕</button>
+      <div style="font-weight: 800; margin-bottom: 8px; color: #60a5fa; font-size: 14px; padding-right: 28px;">
+        🌍 Part (ii) — Martian Year
+      </div>
+      <div style="color: #94a3b8; font-size: 10px; margin-bottom: 10px; border-bottom: 1px solid rgba(100,116,139,0.3); padding-bottom: 8px;">
+        Earth & Mars orbit the Sun. Find the Martian year.
+      </div>
 
-    const triggerBurn = (type: 'prograde' | 'retrograde') => {
-      const earthObj = store.getObject('example-earth');
-      if (!earthObj) return;
+      <div style="background: rgba(96,165,250,0.06); border: 1px solid rgba(96,165,250,0.15); border-radius: 8px; padding: 8px 10px; font-size: 10px; margin-bottom: 8px;">
+        <span style="color: #94a3b8;">Given:</span><br>
+        R<sub>Mars</sub> = 1.52 × R<sub>Earth</sub><br>
+        T<sub>Earth</sub> = 365 days
+      </div>
 
-      const body = earthObj.body;
-      const vel = body.velocity;
-      const speed = Math.hypot(vel.x, vel.y);
+      <div style="background: rgba(96,165,250,0.06); border: 1px solid rgba(96,165,250,0.15); border-radius: 8px; padding: 8px 10px; font-size: 10px; margin-bottom: 8px;">
+        <span style="color: #94a3b8;">Kepler's Third Law:</span><br>
+        (T<sub>M</sub> / T<sub>E</sub>)² = (R<sub>M</sub> / R<sub>E</sub>)³<br>
+        T<sub>M</sub> = T<sub>E</sub> × (R<sub>M</sub> / R<sub>E</sub>)<sup>3/2</sup>
+      </div>
 
-      if (speed > 0.01) {
-        const factor = type === 'prograde' ? 1.15 : 0.85; // +/- 15% delta-v thrust
-        Matter.Body.setVelocity(body, {
-          x: vel.x * factor,
-          y: vel.y * factor
-        });
+      <div style="background: rgba(96,165,250,0.06); border: 1px solid rgba(96,165,250,0.15); border-radius: 8px; padding: 8px 10px; font-size: 10px;">
+        <span style="color: #94a3b8;">Calculation:</span><br>
+        T<sub>M</sub> = 365 × (1.52)<sup>3/2</sup><br>
+        T<sub>M</sub> = 365 × √(1.52³) = 365 × √(3.512)<br>
+        T<sub>M</sub> = 365 × 1.874<br><br>
+        <div style="text-align: center; padding: 6px; background: rgba(96,165,250,0.1); border-radius: 6px;">
+          <span style="color: #60a5fa; font-weight: 800; font-size: 14px;">
+            T<sub>Mars</sub> ≈ 684 days
+          </span>
+        </div>
+      </div>
+    `;
+    canvasWrap.appendChild(panel2);
 
-        if (feedback) {
-          feedback.innerText = `${type.toUpperCase()} BURN APPLIED (${type === 'prograde' ? '+' : '-'}15% Δv)`;
-          feedback.style.color = type === 'prograde' ? '#10b981' : '#f87171';
-          setTimeout(() => {
-            if (feedback) feedback.innerText = '';
-          }, 2000);
+    document.getElementById('close-panel2')?.addEventListener('click', () => {
+      panel2.style.display = panel2.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // ── 6. Orbit tracking ───────────────────────────────────────────────
+    let lastAngle = 0, totalAngle = 0, stepCount = 0, orbitCount = 0;
+    const simTimeEl = document.getElementById('example75-sim-time');
+
+    runtime.addHook({
+      id: 'example7_5-orbit-tracker',
+      beforeStep: () => {
+        const p = store.getObject('example-phobos');
+        if (!p) return;
+        const dx = p.body.position.x - MARS_CENTER_X;
+        const dy = p.body.position.y - MARS_CENTER_Y;
+        const cur = Math.atan2(dy, dx);
+        let delta = cur - lastAngle;
+        if (delta > Math.PI) delta -= 2 * Math.PI;
+        if (delta < -Math.PI) delta += 2 * Math.PI;
+        totalAngle += Math.abs(delta);
+        lastAngle = cur;
+        stepCount++;
+        const completed = Math.floor(totalAngle / (2 * Math.PI));
+        if (completed > orbitCount) orbitCount = completed;
+        if (stepCount % 60 === 0 && simTimeEl) {
+          const pct = ((totalAngle % (2 * Math.PI)) / (2 * Math.PI) * 100).toFixed(1);
+          simTimeEl.innerHTML = `🔴 Phobos orbits: <b style="color:#f87171">${orbitCount}</b> &nbsp;|&nbsp; Current: <b style="color:#fbbf24">${pct}%</b>`;
         }
-
-        // Emit an event to trigger immediate AI tutoring card update
-        physicsEventBus.emit({
-          type: 'OBJECT_SPAWNED', // triggers explanation cards update
-          objectId: 'example-earth',
-          metadata: {
-            name: 'Earth Spaceship',
-            action: `Engine ${type} burn executed`,
-            newVelocity: speed * factor
-          }
-        });
       }
-    };
+    });
 
-    if (progradeBtn) progradeBtn.onclick = () => triggerBurn('prograde');
-    if (retrogradeBtn) retrogradeBtn.onclick = () => triggerBurn('retrograde');
+    return () => {
+      runtime.removeHook('example7_5-label-tracker');
+      runtime.removeHook('example7_5-orbit-tracker');
+      document.getElementById('example-energy-overlay')?.remove();
+      document.getElementById('example-part2-overlay')?.remove();
+    };
   }
 };
