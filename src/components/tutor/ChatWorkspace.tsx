@@ -149,17 +149,21 @@ export function ChatWorkspace({
             </div>
           )}
 
-          {messages.map((m) => (
-            <ChatBubble
-              key={m.id}
-              role={m.role}
-              content={m.content}
-              timestamp={m.timestamp}
-              topicTitle={topicTitle}
-              onCopy={m.role === "ai" ? () => navigator.clipboard?.writeText(m.content) : undefined}
-              onRegenerate={m.role === "ai" ? handleRegenerate : undefined}
-            />
-          ))}
+          {messages.map((m, idx) => {
+            const userQuery = m.role === "ai" && idx > 0 ? messages[idx - 1].content : undefined;
+            return (
+              <ChatBubble
+                key={m.id}
+                role={m.role}
+                content={m.content}
+                timestamp={m.timestamp}
+                topicTitle={topicTitle}
+                userQuery={userQuery}
+                onCopy={m.role === "ai" ? () => navigator.clipboard?.writeText(m.content) : undefined}
+                onRegenerate={m.role === "ai" ? handleRegenerate : undefined}
+              />
+            );
+          })}
 
           {loading && (
             <div className="flex w-full items-start gap-4">

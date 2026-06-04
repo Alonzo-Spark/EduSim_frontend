@@ -1,7 +1,7 @@
 import React from "react";
 import { BlockMath, InlineMath } from "@/components/math/Katex";
 import { Link, useParams } from "@tanstack/react-router";
-import { Activity, FunctionSquare } from "lucide-react";
+import { Activity, FunctionSquare, Atom } from "lucide-react";
 import "katex/dist/katex.min.css";
 
 interface FormulaData {
@@ -74,15 +74,24 @@ export function FormulaLabCard({ formula }: FormulaLabCardProps) {
       )}
 
       {/* Explore Button */}
-      <div className="mt-8 pt-6 border-t border-white/5 flex justify-end">
+      <div className="mt-8 pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-end gap-3">
         <Link
           to="/formula-lab/$topic"
           params={{ topic: topicName }}
           search={{ classId, subject }}
-          className="group relative inline-flex items-center gap-2.5 rounded-[2rem] bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-6 py-3 text-xs font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95 shadow-lg shadow-violet-500/25 hover:shadow-violet-500/35"
+          className="group relative inline-flex items-center gap-2.5 rounded-[2rem] bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-6 py-3 text-xs font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95 shadow-lg shadow-violet-500/25 hover:shadow-violet-500/35 w-full sm:w-auto justify-center"
         >
           <Activity className="h-4 w-4" />
           <span>Explore in Formula Lab</span>
+        </Link>
+        <Link
+          to="/sandbox/$simulationId"
+          params={{ simulationId: "default" }}
+          search={{ query: formula.meaning ? `Explain ${formula.meaning}` : (formula.expression ? `Explain ${formula.expression}` : "Physics Simulation") }}
+          className="group relative inline-flex items-center gap-2.5 rounded-[2rem] bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] hover:border-white/20 px-6 py-3 text-xs font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95 shadow-lg w-full sm:w-auto justify-center"
+        >
+          <Atom className="h-4 w-4 text-violet-400" />
+          <span>Create Simulation</span>
         </Link>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { physicsEventBus, PhysicsEvent } from './physicsEventBus';
 import { generateInsight, ExplanationInsight } from './insightGenerator';
 import { getApiUrl } from '../config/api';
+import { useAuthStore } from '../store/useAuthStore';
 
 export interface ExplanationQueueItem {
   id: string;
@@ -219,9 +220,17 @@ export function useExplanationEngine(
 
         // 2. Query FastAPI backend tutor endpoint
         try {
+          const token = useAuthStore.getState().token;
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          };
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+
           const resp = await fetch(getApiUrl('/api/tutor/explain-sim'), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ query })
           });
           if (!resp.ok) throw new Error(`Backend response error: ${resp.status}`);

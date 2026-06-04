@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { CurriculumService } from "@/services/curriculumService";
 import { PageWrapper } from "@/components/Card";
 import { Crumbs } from "@/components/Crumbs";
-import { Play, Sparkles } from "lucide-react";
+import { Brain, Play } from "lucide-react";
 
 export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
   beforeLoad: ({ params }) => {
@@ -28,11 +28,11 @@ export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
       const s = subjects.find((sub) => sub.code === params.subject || sub.id === params.subject);
       if (!s) throw notFound();
 
-      const chapters = await CurriculumService.getChapters(s.id);
+      const chapters = await CurriculumService.getChapters(s.id, Number(params.classId));
       const chapter = chapters.find((ch) => ch.name === params.chapter);
       if (!chapter) throw notFound();
 
-      const topics = await CurriculumService.getTopics(chapter.id);
+      const topics = await CurriculumService.getTopics(chapter.id, Number(params.classId));
       return { c, s, chapter: { ...chapter, topics }, classId: params.classId, subjectId: params.subject };
     } catch {
       throw notFound();
@@ -44,9 +44,16 @@ function TopicsPage() {
   const { c, s, chapter, classId, subjectId } = Route.useLoaderData();
   const navigate = useNavigate();
 
-  const handleGenerateSimulation = (topic: any) => {
+  const handleAskTutor = (topic: any) => {
     navigate({
-      to: "/simulation-generator",
+      to: "/tutor",
+      search: {
+        subject: s.name,
+        class_name: c.name,
+        chapter: chapter.name,
+        topic: topic.name,
+        prompt: `Explain "${topic.name}" from the chapter "${chapter.name}" in ${s.name} for ${c.name}.`,
+      } as any,
     });
   };
 
@@ -89,19 +96,19 @@ function TopicsPage() {
                 <h3 className="font-semibold">{topic.name}</h3>
 
                 <p className="text-xs text-muted-foreground">
-                  {topic.hasSimulation ? "Premium simulation available" : "Theory topic"}
+                  {topic.has_simulation ? "Premium simulation available" : "Theory topic"}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              {topic.hasSimulation && topic.simulationRoute ? (
+              {topic.has_simulation && topic.simulation_route ? (
                 <motion.button
                   whileHover={{ scale: 1.06 }}
                   whileTap={{ scale: 0.96 }}
                   onClick={() =>
                     navigate({
-                      to: topic.simulationRoute,
+                      to: topic.simulation_route || undefined,
                     })
                   }
                   className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-secondary text-foreground text-sm font-bold border border-border hover:bg-secondary/80 transition-all"
@@ -113,10 +120,10 @@ function TopicsPage() {
               <motion.button
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.96 }}
-                onClick={() => handleGenerateSimulation(topic)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-sm hover:scale-105 transition-all"
+                onClick={() => handleAskTutor(topic)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-sm hover:opacity-90 transition-all"
               >
-                <Sparkles className="w-4 h-4" /> Generate Simulation
+                <Brain className="w-4 h-4" /> Ask AI Tutor
               </motion.button>
             </div>
           </motion.div>

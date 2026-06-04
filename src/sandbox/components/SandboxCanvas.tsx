@@ -620,7 +620,6 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
     activeExampleName,
     activeExampleDescription
   );
-
   const handleAiQuery = async (queryOverride?: string) => {
     const queryToUse = queryOverride !== undefined ? queryOverride : aiPrompt;
     if (!queryToUse.trim()) return;
@@ -639,63 +638,44 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      // ── Fire both calls in parallel ────────────────────────────────────────
-      const [tutorResp, sceneResp] = await Promise.allSettled([
-        // 1. Tutor explanation call — correct endpoint
-        fetch(getApiUrl('/api/tutor/analyze'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: queryToUse })
-        }),
-        // 2. Scene parser call
+      // ── Fire calls in parallel ────────────────────────────────────────
+      const [sceneResp, guideResp] = await Promise.allSettled([
+        // 1. Scene parser call
         fetch(getApiUrl('/api/scene/parse'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_input: queryToUse })
         }),
+        // 2. Dedicated guide/instructions call
+        fetch(getApiUrl('/api/tutor/guide'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: queryToUse })
+        })
       ]);
 
-      // ── Handle tutor response ──────────────────────────────────────────────
-      if (tutorResp.status === 'fulfilled') {
-        const resp = tutorResp.value;
-        if (!resp.ok) throw new Error(`Backend error: ${resp.status} ${resp.statusText}`);
-        const json = await resp.json();
-        if (json.success && json.data) {
-          const d = json.data;
-          pushExplanation({
-            title: d.title || 'AI Answer',
-            explanation: d.ai_explanation || d.explanation || '',
-            effects: d.related_concepts?.map((c: string) => `📌 ${c}`) || [],
-            formula: d.formula || '',
-            suggestions: d.concepts || []
-          });
-
-          // Load dynamic step-by-step instructions into the Guided Mode store!
-          const guide = d.simulation_guide;
-          if (guide && (guide.is_buildable || (Array.isArray(guide.steps) && guide.steps.length > 0))) {
-            useGuidedModeStore.setState({
-              mode: 'guided',
-              guideData: guide,
-              isOpen: true,
-              activeStep: 1,
-              completedSteps: [],
-              highlightedAsset: null,
-              showMeOverlay: null
-            });
+      // ── Handle guide response ──────────────────────────────────────────────
+      if (guideResp && guideResp.status === 'fulfilled') {
+        const resp = guideResp.value;
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json.success && json.data) {
+            const d = json.data;
+            const guide = d.simulation_guide;
+            if (guide && (guide.is_buildable || (Array.isArray(guide.steps) && guide.steps.length > 0))) {
+              useGuidedModeStore.setState({
+                mode: 'guided',
+                guideData: guide,
+                isOpen: true,
+                activeStep: 1,
+                completedSteps: [],
+                highlightedAsset: null,
+                showMeOverlay: null
+              });
+            }
           }
-        } else {
-          throw new Error(json.detail || 'Unknown error from backend');
         }
-      } else {
-        pushExplanation({
-          title: 'Connection Error',
-          explanation: tutorResp.reason?.message || 'Tutor call failed',
-          effects: ['Ensure the EduSim API is running on port 8000'],
-          formula: '',
-          suggestions: []
-        });
       }
-
 
       // ── Handle scene parse response ────────────────────────────────────────
       if (sceneResp.status === 'fulfilled') {
@@ -728,6 +708,18 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
       setAiPrompt('');
     }
   };
+
+  useEffect(() => {
+    if (ready) {
+      const params = new URLSearchParams(window.location.search);
+      const queryParam = params.get('query');
+      if (queryParam) {
+        handleAiQuery(queryParam);
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [ready]);
 
 
   const handleAiKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
