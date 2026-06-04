@@ -51,7 +51,7 @@ function TutorPage() {
     }
   }, [searchParams, fetchTopic]);
 
-  const handleAnalyze = async (query: string) => {
+  const handleAnalyze = async (query: string, history?: Array<{ role: string; content: string }>) => {
     // Cancel previous request if still pending
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -66,7 +66,7 @@ function TutorPage() {
         chapter: searchParams.chapter,
         topic: searchParams.topic
       };
-      const response = await TutorService.analyzeQuery(query, contextArgs, controller.signal);
+      const response = await TutorService.analyzeQuery(query, contextArgs, history, controller.signal);
       if (response.success) {
         setTutorData(response.data);
         setTutorResponse(response.data); // Sync with store for FAB

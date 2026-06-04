@@ -4,7 +4,7 @@ import ChatInput from "./ChatInput";
 import { TutorHeader } from "./TutorHeader";
 
 interface Props {
-  onSend: (text: string) => void;
+  onSend: (text: string, history?: Array<{ role: string; content: string }>) => void;
   aiResponse?: string | null;
   loading?: boolean;
   initialPrompt?: string | null;
@@ -43,6 +43,10 @@ export function ChatWorkspace({
   const lastAiResponseRef = useRef<string | null>(null);
 
   const send = (text: string) => {
+    const historyToSend = messages.map((m) => ({
+      role: m.role === "ai" ? "assistant" : "user",
+      content: m.content,
+    }));
     setMessages((current) => [
       ...current,
       {
@@ -53,7 +57,7 @@ export function ChatWorkspace({
       },
     ]);
     setPendingPrompt(text);
-    onSend(text);
+    onSend(text, historyToSend);
   };
 
   useEffect(() => {
