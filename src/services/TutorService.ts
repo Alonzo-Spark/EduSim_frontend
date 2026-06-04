@@ -28,15 +28,17 @@ export const TutorService = {
     query: string, 
     context?: { class_name?: string; subject?: string; chapter?: string; topic?: string },
     history?: Array<{ role: string; content: string }>,
+    sessionId?: string | null,
     signal?: AbortSignal
-  ): Promise<TutorAnalysisResponse> => {
+  ): Promise<TutorAnalysisResponse & { session_id?: string }> => {
     const body = {
       query,
       class_name: context?.class_name,
       subject: context?.subject,
       chapter: context?.chapter,
       topic: context?.topic,
-      history
+      history,
+      session_id: sessionId
     };
     
     const token = useAuthStore.getState().token;
@@ -59,6 +61,54 @@ export const TutorService = {
       throw new Error(text || "Failed to analyze query");
     }
 
+    return response.json();
+  },
+
+  getSessions: async (): Promise<{ success: boolean; sessions: any[] }> => {
+    const token = useAuthStore.getState().token;
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    const response = await fetch(joinUrl(API_BASE, "/api/persistence/tutor/sessions"), {
+      method: "GET",
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error("Failed to fetch tutor sessions");
+    }
+    return response.json();
+  },
+
+  getSessionMessages: async (sessionId: string): Promise<{ success: boolean; session: any }> => {
+    const token = useAuthStore.getState().token;
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    const response = await fetch(joinUrl(API_BASE, `/api/persistence/tutor/session/${sessionId}`), {
+      method: "GET",
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error("Failed to fetch session messages");
+    }
+    return response.json();
+  },
+
+  deleteSession: async (sessionId: string): Promise<{ success: boolean; message: string }> => {
+    const token = useAuthStore.getState().token;
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    const response = await fetch(joinUrl(API_BASE, `/api/persistence/tutor/session/${sessionId}`), {
+      method: "DELETE",
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete tutor session");
+    }
     return response.json();
   },
 };
