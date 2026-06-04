@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChatBubble, TypingAnimation } from "./ChatBubble";
 import ChatInput from "./ChatInput";
 import { TutorHeader } from "./TutorHeader";
+import { ChatMessage } from "@/services/TutorService";
 
 interface Props {
-  onSend: (text: string) => void;
+  onSend: (text: string, history?: ChatMessage[]) => void;
   aiResponse?: string | null;
   loading?: boolean;
   initialPrompt?: string | null;
@@ -43,17 +44,23 @@ export function ChatWorkspace({
   const lastAiResponseRef = useRef<string | null>(null);
 
   const send = (text: string) => {
+    const newMsg: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: text,
+      timestamp: formatTime(new Date()),
+    };
     setMessages((current) => [
       ...current,
-      {
-        id: crypto.randomUUID(),
-        role: "user",
-        content: text,
-        timestamp: formatTime(new Date()),
-      },
+      newMsg,
     ]);
     setPendingPrompt(text);
-    onSend(text);
+    
+    const history: ChatMessage[] = messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+    onSend(text, history);
   };
 
   useEffect(() => {

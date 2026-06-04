@@ -6,7 +6,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import ChatWorkspace from "@/components/tutor/ChatWorkspace";
-import { TutorService, TutorAnalysisResponse } from "@/services/TutorService";
+import { TutorService, TutorAnalysisResponse, ChatMessage } from "@/services/TutorService";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useCurriculumTopic } from "@/hooks/useCurriculumTopic";
 
@@ -51,7 +51,7 @@ function TutorPage() {
     }
   }, [searchParams, fetchTopic]);
 
-  const handleAnalyze = async (query: string) => {
+  const handleAnalyze = async (query: string, history?: ChatMessage[]) => {
     // Cancel previous request if still pending
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -66,7 +66,7 @@ function TutorPage() {
         chapter: searchParams.chapter,
         topic: searchParams.topic
       };
-      const response = await TutorService.analyzeQuery(query, contextArgs, controller.signal);
+      const response = await TutorService.analyzeQuery(query, contextArgs, history, controller.signal);
       if (response.success) {
         setTutorData(response.data);
         setTutorResponse(response.data); // Sync with store for FAB

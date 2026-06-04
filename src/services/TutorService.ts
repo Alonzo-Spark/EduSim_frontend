@@ -23,10 +23,16 @@ export interface TutorAnalysisResponse {
 
 const API_BASE = getApiUrl("");
 
+export interface ChatMessage {
+  role: "user" | "assistant" | "ai";
+  content: string;
+}
+
 export const TutorService = {
   analyzeQuery: async (
     query: string, 
     context?: { class_name?: string; subject?: string; chapter?: string; topic?: string },
+    history?: ChatMessage[],
     signal?: AbortSignal
   ): Promise<TutorAnalysisResponse> => {
     const body = {
@@ -34,7 +40,11 @@ export const TutorService = {
       class_name: context?.class_name,
       subject: context?.subject,
       chapter: context?.chapter,
-      topic: context?.topic
+      topic: context?.topic,
+      history: history ? history.map(h => ({
+        role: h.role === "ai" ? "assistant" : h.role,
+        content: h.content
+      })) : undefined
     };
     
     const token = useAuthStore.getState().token;
