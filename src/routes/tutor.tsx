@@ -5,10 +5,12 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
-import ChatWorkspace from "@/components/tutor/ChatWorkspace";
+import ChatWorkspace, { Message } from "@/components/tutor/ChatWorkspace";
+import { ChatHistorySidebar } from "@/components/tutor/ChatHistorySidebar";
 import { TutorService, TutorAnalysisResponse, ChatMessage } from "@/services/TutorService";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useCurriculumTopic } from "@/hooks/useCurriculumTopic";
+import { toast } from "sonner";
 
 // Define search params for the route
 export const Route = createFileRoute("/tutor")({
@@ -27,6 +29,9 @@ function TutorPage() {
   const [tutorData, setTutorData] = useState<TutorAnalysisResponse["data"] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [messages, setMessages] = useState<Message[] | undefined>(undefined);
 
   const { setTutorResponse } = useSimulationStore();
 
@@ -66,10 +71,15 @@ function TutorPage() {
         chapter: searchParams.chapter,
         topic: searchParams.topic
       };
-      const response = await TutorService.analyzeQuery(query, contextArgs, history, controller.signal);
+      const response = await TutorService.analyzeQuery(query, contextArgs, history, activeSessionId, controller.signal);
       if (response.success) {
         setTutorData(response.data);
         setTutorResponse(response.data); // Sync with store for FAB
+        
+        if (response.session_id && response.session_id !== activeSessionId) {
+          setActiveSessionId(response.session_id);
+          setRefreshTrigger(prev => prev + 1);
+        }
       } else {
         setError("Failed to analyze question.");
       }
@@ -88,6 +98,38 @@ function TutorPage() {
       setIsLoading(false);
       abortControllerRef.current = undefined;
     }
+  };
+
+  const handleSelectSession = async (sessionId: string) => {
+    setIsLoading(true);
+    try {
+      const res = await TutorService.getSessionMessages(sessionId);
+      if (res.success && res.session) {
+        setActiveSessionId(sessionId);
+        const formatted = res.session.messages.map((m: any) => {
+          const date = new Date(m.created_at);
+          const timeStr = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+          return {
+            id: m.id,
+            role: m.role === "assistant" ? "ai" : "user",
+            content: m.content,
+            timestamp: timeStr
+          };
+        });
+        setMessages(formatted);
+      }
+    } catch (err) {
+      toast.error("Failed to load conversation history");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNewChat = () => {
+    setActiveSessionId(null);
+    setMessages([]);
+    setTutorData(null);
   };
 
   const compactTopicContext = topicContent
@@ -117,6 +159,13 @@ function TutorPage() {
       )}
 
       <div className="relative mx-auto flex h-full w-full max-w-[100rem] items-stretch">
+        <ChatHistorySidebar
+          activeSessionId={activeSessionId}
+          onSelectSession={handleSelectSession}
+          onNewChat={handleNewChat}
+          refreshTrigger={refreshTrigger}
+        />
+
         <div className="flex w-full items-stretch flex-1 min-w-0">
           <ChatWorkspace
             onSend={handleAnalyze}
@@ -129,6 +178,8 @@ function TutorPage() {
             focusInput={Boolean(searchParams.prompt || searchParams.topic)}
             topicTitle={searchParams.topic || searchParams.chapter}
             topicContext={compactTopicContext}
+            messages={messages}
+            onNewChat={handleNewChat}
           />
         </div>
       </div>

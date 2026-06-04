@@ -4,6 +4,13 @@ import ChatInput from "./ChatInput";
 import { TutorHeader } from "./TutorHeader";
 import { ChatMessage } from "@/services/TutorService";
 
+export type Message = {
+  id: string;
+  role: "user" | "ai";
+  content: string;
+  timestamp: string;
+};
+
 interface Props {
   onSend: (text: string, history?: ChatMessage[]) => void;
   aiResponse?: string | null;
@@ -16,14 +23,9 @@ interface Props {
     className?: string;
     chapter?: string;
   };
+  messages?: Message[];
+  onNewChat?: () => void;
 }
-
-type Message = {
-  id: string;
-  role: "user" | "ai";
-  content: string;
-  timestamp: string;
-};
 
 function formatTime(date: Date) {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -37,8 +39,17 @@ export function ChatWorkspace({
   focusInput,
   topicTitle,
   topicContext,
+  messages: propsMessages,
+  onNewChat,
 }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
+
+  useEffect(() => {
+    if (propsMessages !== undefined) {
+      setMessages(propsMessages);
+    }
+  }, [propsMessages]);
+
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastAiResponseRef = useRef<string | null>(null);
@@ -84,6 +95,7 @@ export function ChatWorkspace({
     setMessages([]);
     setPendingPrompt(null);
     lastAiResponseRef.current = null;
+    onNewChat?.();
   };
 
   useEffect(() => {
