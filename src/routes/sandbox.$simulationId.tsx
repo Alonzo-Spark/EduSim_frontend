@@ -5,5 +5,6 @@ export const Route = createFileRoute("/sandbox/$simulationId")({
   component: SandboxPage,
   validateSearch: (search: Record<string, unknown>) => ({
     query: typeof search.query === "string" ? search.query : undefined,
+    mode: typeof search.mode === "string" ? search.mode : undefined,
   }),
 });

@@ -93,10 +93,10 @@ export function ChatBubble({ content, role, timestamp, topicTitle, userQuery, on
                   <Activity className="h-5 w-5 text-white/80" />
                   <span>Explore in Formula Lab</span>
                 </button>
-                <Link
+                 <Link
                   to="/sandbox/$simulationId"
                   params={{ simulationId: "default" }}
-                  search={{ query: userQuery || topicTitle || "Physics Simulation" }}
+                  search={{ query: userQuery || topicTitle || "Physics Simulation", mode: "guide" }}
                   className="group relative flex items-center gap-3 rounded-[2rem] bg-secondary hover:bg-secondary/80 border border-border px-8 py-3.5 text-sm font-bold text-foreground transition-all hover:-translate-y-0.5 active:scale-95 shadow-md w-full sm:w-auto justify-center"
                 >
                   <Atom className="h-5 w-5 text-primary" />
