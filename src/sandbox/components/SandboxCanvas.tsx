@@ -620,7 +620,6 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
     activeExampleName,
     activeExampleDescription
   );
-
   const handleAiQuery = async (queryOverride?: string) => {
     const queryToUse = queryOverride !== undefined ? queryOverride : aiPrompt;
     if (!queryToUse.trim()) return;
@@ -728,6 +727,18 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
       setAiPrompt('');
     }
   };
+
+  useEffect(() => {
+    if (ready) {
+      const params = new URLSearchParams(window.location.search);
+      const queryParam = params.get('query');
+      if (queryParam) {
+        handleAiQuery(queryParam);
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [ready]);
 
 
   const handleAiKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

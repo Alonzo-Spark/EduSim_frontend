@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, RefreshCw, Activity } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Copy, RefreshCw, Activity, Atom } from "lucide-react";
 import { useMounted } from "@/hooks/useMounted";
 import { useTutorStore } from "@/store/tutorStore";
 import { TutorMarkdownRenderer } from "./TutorMarkdownRenderer";
@@ -15,11 +16,12 @@ interface ChatBubbleProps {
   role: "user" | "ai";
   timestamp?: string;
   topicTitle?: string;
+  userQuery?: string;
   onCopy?: () => void;
   onRegenerate?: () => void;
 }
 
-export function ChatBubble({ content, role, timestamp, topicTitle, onCopy, onRegenerate }: ChatBubbleProps) {
+export function ChatBubble({ content, role, timestamp, topicTitle, userQuery, onCopy, onRegenerate }: ChatBubbleProps) {
   const isAi = role === "ai";
   const mounted = useMounted();
   const {
@@ -80,17 +82,26 @@ export function ChatBubble({ content, role, timestamp, topicTitle, onCopy, onReg
             )}
 
             {isAi && formulas.length > 0 && (
-              <div className="mt-6 pt-6 border-t border-border flex justify-center w-full">
+              <div className="mt-6 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
                 <button
                   onClick={() => {
                     setInlineRagContent(content);
                     setShowInlineFormulaLab(true);
                   }}
-                  className="group relative flex items-center gap-3 rounded-[2rem] bg-primary hover:bg-primary/90 px-8 py-3.5 text-sm font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95 shadow-[0_4px_12px_rgba(112,181,255,0.25)] hover:shadow-[0_6px_20px_rgba(112,181,255,0.35)]"
+                  className="group relative flex items-center gap-3 rounded-[2rem] bg-primary hover:bg-primary/90 px-8 py-3.5 text-sm font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95 shadow-[0_4px_12px_rgba(112,181,255,0.25)] hover:shadow-[0_6px_20px_rgba(112,181,255,0.35)] w-full sm:w-auto justify-center"
                 >
                   <Activity className="h-5 w-5 text-white/80" />
                   <span>Explore in Formula Lab</span>
                 </button>
+                <Link
+                  to="/sandbox/$simulationId"
+                  params={{ simulationId: "default" }}
+                  search={{ query: userQuery || topicTitle || "Physics Simulation" }}
+                  className="group relative flex items-center gap-3 rounded-[2rem] bg-secondary hover:bg-secondary/80 border border-border px-8 py-3.5 text-sm font-bold text-foreground transition-all hover:-translate-y-0.5 active:scale-95 shadow-md w-full sm:w-auto justify-center"
+                >
+                  <Atom className="h-5 w-5 text-primary" />
+                  <span>Create Simulation</span>
+                </Link>
               </div>
             )}
 
