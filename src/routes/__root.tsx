@@ -211,7 +211,7 @@ function RootComponent() {
         {/* Main Content Scroll Container */}
         {/* Outlet is rendered directly — no AnimatePresence wrapper to avoid exit-animation
             blocking the incoming page from becoming visible. */}
-        <div className={`flex-1 overflow-x-hidden ${pathname.startsWith('/tutor') || pathname.startsWith('/sandbox') ? 'overflow-hidden p-0' : 'overflow-y-auto pt-28 pb-12 px-4 md:px-10 custom-scrollbar scroll-smooth'}`}>
+        <div className={`flex-1 overflow-x-hidden ${pathname.startsWith('/tutor') || pathname.startsWith('/sandbox') ? 'flex flex-col h-full overflow-hidden p-0' : 'overflow-y-auto pt-28 pb-12 px-4 md:px-10 custom-scrollbar scroll-smooth'}`}>
           <div className={`mx-auto w-full ${pathname.startsWith('/tutor') || pathname.startsWith('/sandbox') ? 'h-full max-w-none' : 'max-w-[1500px]'}`}>
             <Outlet />
           </div>

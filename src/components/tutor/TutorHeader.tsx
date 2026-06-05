@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Menu, User, History, Bell } from "lucide-react";
+import { Menu, User, History, Bell } from "lucide-react";
 import { useSidebarStore } from "@/store/useSidebarStore";
 
 interface TutorHeaderProps {
@@ -68,15 +68,6 @@ export function TutorHeader({ onNewChat, topicTitle, topicContext, toggleHistory
 
       {/* Right Controls - Mobile View */}
       <div className="flex items-center gap-3 lg:hidden">
-        {/* New Chat Button */}
-        <button
-          onClick={onNewChat}
-          className="flex items-center gap-1.5 rounded-full border border-border bg-card hover:bg-secondary px-4 py-1.5 text-xs font-semibold text-foreground transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm"
-        >
-          <Plus className="w-3.5 h-3.5 text-primary" />
-          <span>New</span>
-        </button>
-
         {/* User Profile Button */}
         <button className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all">
           <User className="w-4 h-4" />
@@ -96,14 +87,7 @@ export function TutorHeader({ onNewChat, topicTitle, topicContext, toggleHistory
           <User className="w-5 h-5" />
         </button>
 
-        {/* New Chat Button */}
-        <button
-          onClick={onNewChat}
-          className="flex h-10 items-center gap-1.5 rounded-full border border-border bg-card hover:bg-secondary/50 px-5 text-sm font-semibold text-foreground transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm"
-        >
-          <Plus className="w-4 h-4 text-primary" />
-          <span>New Chat</span>
-        </button>
+
       </div>
     </header>
   );

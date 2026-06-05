@@ -154,7 +154,7 @@ export function ChatWorkspace({
 
       <main className="flex-1 min-h-0 overflow-y-auto custom-scrollbar relative z-10">
         <div
-          className={`mx-auto w-full max-w-[1600px] min-h-full flex flex-col px-4 sm:px-6 md:px-8 pb-40 pt-6 ${messages.length === 0 ? "justify-center" : "justify-start"} space-y-6`}
+          className={`mx-auto w-full max-w-[1600px] min-h-full flex flex-col px-4 sm:px-6 md:px-8 pb-6 pt-6 ${messages.length === 0 ? "justify-center" : "justify-start"} space-y-6`}
         >
           {messages.length === 0 && !loading && (
             isDesktop ? (
@@ -274,7 +274,7 @@ export function ChatWorkspace({
             </div>
           )}
 
-          <div ref={bottomRef} className="h-10 w-full shrink-0" />
+          <div ref={bottomRef} className="h-4 w-full shrink-0" />
         </div>
       </main>
 

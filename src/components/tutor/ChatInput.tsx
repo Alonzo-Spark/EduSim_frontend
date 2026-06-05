@@ -43,9 +43,9 @@ export function ChatInput({ onSend, disabled, focus = false }: ChatInputProps) {
   };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-50 flex flex-col items-center justify-end pointer-events-none pb-4 sm:pb-8">
-      <div className="w-full max-w-3xl px-4 pointer-events-auto">
-        <div className="relative flex flex-col rounded-[26px] border border-border/80 bg-card shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-3xl overflow-hidden p-2 transition-all hover:border-primary/40">
+    <div className="w-full z-10 flex flex-col items-center justify-end pb-2 sm:pb-3 bg-transparent pt-1">
+      <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 md:px-8">
+        <div className="relative flex flex-col rounded-[22px] border border-border/80 bg-transparent shadow-[0_10px_30px_rgba(0,0,0,0.06)] backdrop-blur-3xl overflow-hidden p-1.5 transition-all hover:border-primary/40">
           
           <div className="flex items-center gap-2 px-2">
             {/* Sparkles Icon Indicator - Only shown on mobile/tablet */}
@@ -61,7 +61,7 @@ export function ChatInput({ onSend, disabled, focus = false }: ChatInputProps) {
               onChange={(e) => setText(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask the tutor..."
-              className="flex-1 min-w-0 bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground/60 text-sm sm:text-base focus:ring-0 resize-none min-h-[24px] max-h-[120px] py-2 custom-scrollbar font-medium"
+              className="flex-1 min-w-0 bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground/60 text-sm sm:text-base focus:ring-0 resize-none min-h-[24px] max-h-[120px] py-1.5 custom-scrollbar font-medium"
               rows={1}
             />
 
@@ -91,7 +91,7 @@ export function ChatInput({ onSend, disabled, focus = false }: ChatInputProps) {
             </div>
           </div>
 
-          <div className="text-center pb-0.5 pt-1">
+          <div className="text-center py-0.5">
             <span className="text-[10px] sm:text-[11px] text-muted-foreground/45 font-medium">Press Enter to send</span>
           </div>
         </div>
