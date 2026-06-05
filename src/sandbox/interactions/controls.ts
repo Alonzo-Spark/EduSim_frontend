@@ -29,7 +29,7 @@ export class RuntimeControls {
 
   /** Set world gravity. `y` positive = downward. */
   setGravity(y: number, x = 0): void {
-    this.runtime.physics.setGravity(y, x);
+    this.runtime.gravitySystem.getLinearGravity().setGravity(x, y);
   }
 
   /** Preset shorthand methods for common educational scenarios. */

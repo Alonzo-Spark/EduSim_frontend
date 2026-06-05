@@ -627,7 +627,7 @@ export class PropertyController {
       return;
     }
 
-    this.runtime.physics.setGravity(y, x);
+    this.runtime.gravitySystem.getLinearGravity().setGravity(x, y);
     this.emit('propertyChanged', { objectId: 'global', property: 'gravity', value: { x, y } });
   }
 }
