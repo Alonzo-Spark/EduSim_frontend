@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, CheckCircle2, XCircle, ArrowRight } from "lucide-react";
+import { BookOpen, CheckCircle2, XCircle, ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import { DynamicParsedFormula } from "@/utils/DynamicFormulaExtractor";
+import { getApiUrl } from "@/config/api";
 
 interface QASectionProps {
   topic: string;
@@ -22,11 +23,11 @@ interface QuizQuestion {
   explanation: string;
 }
 
-export default function QASection({ topic, formulas }: QASectionProps) {
+export default function QASection({ topic, chapter, subject, formulas }: QASectionProps) {
   const isNewton = topic.toLowerCase().includes("newton") || 
                    (formulas && formulas.some(f => f.title?.toLowerCase().includes("newton")));
 
-  // 6 Demo Questions as requested: 3 MC, 2 Fill blanks, 1 Concept
+  // Demo Questions as fallback
   const demoQuestions: QuizQuestion[] = [
     {
       id: "q1", type: "multiple-choice",
@@ -80,18 +81,139 @@ export default function QASection({ topic, formulas }: QASectionProps) {
     }
   ] as QuizQuestion[];
 
-  const questions = isNewton ? demoQuestions : genericQuestions;
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState<Record<string, boolean>>({});
   const [score, setScore] = useState(0);
 
-  if (!formulas || formulas.length === 0) return null;
+  // Load initial questions
+  const loadInitialQuestions = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(getApiUrl("/api/questions/generate"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: subject || "physics",
+          chapter: chapter || "",
+          topic: topic || "",
+          formula: formulas && formulas.length > 0 ? formulas[0].formula : "",
+          difficulty: "Medium",
+          question_type: "mixed",
+          exclude_questions: []
+        })
+      });
+
+      if (!response.ok) throw new Error("Failed to generate questions");
+      const data = await response.json();
+      
+      if (data && Array.isArray(data.questions) && data.questions.length > 0) {
+        const mapped = data.questions.map((q: any) => {
+          const hasOptions = Array.isArray(q.options) && q.options.length > 0;
+          return {
+            id: `q-${Math.random().toString(36).substring(2, 9)}`,
+            type: hasOptions ? "multiple-choice" : "fill-blanks",
+            question: q.question,
+            options: hasOptions ? q.options : undefined,
+            correctAnswer: q.answer,
+            explanation: q.explanation
+          };
+        });
+        setQuestions(mapped);
+      } else {
+        setQuestions(isNewton ? demoQuestions : genericQuestions);
+      }
+    } catch (err) {
+      console.warn("Failed to load questions via API, using fallbacks:", err);
+      setQuestions(isNewton ? demoQuestions : genericQuestions);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadInitialQuestions();
+    // Reset quiz state when topic changes
+    setCurrentIndex(0);
+    setAnswers({});
+    setSubmitted({});
+    setScore(0);
+  }, [topic]);
+
+  // Generate more questions
+  const generateMoreQuestions = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const shownQuestions = questions.map(q => q.question);
+      const response = await fetch(getApiUrl("/api/questions/generate"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: subject || "physics",
+          chapter: chapter || "",
+          topic: topic || "",
+          formula: formulas && formulas.length > 0 ? formulas[0].formula : "",
+          difficulty: "Medium",
+          question_type: "mixed",
+          exclude_questions: shownQuestions
+        })
+      });
+
+      if (!response.ok) throw new Error("Failed to generate more questions");
+      const data = await response.json();
+
+      if (data && Array.isArray(data.questions) && data.questions.length > 0) {
+        const mapped = data.questions.map((q: any) => {
+          const hasOptions = Array.isArray(q.options) && q.options.length > 0;
+          return {
+            id: `q-${Math.random().toString(36).substring(2, 9)}`,
+            type: hasOptions ? "multiple-choice" : "fill-blanks",
+            question: q.question,
+            options: hasOptions ? q.options : undefined,
+            correctAnswer: q.answer,
+            explanation: q.explanation
+          };
+        });
+        
+        const prevLength = questions.length;
+        setQuestions(prev => [...prev, ...mapped]);
+        
+        // If they finished the quiz, immediately point them to the first new question
+        if (currentIndex >= prevLength - 1 && submitted[questions[currentIndex]?.id]) {
+          setCurrentIndex(prevLength);
+        }
+      } else {
+        alert("The AI couldn't generate more unique questions for this topic right now. Please try again.");
+      }
+    } catch (err) {
+      console.error("Failed to fetch more questions:", err);
+      alert("Error generating more questions. Check your connection to the AI Tutor.");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="rounded-3xl border border-slate-100 bg-white/85 p-16 text-center text-slate-400 font-medium shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-violet-600 animate-spin" />
+        <span className="text-sm text-slate-500 font-bold tracking-wider animate-pulse">Generating dynamic quiz questions...</span>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) return null;
 
   const currentQ = questions[currentIndex];
-  const isSubmitted = submitted[currentQ.id];
-  const isCorrect = isSubmitted && answers[currentQ.id]?.toLowerCase().trim() === currentQ.correctAnswer.toLowerCase().trim();
+  const isSubmitted = currentQ ? submitted[currentQ.id] : false;
+  const isCorrect = isSubmitted && currentQ && answers[currentQ.id]?.toLowerCase().trim() === currentQ.correctAnswer.toLowerCase().trim();
 
   const handleSelectOption = (option: string) => {
     if (isSubmitted) return;
@@ -131,9 +253,23 @@ export default function QASection({ topic, formulas }: QASectionProps) {
             <p className="text-xs font-semibold text-slate-400">Question {currentIndex + 1} of {questions.length}</p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Score</p>
-          <p className="text-xl font-black text-violet-600">{score}/{questions.length}</p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={generateMoreQuestions}
+            disabled={loadingMore}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-750 text-xs font-bold border border-violet-150 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {loadingMore ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-violet-600 animate-pulse" />
+            )}
+            <span>{loadingMore ? "Generating..." : "Get More Questions"}</span>
+          </button>
+          <div className="text-right">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Score</p>
+            <p className="text-xl font-black text-violet-600">{score}/{questions.length}</p>
+          </div>
         </div>
       </div>
 
@@ -242,20 +378,35 @@ export default function QASection({ topic, formulas }: QASectionProps) {
                     Next Question <ArrowRight className="w-4 h-4" />
                   </button>
                 ) : (
-                  <div className="mt-8 flex flex-col items-center justify-center p-8 bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl text-center shadow-lg shadow-violet-100/10">
+                  <div className="mt-8 flex flex-col items-center justify-center p-8 bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl text-center shadow-lg shadow-violet-100/10 gap-3">
                     <h4 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-indigo-650 mb-2">🎉 Practice Complete!</h4>
-                    <p className="text-base text-slate-600 font-semibold mb-6">You scored <span className="font-extrabold text-violet-600">{score}</span> out of <span className="font-extrabold text-slate-800">{questions.length}</span></p>
-                    <button
-                      onClick={() => {
-                        setCurrentIndex(0);
-                        setAnswers({});
-                        setSubmitted({});
-                        setScore(0);
-                      }}
-                      className="px-8 py-3 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 shadow-md shadow-violet-600/15 transition-all active:scale-95 cursor-pointer"
-                    >
-                      Retry Practice
-                    </button>
+                    <p className="text-base text-slate-600 font-semibold">You scored <span className="font-extrabold text-violet-600">{score}</span> out of <span className="font-extrabold text-slate-800">{questions.length}</span></p>
+                    
+                    <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm justify-center mt-3">
+                      <button
+                        onClick={() => {
+                          setCurrentIndex(0);
+                          setAnswers({});
+                          setSubmitted({});
+                          setScore(0);
+                        }}
+                        className="flex-1 px-6 py-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-755 font-bold transition-all active:scale-95 shadow-sm"
+                      >
+                        Retry Practice
+                      </button>
+                      <button
+                        onClick={generateMoreQuestions}
+                        disabled={loadingMore}
+                        className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 shadow-md shadow-violet-600/15 transition-all active:scale-95 disabled:opacity-50"
+                      >
+                        {loadingMore ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 text-white/80" />
+                        )}
+                        <span>{loadingMore ? "Generating..." : "More Questions"}</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </motion.div>

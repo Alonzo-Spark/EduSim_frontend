@@ -52,6 +52,7 @@ export interface DynamicParsedFormula {
   relatedTopics?: string[];
   controls?: FormulaControl[];
   resultSymbol?: string;
+  derived_expressions?: Record<string, string>;
 }
 
 const OFFLINE_FORMULA_BACKUP: Record<string, {
@@ -257,7 +258,8 @@ export const DynamicFormulaExtractor = {
               controls: uniqueControls,
               anatomy,
               examples: labData?.examples || [],
-              resultSymbol
+              resultSymbol,
+              derived_expressions: labData?.derived_expressions || {}
             };
           } catch (e) {
             console.warn("Failed to load lab data for formula", f.formula, e);
