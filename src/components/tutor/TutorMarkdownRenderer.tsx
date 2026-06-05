@@ -1121,7 +1121,21 @@ export function TutorMarkdownRenderer({ content, className, density = "regular" 
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  const normalizedStr = useMemo(() => normalizeContent(content), [content]);
+  // Check for the warning message
+  const hasWarning = useMemo(() => {
+    return content.includes("This topic is not available in the provided textbook context");
+  }, [content]);
+
+  // Clean content to remove the warning message so it doesn't render inside the card
+  const cleanedContent = useMemo(() => {
+    let temp = content;
+    // Remove the warning lines and double newlines
+    temp = temp.replace(/This topic is not available in the provided textbook context\.?\n*/gi, "");
+    temp = temp.replace(/The following explanation is AI-generated and may not exactly match your textbook\.?\n*/gi, "");
+    return temp.trim();
+  }, [content]);
+
+  const normalizedStr = useMemo(() => normalizeContent(cleanedContent), [cleanedContent]);
   const rawGroups = useMemo(() => groupSections(splitIntoSections(normalizedStr)), [normalizedStr]);
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ group1: true });
@@ -1156,6 +1170,21 @@ export function TutorMarkdownRenderer({ content, className, density = "regular" 
   }, [rawGroups]);
 
   if (!normalizedStr.trim()) {
+    if (hasWarning) {
+      return (
+        <div className={cn("space-y-6 max-w-4xl mx-auto w-full", className)}>
+          <div className="flex gap-3.5 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="text-xs sm:text-sm leading-relaxed">
+              <p className="font-extrabold tracking-tight">Textbook Context Unavailable</p>
+              <p className="text-muted-foreground mt-0.5">
+                This topic is not available in the provided textbook. The following explanation is AI-generated and may not exactly match your textbook.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return null;
   }
 
@@ -1163,6 +1192,17 @@ export function TutorMarkdownRenderer({ content, className, density = "regular" 
 
   return (
     <div className={cn("space-y-6 max-w-4xl mx-auto w-full", className)}>
+      {hasWarning && (
+        <div className="flex gap-3.5 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-600 dark:text-amber-400">
+          <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div className="text-xs sm:text-sm leading-relaxed">
+            <p className="font-extrabold tracking-tight">Textbook Context Unavailable</p>
+            <p className="text-muted-foreground mt-0.5">
+              This topic is not available in the provided textbook. The following explanation is AI-generated and may not exactly match your textbook.
+            </p>
+          </div>
+        </div>
+      )}
       {groupKeys.map((key) => {
         const items = groupedData[key] || [];
         const validItems = items.filter(item => {

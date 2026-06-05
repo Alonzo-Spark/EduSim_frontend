@@ -153,7 +153,6 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
   if (!data.formula) return null;
 
   const hasVariables = data.variables.length > 0;
-  const hasExplanation = Boolean(data.explanation);
 
   const renderFormula = () => {
     try {
@@ -187,13 +186,6 @@ export function FormulaCard({ body, sectionTitle, className, parentContent }: Fo
       <div className="text-xl sm:text-2xl md:text-3xl font-semibold text-center text-foreground overflow-x-auto custom-scrollbar py-4 bg-secondary/30 rounded-xl border border-border shadow-inner">
         {renderFormula()}
       </div>
-
-      {/* ── Short explanation (if exists) ────────────────── */}
-      {hasExplanation && (
-        <p className="mt-4 text-xs sm:text-[13.5px] text-muted-foreground leading-relaxed font-light">
-          {data.explanation}
-        </p>
-      )}
 
       {/* ── Variables responsive grid ────────────────── */}
       {hasVariables && (
