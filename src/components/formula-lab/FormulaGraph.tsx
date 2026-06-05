@@ -10,20 +10,42 @@ const FormulaGraph: React.FC<{
   const data = useMemo(() => {
     if (!formula) return [] as Array<{ x: number; y: number }>;
     const controls = Array.isArray(formula.controls) ? formula.controls : [];
-    const xVar = controls[controls.length - 1];
+    const resultSymbol = formula.resultSymbol || "result";
+    const inputControls = controls.filter((c) => c.symbol !== resultSymbol);
+    const isNewtonSecondLaw = formula.id === "newton-second-law" || formula.formula === "F=ma";
+    const xVar = isNewtonSecondLaw ? inputControls.find((c) => c.symbol === 'a') : inputControls[inputControls.length - 1];
     if (!xVar) return [];
 
     const points: Array<{ x: number; y: number }> = [];
-    const isNewton = formula.title?.toLowerCase().includes("newton");
 
-    if (isNewton) {
+    if (isNewtonSecondLaw) {
         // DEMO SPECIFIC LOGIC for F = ma
-        // x-axis: Acceleration, y-axis: Force, keeping mass constant based on slider.
         const m = values['m'] ?? 10;
         for (let a = 0; a <= 20; a += 1) {
             points.push({ x: a, y: m * a });
         }
         return points;
+    }
+
+    let expr = formula.expression || "";
+    if (formula.derived_expressions && resultSymbol && formula.derived_expressions[resultSymbol]) {
+      expr = formula.derived_expressions[resultSymbol];
+    } else {
+      const clean = expr.replace(/[\$\s]/g, "");
+      const parts = clean.split("=");
+      expr = parts[1] || parts[0];
+      expr = expr
+        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "($1)/($2)")
+        .replace(/\\sin/g, "sin")
+        .replace(/\\cos/g, "cos")
+        .replace(/\\tan/g, "tan")
+        .replace(/\\theta/g, "theta")
+        .replace(/\\Delta/g, "Delta")
+        .replace(/\\cdot/g, "*")
+        .replace(/\\times/g, "*")
+        .replace(/\^/g, "**")
+        .replace(/\{/g, "(")
+        .replace(/\}/g, ")");
     }
 
     const min = xVar.min || 0;
@@ -32,16 +54,16 @@ const FormulaGraph: React.FC<{
     for (let x = min; x <= max; x += step) {
         try {
             const scope = { ...values, [xVar.symbol]: x };
-            const y = mathEvaluate(formula.expression, scope);
+            const y = mathEvaluate(expr, scope);
             if (typeof y === 'number' && Number.isFinite(y)) {
-                points.push({ x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) });
+                points.push({ x: Number(x.toPrecision(6)), y: Number(y.toPrecision(6)) });
             }
         } catch(e) {
             // ignore
         }
     }
     return points;
-  }, [formula]);
+  }, [formula, values]);
 
   if (!formula) {
     return (
@@ -53,9 +75,10 @@ const FormulaGraph: React.FC<{
 
   const controls = Array.isArray(formula.controls) ? formula.controls : [];
   const anatomy = Array.isArray(formula.anatomy) ? formula.anatomy : [];
-  const isNewton = formula.title?.toLowerCase().includes("newton");
-  const xVar = isNewton ? controls.find(c => c.symbol === 'a') : controls[0];
   const resultSymbol = formula.resultSymbol || "result";
+  const inputControls = controls.filter((c) => c.symbol !== resultSymbol);
+  const isNewtonSecondLaw = formula.id === "newton-second-law" || formula.formula === "F=ma";
+  const xVar = isNewtonSecondLaw ? inputControls.find(c => c.symbol === 'a') : inputControls[inputControls.length - 1];
   const xLabel = xVar ? (anatomy.find(a => a.symbol === xVar?.symbol)?.meaning || xVar?.symbol) : "x";
   const yLabel = anatomy.find(a => a.symbol === resultSymbol)?.meaning || resultSymbol;
   const title = formula.title || formula.displayFormula || formula.formula || formula.raw || "Unnamed Formula";
