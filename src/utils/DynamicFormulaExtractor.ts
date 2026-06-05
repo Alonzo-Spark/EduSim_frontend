@@ -168,102 +168,105 @@ export const DynamicFormulaExtractor = {
       const extractData = await extractRes.json();
       const formulasList = extractData.formulas || [];
       
-      const parsedFormulas: DynamicParsedFormula[] = [];
-      
-      // 2. Fetch metadata for each formula
-      for (const f of formulasList) {
-        try {
-          let labData: any = null;
-          
+      // 2. Fetch metadata for each formula in parallel
+      const parsedFormulasResults = await Promise.all(
+        formulasList.map(async (f: any) => {
           try {
-            const labRes = await fetch(getApiUrl("/api/formula/lab"), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ formula: f.formula })
-            });
+            let labData: any = null;
             
-            if (labRes.ok) {
-              labData = await labRes.json();
-            }
-          } catch (fetchErr) {
-            console.warn("Could not reach formula lab endpoint, using offline fallback.", fetchErr);
-          }
-          
-          // Deduplicate controls based on symbol (so we don't have n1, n2, n_1 all duplicated)
-          let uniqueControls: FormulaControl[] = [];
-          const seenVars = new Set<string>();
-          for (const v of (labData?.variables || [])) {
-            if (!seenVars.has(v.symbol)) {
-              seenVars.add(v.symbol);
-              uniqueControls.push({
-                symbol: v.symbol,
-                label: v.label || v.symbol,
-                unit: v.unit || "",
-                min: v.min !== undefined ? v.min : 1,
-                max: v.max !== undefined ? v.max : 100,
-                step: v.step !== undefined ? v.step : 1,
-                defaultValue: v.defaultValue !== undefined ? v.defaultValue : 10
+            try {
+              const labRes = await fetch(getApiUrl("/api/formula/lab"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ formula: f.formula })
               });
+              
+              if (labRes.ok) {
+                labData = await labRes.json();
+              }
+            } catch (fetchErr) {
+              console.warn("Could not reach formula lab endpoint, using offline fallback.", fetchErr);
             }
-          }
-          
-          let anatomy: FormulaAnatomyRow[] = labData?.anatomy || [];
-          let title = labData?.title || "Formula";
-          let description = labData?.description || content;
-          let resultSymbol = labData?.resultSymbol || "y";
-          
-          // If backend returned empty variable data, use premium local fallbacks
-          if (anatomy.length === 0) {
-            const cleanFormula = f.formula.replace(/[\$\s]/g, ""); // Strip $ and spaces
-            const matchedKey = Object.keys(OFFLINE_FORMULA_BACKUP).find(key => 
-              cleanFormula.toUpperCase().includes(key) || 
-              key.includes(cleanFormula.toUpperCase())
-            );
             
-            if (matchedKey) {
-              const backup = OFFLINE_FORMULA_BACKUP[matchedKey];
-              title = backup.title;
-              description = backup.description;
-              anatomy = backup.anatomy;
-              uniqueControls = backup.controls;
-              resultSymbol = backup.resultSymbol;
-            } else {
-              const parsedGeneric = parseGenericFormula(f.formula);
-              title = parsedGeneric.title;
-              description = parsedGeneric.description;
-              anatomy = parsedGeneric.anatomy;
-              uniqueControls = parsedGeneric.controls;
-              resultSymbol = parsedGeneric.resultSymbol;
+            // Deduplicate controls based on symbol (so we don't have n1, n2, n_1 all duplicated)
+            let uniqueControls: FormulaControl[] = [];
+            const seenVars = new Set<string>();
+            for (const v of (labData?.variables || [])) {
+              if (!seenVars.has(v.symbol)) {
+                seenVars.add(v.symbol);
+                uniqueControls.push({
+                  symbol: v.symbol,
+                  label: v.label || v.symbol,
+                  unit: v.unit || "",
+                  min: v.min !== undefined ? v.min : 1,
+                  max: v.max !== undefined ? v.max : 100,
+                  step: v.step !== undefined ? v.step : 1,
+                  defaultValue: v.defaultValue !== undefined ? v.defaultValue : 10
+                });
+              }
             }
-          }
-          
-          let formulaId = labData?.id || f.id;
-          if (formulaId === "dynamic-formula" || formulaId === "fallback") {
-            formulaId = f.id || `formula-${Math.random().toString(36).substring(2, 9)}`;
-          }
+            
+            let anatomy: FormulaAnatomyRow[] = labData?.anatomy || [];
+            let title = labData?.title || "Formula";
+            let description = labData?.description || content;
+            let resultSymbol = labData?.resultSymbol || "y";
+            
+            // If backend returned empty variable data, use premium local fallbacks
+            if (anatomy.length === 0) {
+              const cleanFormula = f.formula.replace(/[\$\s]/g, ""); // Strip $ and spaces
+              const matchedKey = Object.keys(OFFLINE_FORMULA_BACKUP).find(key => 
+                cleanFormula.toUpperCase().includes(key) || 
+                key.includes(cleanFormula.toUpperCase())
+              );
+              
+              if (matchedKey) {
+                const backup = OFFLINE_FORMULA_BACKUP[matchedKey];
+                title = backup.title;
+                description = backup.description;
+                anatomy = backup.anatomy;
+                uniqueControls = backup.controls;
+                resultSymbol = backup.resultSymbol;
+              } else {
+                const parsedGeneric = parseGenericFormula(f.formula);
+                title = parsedGeneric.title;
+                description = parsedGeneric.description;
+                anatomy = parsedGeneric.anatomy;
+                uniqueControls = parsedGeneric.controls;
+                resultSymbol = parsedGeneric.resultSymbol;
+              }
+            }
+            
+            let formulaId = labData?.id || f.id;
+            if (formulaId === "dynamic-formula" || formulaId === "fallback") {
+              formulaId = f.id || `formula-${Math.random().toString(36).substring(2, 9)}`;
+            }
 
-          parsedFormulas.push({
-            id: formulaId,
-            raw: f.formula,
-            rawFormula: f.formula,
-            expression: f.formula,
-            latex: f.formula,
-            formula: f.formula,
-            displayFormula: formatLatexForDisplay(f.formula),
-            title,
-            category: subject,
-            topic,
-            description,
-            variables: uniqueControls,
-            controls: uniqueControls,
-            anatomy,
-            examples: labData?.examples || [],
-            resultSymbol
-          });
-        } catch (e) {
-          console.warn("Failed to load lab data for formula", f.formula, e);
-        }
-      }
+            return {
+              id: formulaId,
+              raw: f.formula,
+              rawFormula: f.formula,
+              expression: f.formula,
+              latex: f.formula,
+              formula: f.formula,
+              displayFormula: formatLatexForDisplay(f.formula),
+              title,
+              category: subject,
+              topic,
+              description,
+              variables: uniqueControls,
+              controls: uniqueControls,
+              anatomy,
+              examples: labData?.examples || [],
+              resultSymbol
+            };
+          } catch (e) {
+            console.warn("Failed to load lab data for formula", f.formula, e);
+            return null;
+          }
+        })
+      );
+      
+      const parsedFormulas = parsedFormulasResults.filter((f): f is DynamicParsedFormula => f !== null);
       
       return parsedFormulas;
     } catch (e) {
