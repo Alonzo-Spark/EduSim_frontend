@@ -7,10 +7,16 @@ import { Play, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
   beforeLoad: ({ params }) => {
+    let decodedChapter = params.chapter;
+    try {
+      decodedChapter = decodeURIComponent(params.chapter);
+    } catch (e) {
+      // ignore
+    }
     if (
       params.classId === "9" &&
-      params.subject === "physics" &&
-      params.chapter.toUpperCase() === "LAWS OF MOTION"
+      (params.subject || "").toLowerCase() === "physics" &&
+      decodedChapter.toUpperCase() === "LAWS OF MOTION"
     ) {
       throw redirect({
         to: "/simulation/class9/physics/laws-of-motion",
@@ -25,16 +31,35 @@ export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
       if (!c) throw notFound();
 
       const subjects = await CurriculumService.getSubjects(Number(params.classId));
-      const s = subjects.find((sub) => sub.code === params.subject || sub.id === params.subject);
+      const s = subjects.find(
+        (sub) =>
+          (sub.code || "").toLowerCase() === (params.subject || "").toLowerCase() ||
+          (sub.id || "").toLowerCase() === (params.subject || "").toLowerCase()
+      );
       if (!s) throw notFound();
 
       const chapters = await CurriculumService.getChapters(s.id, Number(params.classId));
-      const chapter = chapters.find((ch) => ch.name === params.chapter);
+      let decodedChapterParam = params.chapter;
+      try {
+        decodedChapterParam = decodeURIComponent(params.chapter);
+      } catch (e) {
+        // ignore
+      }
+      const chapter = chapters.find(
+        (ch) => (ch.name || "").toLowerCase() === decodedChapterParam.toLowerCase()
+      );
       if (!chapter) throw notFound();
 
       const topics = await CurriculumService.getTopics(chapter.id, Number(params.classId));
+
+      console.log("[DEBUG] selectedClass:", c);
+      console.log("[DEBUG] selectedSubject:", s);
+      console.log("[DEBUG] chapters loaded:", chapters);
+      console.log("[DEBUG] topics loaded:", topics);
+
       return { c, s, chapter: { ...chapter, topics }, classId: params.classId, subjectId: params.subject };
-    } catch {
+    } catch (e) {
+      console.error("[DEBUG] Error in topics loader:", e);
       throw notFound();
     }
   },
@@ -69,59 +94,65 @@ function TopicsPage() {
         {chapter.name} <span className="text-muted-foreground text-lg font-normal">— Topics</span>
       </h1>
 
-      <p className="text-muted-foreground mb-8">{chapter.topics.length} topics available</p>
+      <p className="text-muted-foreground mb-8">{chapter.topics?.length || 0} topics available</p>
 
-      <div className="space-y-3">
-        {chapter.topics.map((topic, i) => (
-          <motion.div
-            key={topic.name}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.04 }}
-            className="bg-card border border-border rounded-2xl p-5 flex items-center justify-between gap-4 hover:border-primary/50 transition-all shadow-sm hover:shadow-md"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center font-mono text-sm text-primary font-bold">
-                {String(i + 1).padStart(2, "0")}
+      {!chapter || !Array.isArray(chapter.topics) || chapter.topics.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground bg-card border border-dashed border-border rounded-2xl">
+          No topics available.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {chapter.topics.map((topic, i) => (
+            <motion.div
+              key={topic.name}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.04 }}
+              className="bg-card border border-border rounded-2xl p-5 flex items-center justify-between gap-4 hover:border-primary/50 transition-all shadow-sm hover:shadow-md"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center font-mono text-sm text-primary font-bold">
+                  {String(i + 1).padStart(2, "0")}
+                </div>
+
+                <div>
+                  <h3 className="font-semibold">{topic.name}</h3>
+
+                  <p className="text-xs text-muted-foreground">
+                    {topic.has_simulation ? "Premium simulation available" : "Theory topic"}
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <h3 className="font-semibold">{topic.name}</h3>
+              <div className="flex items-center gap-2">
+                {topic.has_simulation && topic.simulation_route ? (
+                  <motion.button
+                    whileHover={{ scale: 1.06 }}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() =>
+                      navigate({
+                        to: topic.simulation_route,
+                      })
+                    }
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-secondary text-foreground text-sm font-bold border border-border hover:bg-secondary/80 transition-all"
+                  >
+                    <Play className="w-4 h-4 text-primary" /> Lab
+                  </motion.button>
+                ) : null}
 
-                <p className="text-xs text-muted-foreground">
-                  {topic.has_simulation ? "Premium simulation available" : "Theory topic"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {topic.has_simulation && topic.simulation_route ? (
                 <motion.button
                   whileHover={{ scale: 1.06 }}
                   whileTap={{ scale: 0.96 }}
-                  onClick={() =>
-                    navigate({
-                      to: topic.simulation_route,
-                    })
-                  }
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-secondary text-foreground text-sm font-bold border border-border hover:bg-secondary/80 transition-all"
+                  onClick={() => handleGenerateSimulation(topic)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-sm hover:scale-105 transition-all"
                 >
-                  <Play className="w-4 h-4 text-primary" /> Lab
+                  <Sparkles className="w-4 h-4" /> Generate Simulation
                 </motion.button>
-              ) : null}
-
-              <motion.button
-                whileHover={{ scale: 1.06 }}
-                whileTap={{ scale: 0.96 }}
-                onClick={() => handleGenerateSimulation(topic)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-sm hover:scale-105 transition-all"
-              >
-                <Sparkles className="w-4 h-4" /> Generate Simulation
-              </motion.button>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </PageWrapper>
   );
 }

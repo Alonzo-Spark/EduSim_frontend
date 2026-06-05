@@ -60,6 +60,7 @@ export function ChatInput({ onSend, disabled, focus = false }: ChatInputProps) {
               </button>
               
               <button
+                aria-label="Send message"
                 onClick={() => {
                   if (text.trim() && !disabled) {
                     onSend(text.trim());

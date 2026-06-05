@@ -1,6 +1,6 @@
 import React from "react";
 import { DynamicParsedFormula } from "@/utils/DynamicFormulaExtractor";
-import { BlockMath } from "react-katex";
+import { BlockMath } from "@/components/math/Katex";
 
 interface Props {
   formulas?: DynamicParsedFormula[] | null;

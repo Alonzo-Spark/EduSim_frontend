@@ -12,12 +12,22 @@ export const Route = createFileRoute("/chapters/$classId/$subject")({
       if (!c) throw notFound();
 
       const subjects = await CurriculumService.getSubjects(Number(params.classId));
-      const s = subjects.find((sub) => sub.code === params.subject || sub.id === params.subject);
+      const s = subjects.find(
+        (sub) =>
+          (sub.code || "").toLowerCase() === (params.subject || "").toLowerCase() ||
+          (sub.id || "").toLowerCase() === (params.subject || "").toLowerCase()
+      );
       if (!s) throw notFound();
 
       const chapters = await CurriculumService.getChapters(s.id, Number(params.classId));
+      
+      console.log("[DEBUG] selectedClass:", c);
+      console.log("[DEBUG] selectedSubject:", s);
+      console.log("[DEBUG] chapters loaded:", chapters);
+
       return { c, s, chapters };
-    } catch {
+    } catch (e) {
+      console.error("[DEBUG] Error in chapters loader:", e);
       throw notFound();
     }
   },
@@ -25,7 +35,8 @@ export const Route = createFileRoute("/chapters/$classId/$subject")({
 
 function ChaptersPage() {
   const { c, s, chapters } = Route.useLoaderData();
-  const chapterCount = chapters.length;
+  const safeChapters = Array.isArray(chapters) ? chapters : [];
+  const chapterCount = safeChapters.length;
 
   return (
     <PageWrapper>
@@ -43,29 +54,35 @@ function ChaptersPage() {
 
       <p className="text-muted-foreground mb-8">{chapterCount} chapters available</p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {chapters.map((chapter, i) => (
-          <Link
-            key={chapter.name}
-            to="/topics/$classId/$subject/$chapter"
-            params={{
-              classId: String(c.id),
-              subject: s.id,
-              chapter: chapter.name,
-            }}
-          >
-            <Card delay={i * 0.02}>
-              <div className="text-xs font-bold text-primary mb-2">CHAPTER</div>
+      {chapterCount === 0 ? (
+        <div className="text-center py-12 text-muted-foreground bg-card border border-dashed border-border rounded-2xl">
+          No chapters available.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {safeChapters.map((chapter, i) => (
+            <Link
+              key={chapter.name}
+              to="/topics/$classId/$subject/$chapter"
+              params={{
+                classId: String(c.id),
+                subject: s.id,
+                chapter: chapter.name,
+              }}
+            >
+              <Card delay={i * 0.02}>
+                <div className="text-xs font-bold text-primary mb-2">CHAPTER</div>
 
-              <div className="text-lg font-bold mb-2">{chapter.name}</div>
+                <div className="text-lg font-bold mb-2">{chapter.name}</div>
 
-              <p className="text-xs text-muted-foreground">
-                Chapter {i + 1} of {chapters.length}
-              </p>
-            </Card>
-          </Link>
-        ))}
-      </div>
+                <p className="text-xs text-muted-foreground">
+                  Chapter {i + 1} of {safeChapters.length}
+                </p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
     </PageWrapper>
   );
 }

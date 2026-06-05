@@ -23,7 +23,6 @@ const items: SidebarItem[] = [
   { to: "/", label: "Home", icon: Home },
   { to: "/tutor", label: "Tutor", icon: GraduationCap },
   { to: "/profile", label: "Profile", icon: User },
-  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {

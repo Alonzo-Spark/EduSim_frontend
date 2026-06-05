@@ -1,6 +1,6 @@
 import React from "react";
 import { DynamicParsedFormula } from "@/utils/DynamicFormulaExtractor";
-import { BlockMath } from "react-katex";
+import { BlockMath } from "@/components/math/Katex";
 
 function cleanAndTruncate(text: string, maxWords: number): string {
   if (!text) return "";

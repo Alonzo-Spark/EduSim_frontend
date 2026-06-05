@@ -165,7 +165,7 @@ body,
   --neon-blue: #70B5FF;
 
   --gradient-bg: none;
-  --gradient-primary: none;
+  --gradient-primary: linear-gradient(135deg, #0F172A 0%, #2563EB 100%);
   --shadow-glow: none;
   --shadow-glow-cyan: none;
   --shadow-premium: 0 4px 20px rgba(112, 181, 255, 0.08);
