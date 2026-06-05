@@ -55,16 +55,19 @@ export const CurriculumService = {
 
   getChapters: async (subjectId: string, classId?: number): Promise<DBChapter[]> => {
     let subject: any = null;
+    const normSubjectId = (subjectId || "").toLowerCase();
     for (const c of CLASSES) {
       // If classId is provided, only search within that class
       if (classId !== undefined && c.id !== classId) continue;
-      const s = c.subjects.find(sub => sub.id === subjectId);
+      const s = c.subjects.find(sub => (sub.id || "").toLowerCase() === normSubjectId);
       if (s) {
         subject = s;
         break;
       }
     }
-    if (!subject || typeof subject.chapters === 'number') return [];
+    if (!subject || typeof subject.chapters === 'number' || !Array.isArray(subject.chapters)) {
+      return [];
+    }
     
     return subject.chapters.map((ch: any) => ({
       id: ch.name,
@@ -76,11 +79,19 @@ export const CurriculumService = {
 
   getTopics: async (chapterId: string, classId?: number): Promise<DBTopic[]> => {
     let chapter: any = null;
+    let decodedChapterId = chapterId || "";
+    try {
+      decodedChapterId = decodeURIComponent(chapterId);
+    } catch (e) {
+      // ignore decode error
+    }
+    const normChapterId = decodedChapterId.toLowerCase();
+
     for (const c of CLASSES) {
       if (classId !== undefined && c.id !== classId) continue;
       for (const s of c.subjects) {
-        if (typeof s.chapters !== 'number') {
-          const ch = s.chapters.find((chap: any) => chap.name === chapterId);
+        if (s && typeof s.chapters !== 'number' && Array.isArray(s.chapters)) {
+          const ch = s.chapters.find((chap: any) => (chap.name || "").toLowerCase() === normChapterId);
           if (ch) {
             chapter = ch;
             break;
@@ -89,7 +100,7 @@ export const CurriculumService = {
       }
       if (chapter) break;
     }
-    if (!chapter) return [];
+    if (!chapter || !Array.isArray(chapter.topics)) return [];
     
     return chapter.topics.map((t: any) => ({
       id: t.name,
