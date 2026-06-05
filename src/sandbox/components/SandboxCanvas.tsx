@@ -37,9 +37,9 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-type GravityPreset = 'zero' | 'moon' | 'earth' | 'jupiter';
+type GravityPreset = 'zero' | 'moon' | 'earth' | 'jupiter' | 'custom';
 
-const GRAVITY_VALUES: Record<GravityPreset, number> = {
+const GRAVITY_VALUES: Record<Exclude<GravityPreset, 'custom'>, number> = {
   zero: 0, moon: 0.16, earth: 1, jupiter: 2.53,
 };
 
@@ -308,6 +308,7 @@ export const SandboxCanvas: React.FC = () => {
   const [ready, setReady] = useState(false);
   const [bodyCount, setBodyCount] = useState(0);
   const [gravity, setGravity] = useState<GravityPreset>('earth');
+  const [gravityValue, setGravityValue] = useState<number>(1.0);
   const [speed, setSpeed] = useState(1);
   const [selected, setSelected] = useState<RuntimeObject | null>(null);
   const [tutorEnabled, setTutorEnabled] = useState(true);
@@ -1766,7 +1767,7 @@ export const SandboxCanvas: React.FC = () => {
 
     // Restore correct gravity behaviors based on active mode
     if (gravityMode === 'linear') {
-      ia.controls.setGravity(GRAVITY_VALUES[gravity]);
+      ia.controls.setGravity(gravity === 'custom' ? gravityValue : GRAVITY_VALUES[gravity]);
     }
 
     ia.controls.setSimulationSpeed(speed);
@@ -1774,7 +1775,7 @@ export const SandboxCanvas: React.FC = () => {
       rt.start();
       store.setRuntimeState('running');
     }
-  }, [ready, running, gravity, speed, gravityMode, handleCameraChange, repositionBoundaries]);
+  }, [ready, running, gravity, gravityValue, speed, gravityMode, handleCameraChange, repositionBoundaries]);
 
   const handleSelectExample = useCallback(async (exampleId: string) => {
     const rt = runtimeRef.current;
@@ -1860,10 +1861,10 @@ export const SandboxCanvas: React.FC = () => {
         shape: type,
         name: type === 'circle' ? 'Circle' : 'Rectangle',
         mass: obj.body.mass,
-        gravity: GRAVITY_VALUES[gravity],
+        gravity: gravity === 'custom' ? gravityValue : GRAVITY_VALUES[gravity],
       },
     });
-  }, [ready, gravity]);
+  }, [ready, gravity, gravityValue]);
 
   const blast = useCallback(async () => {
     if (!ready) return;
@@ -1881,9 +1882,24 @@ export const SandboxCanvas: React.FC = () => {
     dynRef.current.forEach((b) => Matter.Body.applyForce(b, b.position, { x: fx * b.mass, y: 0 }));
   }, [ready]);
 
-  function changeGravity(preset: GravityPreset) {
+  function changeGravity(preset: Exclude<GravityPreset, 'custom'>) {
     setGravity(preset);
-    propertyControllerRef.current?.updateGlobalGravity(GRAVITY_VALUES[preset]);
+    const val = GRAVITY_VALUES[preset];
+    setGravityValue(val);
+    propertyControllerRef.current?.updateGlobalGravity(val);
+  }
+
+  function handleGravitySliderChange(val: number) {
+    setGravityValue(val);
+    const matchedPreset = (Object.keys(GRAVITY_VALUES) as Exclude<GravityPreset, 'custom'>[]).find(
+      (key) => Math.abs(GRAVITY_VALUES[key] - val) < 0.01
+    );
+    if (matchedPreset) {
+      setGravity(matchedPreset);
+    } else {
+      setGravity('custom');
+    }
+    propertyControllerRef.current?.updateGlobalGravity(val);
   }
 
   const changeSpeed = (val: number) => {
@@ -2472,10 +2488,10 @@ export const SandboxCanvas: React.FC = () => {
         shape: spawnType,
         name: asset.name,
         mass: obj.body.mass,
-        gravity: gravityMode === 'radial' ? 'radial' : GRAVITY_VALUES[gravity],
+        gravity: gravityMode === 'radial' ? 'radial' : (gravity === 'custom' ? gravityValue : GRAVITY_VALUES[gravity]),
       },
     });
-  }, [ready, checkConstraintSnapping, gravity, gravityMode, initializeCelestialEntity]);
+  }, [ready, checkConstraintSnapping, gravity, gravityValue, gravityMode, initializeCelestialEntity]);
 
   // ── Canvas HTML5 drag-and-drop bridge (for FloatingAssetPanel) ────────────
   // Uses native window-level listeners to bypass react-rnd / framer-motion event capture.
@@ -2994,13 +3010,37 @@ export const SandboxCanvas: React.FC = () => {
             </div>
 
             {gravityMode === 'linear' ? (
-              <div style={S.gravRow}>
-                {(Object.keys(GRAVITY_VALUES) as GravityPreset[]).map((k) => (
-                  <button key={k}
-                    style={{ ...S.gravBtn, ...(gravity === k ? S.gravActive : {}) }}
-                    onClick={() => changeGravity(k)} disabled={!ready}
-                  >{k}</button>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                <div style={S.gravRow}>
+                  {(Object.keys(GRAVITY_VALUES) as Exclude<GravityPreset, 'custom'>[]).map((k) => (
+                    <button key={k}
+                      style={{ ...S.gravBtn, ...(gravity === k ? S.gravActive : {}) }}
+                      onClick={() => changeGravity(k)} disabled={!ready}
+                    >{k}</button>
+                  ))}
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '4px 8px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#94a3b8' }}>
+                    <span>Gravity Acceleration (g)</span>
+                    <span style={{ fontFamily: 'monospace', color: '#fbbf24' }}>
+                      {gravityValue.toFixed(2)}x {gravity === 'custom' ? '(Custom)' : `(${gravity.toUpperCase()})`}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={4.0}
+                    step={0.05}
+                    value={gravityValue}
+                    disabled={!ready}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      handleGravitySliderChange(val);
+                    }}
+                    style={{ cursor: ready ? 'pointer' : 'not-allowed', accentColor: '#10b981' }}
+                  />
+                </div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, padding: '4px 8px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 8 }}>
