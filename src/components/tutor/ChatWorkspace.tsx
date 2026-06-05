@@ -3,6 +3,7 @@ import { ChatBubble, TypingAnimation } from "./ChatBubble";
 import ChatInput from "./ChatInput";
 import { TutorHeader } from "./TutorHeader";
 import { ChatMessage } from "@/services/TutorService";
+import { Atom, Beaker, Leaf, Calculator, Landmark, Code2, Sparkles, BookOpen, Lightbulb, Share2 } from "lucide-react";
 
 export type Message = {
   id: string;
@@ -25,6 +26,7 @@ interface Props {
   };
   messages?: Message[];
   onNewChat?: () => void;
+  toggleHistory?: () => void;
 }
 
 function formatTime(date: Date) {
@@ -41,8 +43,17 @@ export function ChatWorkspace({
   topicContext,
   messages: propsMessages,
   onNewChat,
+  toggleHistory,
 }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const updateDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    updateDesktop();
+    window.addEventListener("resize", updateDesktop);
+    return () => window.removeEventListener("resize", updateDesktop);
+  }, []);
 
   useEffect(() => {
     if (propsMessages !== undefined) {
@@ -124,44 +135,116 @@ export function ChatWorkspace({
     }
   }, [messages, loading, aiResponse]);
 
-  const topics = ["Physics", "Chemistry", "Biology", "Math", "History", "Coding"];
+  const subjects = [
+    { name: "Physics", icon: Atom, bg: "bg-blue-500/10", iconColor: "text-blue-600" },
+    { name: "Chemistry", icon: Beaker, bg: "bg-amber-500/10", iconColor: "text-amber-600" },
+    { name: "Biology", icon: Leaf, bg: "bg-emerald-500/10", iconColor: "text-emerald-600" },
+    { name: "Math", icon: Calculator, bg: "bg-purple-500/10", iconColor: "text-purple-600" },
+    { name: "History", icon: Landmark, bg: "bg-rose-500/10", iconColor: "text-rose-600" },
+    { name: "Coding", icon: Code2, bg: "bg-sky-500/10", iconColor: "text-sky-600" },
+  ];
 
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 w-full relative bg-transparent">
-      <TutorHeader onNewChat={handleNewChat} topicTitle={topicTitle} topicContext={topicContext} />
+      <TutorHeader onNewChat={handleNewChat} topicTitle={topicTitle} topicContext={topicContext} toggleHistory={toggleHistory} />
 
-      <main className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+      {messages.length === 0 && (
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.05),transparent_50%)] dark:bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.02),transparent_50%)] pointer-events-none z-0" />
+      )}
+
+      <main className="flex-1 min-h-0 overflow-y-auto custom-scrollbar relative z-10">
         <div
           className={`mx-auto w-full max-w-[1600px] min-h-full flex flex-col px-4 sm:px-6 md:px-8 pb-40 pt-6 ${messages.length === 0 ? "justify-center" : "justify-start"} space-y-6`}
         >
           {messages.length === 0 && !loading && (
-            <div className="flex flex-col items-center justify-center w-full space-y-10 mt-[-5vh]">
-              <div className="text-center space-y-3">
-                <div className="inline-block rounded-2xl bg-secondary px-4 py-1.5 mb-2 border border-border/30">
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-                    AI Tutor
-                  </span>
+            isDesktop ? (
+              <div className="flex flex-col items-center justify-center w-full space-y-10 mt-[-5vh]">
+                <div className="text-center space-y-3">
+                  <div className="inline-block rounded-2xl bg-secondary px-4 py-1.5 mb-2 border border-border/30">
+                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
+                      AI Tutor
+                    </span>
+                  </div>
+                  <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
+                    What would you like to learn today?
+                  </h2>
                 </div>
-                <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
-                  What would you like to learn today?
-                </h2>
-              </div>
 
-              <div className="flex flex-wrap justify-center gap-3 max-w-2xl relative z-40">
-                {topics.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => {
-                      send(`Explain ${t}`);
-                    }}
-                    className="pointer-events-auto relative z-50 rounded-full border border-border bg-card px-6 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-secondary hover:border-primary hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
-                  >
-                    {t}
-                  </button>
-                ))}
+                <div className="flex flex-wrap justify-center gap-3 max-w-2xl relative z-40">
+                  {subjects.map((sub) => (
+                    <button
+                      key={sub.name}
+                      type="button"
+                      onClick={() => {
+                        send(`Explain ${sub.name}`);
+                      }}
+                      className="pointer-events-auto relative z-50 rounded-full border border-border bg-card px-6 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-secondary hover:border-primary hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+                    >
+                      {sub.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center w-full space-y-10 py-12 relative">
+                {/* Background Decorative Icons */}
+                <div className="absolute top-0 left-4 sm:left-12 opacity-15 pointer-events-none text-blue-500 animate-pulse hidden sm:block">
+                  <Atom className="w-16 h-16 sm:w-20 sm:h-20" />
+                </div>
+                <div className="absolute top-4 right-4 sm:right-12 opacity-15 pointer-events-none text-amber-500 animate-pulse hidden sm:block">
+                  <Lightbulb className="w-16 h-16 sm:w-20 sm:h-20" />
+                </div>
+                <div className="absolute bottom-8 left-4 sm:left-12 opacity-15 pointer-events-none text-emerald-500 animate-pulse hidden sm:block">
+                  <BookOpen className="w-16 h-16 sm:w-20 sm:h-20" />
+                </div>
+                <div className="absolute bottom-12 right-4 sm:right-12 opacity-15 pointer-events-none text-purple-500 animate-pulse hidden sm:block">
+                  <Share2 className="w-16 h-16 sm:w-20 sm:h-20" />
+                </div>
+
+                {/* Welcome Badge and Title */}
+                <div className="flex flex-col items-center text-center space-y-4 max-w-xl z-10 animate-fade-in">
+                  <div className="flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/20 px-3.5 py-1 text-[11px] font-bold uppercase tracking-widest text-primary shadow-sm">
+                    <Sparkles className="w-3.5 h-3.5 text-primary fill-primary/20" />
+                    <span>AI Tutor</span>
+                  </div>
+                  
+                  <h2 className="text-3xl sm:text-4.5xl font-extrabold tracking-tight text-foreground leading-tight">
+                    What would you like to learn today?
+                  </h2>
+
+                  {/* Decorative Divider */}
+                  <div className="flex items-center justify-center gap-1.5 pt-2">
+                    <div className="w-8 h-1 rounded-full bg-primary" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                    <div className="w-8 h-1 rounded-full bg-primary/20" />
+                  </div>
+                </div>
+
+                {/* Subject Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl px-4 z-10">
+                  {subjects.map((sub) => {
+                    const Icon = sub.icon;
+                    return (
+                      <button
+                        key={sub.name}
+                        type="button"
+                        onClick={() => {
+                          send(`Explain ${sub.name}`);
+                        }}
+                        className="pointer-events-auto flex items-center gap-4 px-5 py-4 bg-card hover:bg-secondary/40 border border-border/80 hover:border-primary/45 rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-103 active:scale-98 cursor-pointer text-left w-full group"
+                      >
+                        <div className={`w-11 h-11 rounded-full ${sub.bg} ${sub.iconColor} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
+                          <Icon className="w-5.5 h-5.5" />
+                        </div>
+                        <span className="font-bold text-foreground text-sm sm:text-base group-hover:text-primary transition-colors">
+                          {sub.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )
           )}
 
           {messages.map((m, idx) => {

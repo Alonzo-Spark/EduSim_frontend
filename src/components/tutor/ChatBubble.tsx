@@ -53,10 +53,10 @@ export function ChatBubble({ content, role, timestamp, topicTitle, userQuery, on
       className={`flex w-full mb-2 ${isAi ? "justify-start" : "justify-end"}`}
     >
       <div
-        className={`flex flex-col w-full ${isAi ? "max-w-[1600px] items-start" : "max-w-[80%] sm:max-w-[70%] md:max-w-[600px] items-end"}`}
+        className={`flex flex-col w-full ${isAi ? "max-w-5xl items-start" : "max-w-[80%] sm:max-w-[70%] md:max-w-[600px] items-end"}`}
       >
         <div
-          className={`relative group flex items-start gap-2.5 sm:gap-3 w-fit ${isAi ? "" : "flex-row-reverse"}`}
+          className={`relative group flex items-start gap-2.5 sm:gap-3 ${isAi ? "w-full max-w-5xl" : "w-fit flex-row-reverse"}`}
         >
           {isAi && (
             <div className="w-9 h-9 sm:w-10 sm:h-10 mt-1 rounded-full flex items-center justify-center shrink-0 bg-primary text-white shadow-sm">
@@ -142,7 +142,7 @@ export function ChatBubble({ content, role, timestamp, topicTitle, userQuery, on
               initial={{ opacity: 0, height: 0, marginTop: 0 }}
               animate={{ opacity: 1, height: "auto", marginTop: 16 }}
               exit={{ opacity: 0, height: 0, marginTop: 0 }}
-              className="w-full ml-12 overflow-hidden"
+              className="w-full ml-[46px] sm:ml-[52px] max-w-[calc(100%-46px)] sm:max-w-[calc(100%-52px)] overflow-hidden"
             >
               <React.Suspense
                 fallback={<div className="h-32 w-full animate-pulse rounded-2xl bg-white/5" />}
@@ -157,12 +157,12 @@ export function ChatBubble({ content, role, timestamp, topicTitle, userQuery, on
               initial={{ opacity: 0, height: 0, marginTop: 0 }}
               animate={{ opacity: 1, height: "auto", marginTop: 16 }}
               exit={{ opacity: 0, height: 0, marginTop: 0 }}
-              className="w-full ml-12 overflow-hidden"
+              className="w-full ml-[46px] sm:ml-[52px] max-w-[calc(100%-46px)] sm:max-w-[calc(100%-52px)] overflow-hidden"
             >
               <React.Suspense
                 fallback={<div className="h-48 w-full animate-pulse rounded-2xl bg-white/5" />}
               >
-                <FormulaLabPageLazy topic={topicTitle || "General"} ragContent={mainContent} />
+                <FormulaLabPageLazy topic={topicTitle || "General"} ragContent={mainContent} isInline={true} />
               </React.Suspense>
             </motion.div>
           )}
