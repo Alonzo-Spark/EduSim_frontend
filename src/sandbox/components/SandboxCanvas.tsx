@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAssetStore } from '../../store/assetStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { assetsRegistry } from '../../config/assetsRegistry';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -286,6 +287,34 @@ const StepCard: React.FC<StepCardProps> = ({ num, title, description, type }) =>
   );
 };
 
+const getHexColor = (num: number) => {
+  return '#' + num.toString(16).padStart(6, '0');
+};
+
+const CanvasIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m12 3-10 5 10 5 10-5-10-5Z" />
+    <path d="m2 17 10 5 10-5" />
+    <path d="m2 12 10 5 10-5" />
+  </svg>
+);
+
+const AssetsIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="7.5" cy="16.5" r="3.5" />
+    <path d="M16 12h5v5h-5z" />
+    <path d="M12 3l4 7H8z" />
+  </svg>
+);
+
+const DataIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 3v18h18" />
+    <path d="m18.7 8-5.1 5.2-2.8-2.7L7 14.3" />
+    <circle cx="18.5" cy="18.5" r="2.5" />
+  </svg>
+);
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const SandboxCanvas: React.FC = () => {
@@ -303,8 +332,8 @@ export const SandboxCanvas: React.FC = () => {
   const dynRef = useRef<Body[]>([]);
 
   const [running, setRunning] = useState(false);
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [ready, setReady] = useState(false);
   const [bodyCount, setBodyCount] = useState(0);
   const [gravity, setGravity] = useState<GravityPreset>('earth');
@@ -318,12 +347,29 @@ export const SandboxCanvas: React.FC = () => {
   const [tutorPinned, setTutorPinned] = useState(false);
   const [tutorMaximized, setTutorMaximized] = useState(false);
   const [activeTab, setActiveTab] = useState<'explanation' | 'effects' | 'formula'>('explanation');
-const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
+  const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
   const [boundaryMode, setBoundaryMode] = useState<'screen' | 'custom' | 'none'>('screen');
   const [customWidth, setCustomWidth] = useState(1200);
   const [customHeight, setCustomHeight] = useState(800);
   const [boundaryThickness] = useState(28);
   const [propertyVersion, setPropertyVersion] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState<'canvas' | 'assets' | 'data' | 'ai'>('canvas');
+  const [dataTabType, setDataTabType] = useState<'object' | 'global'>('object');
+  const [mobileAiInputOpen, setMobileAiInputOpen] = useState(false);
+  const [mobileToolboxOpen, setMobileToolboxOpen] = useState(false);
+  const [velocityHistory, setVelocityHistory] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
+  const [assetSearchQuery, setAssetSearchQuery] = useState('');
+  const [activeAssetCategory, setActiveAssetCategory] = useState('Shapes');
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const boundaryModeRef = useRef(boundaryMode);
   const customWidthRef = useRef(customWidth);
@@ -1345,7 +1391,16 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
             if (rt.getState() === 'running') {
               simTimeRef.current += 16.67;
             }
-            setTelemetryTick((t) => t + 1);
+            setTelemetryTick((t) => {
+              if (t % 10 === 0) {
+                const activeId = interactionRef.current?.selection.getSelectedId();
+                const activeObj = activeId ? storeRef.current?.getObject(activeId) : null;
+                const targetObj = activeObj || storeRef.current?.getAllObjects().find(o => !o.body.isStatic && o.id !== 'ground' && !o.id.startsWith('wall'));
+                const vel = targetObj?.body ? Math.hypot(targetObj.body.velocity.x, targetObj.body.velocity.y) : 0;
+                setVelocityHistory((prev) => [...prev.slice(1), vel]);
+              }
+              return t + 1;
+            });
           },
         });
 
@@ -2625,11 +2680,58 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={S.root}>
+    <div style={{
+      ...S.root,
+      flexDirection: isMobile ? 'column' : 'row',
+    }}>
+      {/* Mobile Top Header */}
+      {isMobile && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          height: '56px',
+          padding: '0 16px',
+          background: '#090d16',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          flexShrink: 0,
+          zIndex: 400,
+          userSelect: 'none',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px', display: 'flex', alignItems: 'center', filter: 'drop-shadow(0 2px 8px rgba(99,102,241,0.5))' }}>🧪</span>
+            <span style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>EduSim</span>
+          </div>
+          <button 
+            style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '50%',
+              color: '#cbd5e1',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '36px',
+              outline: 'none',
+            }}
+            onClick={() => setMobileToolboxOpen(true)}
+          >
+            <Settings size={18} />
+          </button>
+        </div>
+      )}
+
       {/* ── Left panel ─────────────────────────────────────── */}
       <aside
         style={{
           ...S.panel,
+          display: isMobile ? 'none' : (leftPanelOpen ? 'flex' : 'none'),
+          position: isMobile ? 'absolute' : 'relative',
+          left: 0,
+          top: 0,
+          zIndex: isMobile ? 300 : 'auto',
           width: leftPanelOpen ? 288 : 0,
           minWidth: leftPanelOpen ? 268 : 0,
           padding: leftPanelOpen ? '20px 16px' : 0,
@@ -3367,6 +3469,13 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
           ...S.canvasWrap,
           outline: isOverCanvas ? '2px dashed rgba(99,102,241,0.6)' : 'none',
           outlineOffset: '-3px',
+          position: isMobile && activeMobileTab !== 'canvas' ? 'absolute' : 'relative',
+          opacity: isMobile && activeMobileTab !== 'canvas' ? 0 : 1,
+          pointerEvents: isMobile && activeMobileTab !== 'canvas' ? 'none' : 'auto',
+          zIndex: isMobile && activeMobileTab !== 'canvas' ? -100 : 'auto',
+          visibility: isMobile && activeMobileTab !== 'canvas' ? 'hidden' : 'visible',
+          width: '100%',
+          height: '100%',
         }}
       >
         <div style={S.dotGrid} />
@@ -3374,7 +3483,7 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
           ref={mountRef}
           style={{
             ...S.mount,
-            bottom: bottomPanelOpen ? 110 : 0,
+            bottom: isMobile ? 0 : (bottomPanelOpen ? 110 : 0),
             transition: 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         />
@@ -3383,10 +3492,10 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
 
         {/* Floating Sidebar Toggle Buttons */}
         <button
-          onClick={() => setLeftPanelOpen((open) => !open)}
+          onClick={() => setLeftPanelOpen((open) => { const next = !open; if (next && isMobile) setRightPanelOpen(false); return next; })}
           style={{
             position: 'absolute',
-            left: 14,
+            left: leftPanelOpen && isMobile ? 302 : 14,
             top: '50%',
             transform: 'translateY(-50%)',
             zIndex: 350,
@@ -3397,7 +3506,7 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
             background: 'rgba(15, 23, 42, 0.65)',
             color: '#a5b4fc',
             backdropFilter: 'blur(8px)',
-            display: 'flex',
+            display: isMobile ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
@@ -3421,10 +3530,10 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
         </button>
 
         <button
-          onClick={() => setRightPanelOpen((open) => !open)}
+          onClick={() => setRightPanelOpen((open) => { const next = !open; if (next && isMobile) setLeftPanelOpen(false); return next; })}
           style={{
             position: 'absolute',
-            right: 14,
+            right: rightPanelOpen && isMobile ? 334 : 14,
             top: '50%',
             transform: 'translateY(-50%)',
             zIndex: 350,
@@ -3435,7 +3544,7 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
             background: 'rgba(15, 23, 42, 0.65)',
             color: '#a5b4fc',
             backdropFilter: 'blur(8px)',
-            display: 'flex',
+            display: isMobile ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
@@ -3503,13 +3612,14 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
           </div>
         )}
 
-        <div style={{ ...S.badge, bottom: bottomPanelOpen ? 124 : 14, transition: 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+        <div style={{ ...S.badge, display: isMobile ? 'none' : 'flex', bottom: bottomPanelOpen ? 124 : 14, transition: 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
           <span style={{ ...S.dot, background: '#6366f1', marginRight: 6 }} />
           Drag shapes & constraints · Drop anywhere
         </div>
 
         {/* Persistent Bottom Observables & Telemetry Dock */}
         <div style={{
+          display: isMobile ? 'none' : 'flex',
           position: 'absolute',
           bottom: 0,
           left: 0,
@@ -3518,7 +3628,6 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
           background: 'rgba(15, 23, 42, 0.92)',
           backdropFilter: 'blur(20px)',
           borderTop: bottomPanelOpen ? '1px solid rgba(255, 255, 255, 0.08)' : '0px solid transparent',
-          display: 'flex',
           alignItems: 'stretch',
           zIndex: 340,
           fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif',
@@ -3722,7 +3831,7 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
         </div>
 
         {/* Floating Expand Button when Collapsed */}
-        {!bottomPanelOpen && (
+        {!bottomPanelOpen && !isMobile && (
           <button
             onClick={() => setBottomPanelOpen(true)}
             style={{
@@ -3789,7 +3898,7 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
               ? '0 0 16px rgba(91, 95, 255, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3)'
               : '0 4px 12px rgba(0, 0, 0, 0.35)',
             backdropFilter: 'blur(12px)',
-            display: 'flex',
+            display: isMobile ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
@@ -3827,7 +3936,7 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
 
         {/* Floating AI Response Panel — hidden when tutor is off */}
         <AnimatePresence mode="wait">
-          {tutorEnabled && currentExplanation && (
+          {tutorEnabled && currentExplanation && !isMobile && (
             /* Expanded Full Workspace AI Inspector Panel */
             <motion.div
               key="tutor-expanded"
@@ -4679,12 +4788,1190 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
             </>
           );
         })()}
+        {/* Mobile-specific Canvas overlays */}
+        {isMobile && activeMobileTab === 'canvas' && (
+          <>
+            {/* Top Engine status bar */}
+            <div style={{
+              position: 'absolute',
+              top: '12px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 250,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '20px',
+              padding: '6px 14px',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              pointerEvents: 'auto',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: running ? '#10b981' : '#f59e0b',
+                  boxShadow: running ? '0 0 8px #10b981' : '0 0 8px #f59e0b'
+                }} />
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#cbd5e1' }}>
+                  Engine: {running ? 'Running' : 'Paused'}
+                </span>
+              </div>
+              <div style={{ width: '1px', height: '12px', background: 'rgba(255, 255, 255, 0.15)' }} />
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', fontFamily: 'monospace' }}>
+                Time: {formatTime(simTimeRef.current)}
+              </span>
+            </div>
+
+            {/* Overlaid top-left telemetry block */}
+            <div style={{
+              position: 'absolute',
+              top: '12px',
+              left: '12px',
+              zIndex: 250,
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(34, 197, 94, 0.25)',
+              borderRadius: '12px',
+              padding: '8px 12px',
+              width: '120px',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            }}>
+              <div style={{ fontSize: '8px', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>
+                Velocity
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 900, color: '#ffffff', fontFamily: 'monospace' }}>
+                {(() => {
+                  const activeId = interactionRef.current?.selection.getSelectedId();
+                  const activeObj = activeId ? storeRef.current?.getObject(activeId) : null;
+                  const targetObj = activeObj || storeRef.current?.getAllObjects().find(o => !o.body.isStatic && o.id !== 'ground' && !o.id.startsWith('wall'));
+                  const vel = targetObj?.body ? Math.hypot(targetObj.body.velocity.x, targetObj.body.velocity.y) : 0;
+                  return vel.toFixed(1);
+                })()} <span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>m/s</span>
+              </div>
+              <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', marginTop: '6px', overflow: 'hidden' }}>
+                <div style={{
+                  width: `${Math.min(100, ((() => {
+                    const activeId = interactionRef.current?.selection.getSelectedId();
+                    const activeObj = activeId ? storeRef.current?.getObject(activeId) : null;
+                    const targetObj = activeObj || storeRef.current?.getAllObjects().find(o => !o.body.isStatic && o.id !== 'ground' && !o.id.startsWith('wall'));
+                    return targetObj?.body ? Math.hypot(targetObj.body.velocity.x, targetObj.body.velocity.y) : 0;
+                  })() / 30) * 100)}%`,
+                  height: '100%',
+                  background: '#34d399',
+                  borderRadius: '2px',
+                  transition: 'width 0.1s ease',
+                }} />
+              </div>
+            </div>
+
+            {/* Toolbox button */}
+            <button
+              onClick={() => setMobileToolboxOpen(true)}
+              style={{
+                position: 'absolute',
+                bottom: '84px',
+                right: '16px',
+                zIndex: 250,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(15, 23, 42, 0.8)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '20px',
+                padding: '8px 16px',
+                color: '#cbd5e1',
+                fontSize: '12px',
+                fontWeight: 700,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <Settings size={14} />
+              Toolbox
+            </button>
+
+            {/* + action button */}
+            <button
+              onClick={() => setActiveMobileTab('assets')}
+              style={{
+                position: 'absolute',
+                bottom: '16px',
+                right: '16px',
+                zIndex: 250,
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px',
+                fontWeight: 400,
+                boxShadow: '0 8px 24px rgba(79, 70, 229, 0.5)',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              +
+            </button>
+
+            {/* Ask about gravity query input button */}
+            <button
+              onClick={() => setMobileAiInputOpen(true)}
+              style={{
+                position: 'absolute',
+                bottom: '16px',
+                left: '16px',
+                right: '88px',
+                zIndex: 250,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'rgba(15, 23, 42, 0.8)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '24px',
+                height: '56px',
+                padding: '0 20px',
+                color: '#cbd5e1',
+                fontSize: '13.5px',
+                fontWeight: 500,
+                textAlign: 'left',
+                boxShadow: '0 4px 20px rgba(99, 102, 241, 0.15)',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <Sparkles size={16} color="#818cf8" />
+              Ask about gravity...
+            </button>
+          </>
+        )}
       </div>
+
+      {/* Mobile Assets, Data, AI Tab views */}
+      {isMobile && activeMobileTab === 'assets' && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          background: '#0b0f19',
+          overflowY: 'auto',
+          padding: '16px',
+          color: '#ffffff',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          flex: 1,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.02em' }}>Asset Library</h2>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.05)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+            }}>
+              <Search size={16} color="#94a3b8" />
+            </div>
+          </div>
+
+          <div style={{ position: 'relative', marginBottom: '16px' }}>
+            <input
+              type="text"
+              placeholder="Search assets..."
+              value={assetSearchQuery}
+              onChange={(e) => setAssetSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                height: '42px',
+                background: 'rgba(0, 0, 0, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '10px',
+                padding: '0 12px 0 36px',
+                color: '#ffffff',
+                fontSize: '13px',
+                outline: 'none',
+              }}
+            />
+            <Search size={14} color="#64748b" style={{ position: 'absolute', left: '12px', top: '14px' }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '20px', paddingBottom: '4px' }}>
+            {['Shapes', 'Physics', 'Structures', 'Lab'].map((cat) => {
+              const isActive = activeAssetCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActiveAssetCategory(cat)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: 'none',
+                    background: isActive ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'rgba(255, 255, 255, 0.05)',
+                    color: isActive ? '#ffffff' : '#64748b',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: isActive ? '0 4px 12px rgba(79, 70, 229, 0.3)' : 'none',
+                    outline: 'none',
+                  }}
+                >
+                  {cat === 'Shapes' && '🔺 '}
+                  {cat === 'Physics' && '⚡ '}
+                  {cat === 'Structures' && '🧱 '}
+                  {cat === 'Lab' && '🔬 '}
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '80px' }}>
+            {Object.entries(assetsRegistry).map(([cat, list]) => {
+              if (cat !== activeAssetCategory) return null;
+              return list
+                .filter(a => a.name.toLowerCase().includes(assetSearchQuery.toLowerCase()))
+                .map((asset) => {
+                  const isCircle = asset.spawnType === 'circle';
+                  const fill = getHexColor(asset.spawnConfig.fillColor);
+                  const stroke = getHexColor(asset.spawnConfig.strokeColor);
+                  return (
+                    <div
+                      key={asset.id}
+                      onClick={async () => {
+                        const wrap = canvasWrapRef.current;
+                        let worldX = 400;
+                        let worldY = 300;
+                        if (wrap) {
+                          const r = wrap.getBoundingClientRect();
+                          const cssX = r.width / 2;
+                          const cssY = r.height / 2;
+                          worldX = (cssX - panXRef.current) / zoomRef.current;
+                          worldY = (cssY - panYRef.current) / zoomRef.current;
+                        }
+                        await handleAssetDrop(asset, worldX, worldY);
+                        setActiveMobileTab('canvas');
+                      }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                        borderRadius: '14px',
+                        padding: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {isCircle ? (
+                        <div style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '50%',
+                          background: `radial-gradient(circle at 30% 30%, ${stroke}, ${fill})`,
+                          boxShadow: `0 8px 20px ${fill}33`,
+                        }} />
+                      ) : (
+                        <div style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '8px',
+                          transform: 'rotate(10deg)',
+                          background: `linear-gradient(135deg, ${stroke}, ${fill})`,
+                          boxShadow: `0 8px 20px ${fill}33`,
+                        }} />
+                      )}
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1', textAlign: 'center' }}>
+                        {asset.name}
+                      </span>
+                    </div>
+                  );
+                });
+            })}
+          </div>
+        </div>
+      )}
+
+      {isMobile && activeMobileTab === 'data' && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          background: '#0b0f19',
+          overflowY: 'auto',
+          padding: '16px',
+          color: '#ffffff',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          flex: 1,
+        }}>
+          <div style={{
+            display: 'flex',
+            background: 'rgba(0, 0, 0, 0.4)',
+            borderRadius: '10px',
+            padding: '3px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            marginBottom: '20px',
+          }}>
+            <button
+              onClick={() => setDataTabType('object')}
+              style={{
+                flex: 1,
+                padding: '10px 0',
+                borderRadius: '8px',
+                border: 'none',
+                background: dataTabType === 'object' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+                color: dataTabType === 'object' ? '#fff' : '#64748b',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.25s ease',
+                boxShadow: dataTabType === 'object' ? '0 4px 12px rgba(79, 70, 229, 0.3)' : 'none',
+                outline: 'none',
+              }}
+            >
+              ACTIVE OBJECT
+            </button>
+            <button
+              onClick={() => setDataTabType('global')}
+              style={{
+                flex: 1,
+                padding: '10px 0',
+                borderRadius: '8px',
+                border: 'none',
+                background: dataTabType === 'global' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+                color: dataTabType === 'global' ? '#fff' : '#64748b',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.25s ease',
+                boxShadow: dataTabType === 'global' ? '0 4px 12px rgba(79, 70, 229, 0.3)' : 'none',
+                outline: 'none',
+              }}
+            >
+              GLOBAL SYSTEM
+            </button>
+          </div>
+
+          {(() => {
+            const activeId = interactionRef.current?.selection.getSelectedId();
+            const activeObj = activeId ? storeRef.current?.getObject(activeId) : null;
+            const targetObj = activeObj || storeRef.current?.getAllObjects().find(o => !o.body.isStatic && o.id !== 'ground' && !o.id.startsWith('wall'));
+            const speedVal = targetObj?.body ? Math.hypot(targetObj.body.velocity.x, targetObj.body.velocity.y) : 0;
+            const massVal = targetObj?.body ? targetObj.body.mass : 0;
+
+            if (dataTabType === 'object') {
+              return (
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  marginBottom: '80px',
+                }}>
+                  {targetObj ? (
+                    <>
+                      <div style={{
+                        background: 'rgba(255,255,255,0.01)',
+                        border: '1px solid rgba(255,255,255,0.03)',
+                        borderRadius: '12px',
+                        padding: '14px',
+                      }}>
+                        <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#38bdf8', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Velocity</span>
+                          <span style={{ fontSize: '11px' }}>🌀</span>
+                        </div>
+                        <div style={{ fontSize: '24px', fontWeight: 900, fontFamily: 'monospace', marginBottom: '12px' }}>
+                          {speedVal.toFixed(2)} <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>m/s</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '40px', padding: '4px 0' }}>
+                          {velocityHistory.map((val, idx) => {
+                            const max = Math.max(...velocityHistory, 1);
+                            const pct = (val / max) * 100;
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  flex: 1,
+                                  height: `${Math.max(10, pct)}%`,
+                                  background: idx === velocityHistory.length - 1 ? 'linear-gradient(to top, #4f46e5, #818cf8)' : 'rgba(99, 102, 241, 0.3)',
+                                  borderRadius: '2px',
+                                  transition: 'height 0.2s ease',
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div style={{
+                        background: 'rgba(255,255,255,0.01)',
+                        border: '1px solid rgba(255,255,255,0.03)',
+                        borderRadius: '12px',
+                        padding: '14px',
+                      }}>
+                        <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#34d399', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Acceleration (Gravity)</span>
+                          <span style={{ fontSize: '11px' }}>📈</span>
+                        </div>
+                        <div style={{ fontSize: '24px', fontWeight: 900, fontFamily: 'monospace', marginBottom: '12px' }}>
+                          {(gravityMode === 'linear' ? GRAVITY_VALUES[gravity] * 9.81 : 0.00).toFixed(2)} <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>m/s²</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="25"
+                          step="0.1"
+                          value={(gravityMode === 'linear' ? GRAVITY_VALUES[gravity] * 9.81 : 0.00)}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            const scale = val / 9.81;
+                            propertyControllerRef.current?.updateGlobalGravity(scale);
+                            let closest: GravityPreset = 'earth';
+                            let minDiff = Infinity;
+                            for (const [k, v] of Object.entries(GRAVITY_VALUES)) {
+                              const diff = Math.abs(v - scale);
+                              if (diff < minDiff) {
+                                minDiff = diff;
+                                closest = k as GravityPreset;
+                              }
+                            }
+                            setGravity(closest);
+                          }}
+                          style={{
+                            width: '100%',
+                            accentColor: '#10b981',
+                            cursor: 'pointer',
+                            height: '6px',
+                            background: 'rgba(255,255,255,0.1)',
+                            borderRadius: '3px',
+                            outline: 'none',
+                          }}
+                        />
+                      </div>
+
+                      <div style={{
+                        background: 'rgba(255,255,255,0.01)',
+                        border: '1px solid rgba(255,255,255,0.03)',
+                        borderRadius: '12px',
+                        padding: '14px',
+                      }}>
+                        <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#a78bfa', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Momentum</span>
+                          <span style={{ fontSize: '11px' }}>⚖️</span>
+                        </div>
+                        <div style={{ fontSize: '24px', fontWeight: 900, fontFamily: 'monospace', marginBottom: '12px' }}>
+                          {(massVal * speedVal).toFixed(1)} <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>kg·m/s</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          {[1, 2, 3, 4, 5, 6].map((i) => {
+                            const m = massVal * speedVal;
+                            const limit = i * 20;
+                            const filled = m >= limit;
+                            return (
+                              <div
+                                key={i}
+                                style={{
+                                  flex: 1,
+                                  height: '14px',
+                                  borderRadius: '3px',
+                                  background: filled ? '#a78bfa' : 'rgba(255,255,255,0.05)',
+                                  boxShadow: filled ? '0 0 8px rgba(167,139,250,0.5)' : 'none',
+                                  transition: 'background 0.2s ease',
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div style={{
+                        background: 'rgba(255,255,255,0.01)',
+                        border: '1px solid rgba(255,255,255,0.03)',
+                        borderRadius: '12px',
+                        padding: '14px',
+                      }}>
+                        <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#ec4899', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Kinetic Energy</span>
+                          <span style={{ fontSize: '11px' }}>⚡</span>
+                        </div>
+                        <div style={{ fontSize: '24px', fontWeight: 900, fontFamily: 'monospace', marginBottom: '12px' }}>
+                          {(0.5 * massVal * speedVal * speedVal).toFixed(0)} <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>J</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{
+                              width: `${Math.min(100, (0.5 * massVal * speedVal * speedVal / 200) * 100)}%`,
+                              height: '100%',
+                              background: 'linear-gradient(to right, #ec4899, #f43f5e)',
+                              transition: 'width 0.1s ease',
+                            }} />
+                          </div>
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#ec4899', fontFamily: 'monospace' }}>
+                            {Math.min(100, Math.round((0.5 * massVal * speedVal * speedVal / 200) * 100))}%
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{
+                        background: 'rgba(99, 102, 241, 0.05)',
+                        border: '1px solid rgba(99, 102, 241, 0.15)',
+                        borderRadius: '14px',
+                        padding: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Sparkles size={16} color="#c084fc" />
+                          <span style={{ fontSize: '13px', fontWeight: 800, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Lab Assistant</span>
+                        </div>
+                        <p style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.6', margin: 0 }}>
+                          {currentExplanation?.insight?.explanation ? currentExplanation.insight.explanation : (
+                            <>
+                              The current system exhibits stable motion. Based on the {speedVal.toFixed(1)} m/s velocity peak, the object's trajectory is predictable. Adjust acceleration gravity values to study gravity-assisted orbits or collision behaviors.
+                            </>
+                          )}
+                        </p>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>PREDICTION ACTIVE</span>
+                          <span style={{ fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: '#94a3b8' }}>SYNC: 99.2%</span>
+                        </div>
+                      </div>
+
+                      <div style={{
+                        borderRadius: '14px',
+                        padding: '24px 16px',
+                        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.4)), url("https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=600&auto=format&fit=crop&q=60") center/cover',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'flex-end',
+                        height: '100px',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}>
+                        <span style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Current Environment</span>
+                        <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', margin: '4px 0 0' }}>Quantum Chamber A-12</h4>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{
+                      padding: '30px 20px',
+                      textAlign: 'center',
+                      color: '#64748b',
+                      fontSize: '13px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      <span>📦</span>
+                      <span>No active dynamic objects. Go to the Canvas or Assets tab to spawn objects, then select one to view its real-time telemetry!</span>
+                    </div>
+                  )}
+                </div>
+              );
+            } else {
+              return (
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  marginBottom: '80px',
+                }}>
+                  <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '10px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#cbd5e1' }}>Total Bodies</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#818cf8', fontFamily: 'monospace' }}>{bodyCount}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '10px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#cbd5e1' }}>Gravity Mode</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#818cf8' }}>{gravityMode === 'radial' ? '🌌 Orbital Gravity' : '🍎 Linear Gravity'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '10px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#cbd5e1' }}>Sim Clock</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#818cf8', fontFamily: 'monospace' }}>{formatTime(simTimeRef.current)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '10px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#cbd5e1' }}>Boundary System</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#818cf8' }}>{boundaryMode.toUpperCase()}</span>
+                  </div>
+                </div>
+              );
+            }
+          })()}
+        </div>
+      )}
+
+      {isMobile && activeMobileTab === 'ai' && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          background: '#0b0f19',
+          overflowY: 'auto',
+          padding: '16px',
+          color: '#ffffff',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          flex: 1,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.02em' }}>AI Explanation</h2>
+            <button
+              onClick={() => setActiveMobileTab('canvas')}
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: 'none',
+                color: '#ffffff',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div style={{
+            background: 'rgba(168, 85, 247, 0.05)',
+            border: '1px solid rgba(168, 85, 247, 0.2)',
+            borderRadius: '16px',
+            padding: '16px',
+            marginBottom: '20px',
+          }}>
+            <span style={{ fontSize: '9px', fontWeight: 800, color: '#c084fc', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Simulation Analysis</span>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '6px 0 10px', color: '#ffffff' }}>
+              {currentExplanation?.insight?.title ? currentExplanation.insight.title : 'Elastic Collision Observed'}
+            </h3>
+            <p style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.6', margin: 0 }}>
+              {currentExplanation?.insight?.explanation ? currentExplanation.insight.explanation : 'The interaction between Particle A and Particle B resulted in a perfect momentum exchange with negligible energy loss.'}
+            </p>
+          </div>
+
+          <h4 style={{ fontSize: '9px', fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '14px' }}>
+            🎬 What Happened
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingLeft: '8px', borderLeft: '1px solid rgba(255,255,255,0.08)', marginLeft: '12px', marginBottom: '30px' }}>
+            {currentExplanation?.insight?.effects && currentExplanation.insight.effects.length > 0 ? (
+              currentExplanation.insight.effects.map((effect: string, idx: number) => (
+                <div key={idx} style={{ position: 'relative', paddingLeft: '20px' }}>
+                  <div style={{
+                    position: 'absolute',
+                    left: '-23px',
+                    top: '0px',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: '#0b0f19',
+                    border: '2px solid #a855f7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    color: '#c084fc',
+                  }}>
+                    {String(idx + 1).padStart(2, '0')}
+                  </div>
+                  <p style={{ fontSize: '12.5px', color: '#cbd5e1', lineHeight: '1.55', margin: 0 }}>
+                    {effect}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <>
+                <div style={{ position: 'relative', paddingLeft: '20px' }}>
+                  <div style={{
+                    position: 'absolute',
+                    left: '-23px',
+                    top: '0px',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: '#0b0f19',
+                    border: '2px solid #a855f7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    color: '#c084fc',
+                  }}>
+                    01
+                  </div>
+                  <h5 style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 4px', color: '#ffffff' }}>Contact Initialized</h5>
+                  <p style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.5', margin: 0 }}>
+                    The collision occurred at t = 2.45s. The velocity vectors were perfectly aligned for a head-on impact.
+                  </p>
+                </div>
+                <div style={{ position: 'relative', paddingLeft: '20px' }}>
+                  <div style={{
+                    position: 'absolute',
+                    left: '-23px',
+                    top: '0px',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: '#0b0f19',
+                    border: '2px solid #a855f7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    color: '#c084fc',
+                  }}>
+                    02
+                  </div>
+                  <h5 style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 4px', color: '#ffffff' }}>Force Distribution</h5>
+                  <p style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.5', margin: 0 }}>
+                    Kinetic energy peaked at 450.2 J as the electromagnetic repulsion between particles reached its maximum threshold.
+                  </p>
+                </div>
+                <div style={{ position: 'relative', paddingLeft: '20px' }}>
+                  <div style={{
+                    position: 'absolute',
+                    left: '-23px',
+                    top: '0px',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: '#0b0f19',
+                    border: '2px solid #a855f7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    color: '#c084fc',
+                  }}>
+                    03
+                  </div>
+                  <h5 style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 4px', color: '#ffffff' }}>Post-Collision State</h5>
+                  <p style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.5', margin: 0 }}>
+                    Particle A transferred 99% of its velocity to Particle B, returning to rest post-contact.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+            <button
+              onClick={() => setActiveMobileTab('data')}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                height: '52px',
+                background: '#818cf8',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#ffffff',
+                fontSize: '13.5px',
+                fontWeight: 700,
+                boxShadow: '0 4px 16px rgba(129, 140, 248, 0.35)',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              📈 Show Graph
+            </button>
+            <button
+              onClick={() => {
+                if (currentExplanation?.insight?.formula) {
+                  alert(`Formulas:\n${currentExplanation.insight.formula}`);
+                } else {
+                  alert('Calculations:\nEk = 1/2 * m * v²\np = m * v');
+                }
+              }}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                height: '52px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '12px',
+                color: '#cbd5e1',
+                fontSize: '13.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              ∑ Calculations
+            </button>
+          </div>
+
+          <button
+            onClick={() => {
+              alert('Simulation state saved to laboratory history!');
+            }}
+            style={{
+              width: '100%',
+              height: '48px',
+              background: 'transparent',
+              border: 'none',
+              color: '#cbd5e1',
+              fontSize: '11.5px',
+              fontWeight: 800,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              marginBottom: '80px',
+              outline: 'none',
+            }}
+          >
+            ⏱️ Save to History
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Input Overlays */}
+      <AnimatePresence>
+        {isMobile && mobileAiInputOpen && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 500,
+            background: 'rgba(9, 13, 22, 0.85)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+          }}>
+            <div 
+              onClick={() => setMobileAiInputOpen(false)}
+              style={{ flex: 1 }} 
+            />
+            <div style={{
+              background: '#0f172a',
+              borderTop: '1px solid rgba(255,255,255,0.08)',
+              borderTopLeftRadius: '20px',
+              borderTopRightRadius: '20px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ask AI Assistant</span>
+                <button
+                  onClick={() => setMobileAiInputOpen(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer', outline: 'none' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <textarea
+                placeholder="Ask about gravity, collision forces, orbital resonance..."
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAiQuery();
+                    setMobileAiInputOpen(false);
+                    setActiveMobileTab('ai');
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  height: '100px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  outline: 'none',
+                  resize: 'none',
+                }}
+              />
+              <button
+                onClick={async () => {
+                  await handleAiQuery();
+                  setMobileAiInputOpen(false);
+                  setActiveMobileTab('ai');
+                }}
+                disabled={aiLoading}
+                style={{
+                  height: '46px',
+                  background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                  outline: 'none',
+                }}
+              >
+                {aiLoading ? 'Thinking...' : 'Generate Simulation ✦'}
+              </button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isMobile && mobileToolboxOpen && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 500,
+            background: 'rgba(9, 13, 22, 0.85)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+          } as any}>
+            <div 
+              onClick={() => setMobileToolboxOpen(false)}
+              style={{ flex: 1 }} 
+            />
+            <div style={{
+              background: '#0f172a',
+              borderTop: '1px solid rgba(255,255,255,0.08)',
+              borderTopLeftRadius: '20px',
+              borderTopRightRadius: '20px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              maxHeight: '80%',
+              overflowY: 'auto',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sandbox Toolbox</span>
+                <button
+                  onClick={() => setMobileToolboxOpen(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer', outline: 'none' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => { togglePlay(); setMobileToolboxOpen(false); }}
+                  style={{
+                    flex: 1,
+                    height: '46px',
+                    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                    border: 'none',
+                    borderRadius: '10px',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    outline: 'none',
+                  }}
+                >
+                  {running ? '⏸ Pause Simulation' : '▶ Resume Simulation'}
+                </button>
+                <button
+                  onClick={() => { handleReset(); setMobileToolboxOpen(false); }}
+                  style={{
+                    width: '46px',
+                    height: '46px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '10px',
+                    color: '#cbd5e1',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    outline: 'none',
+                  }}
+                >
+                  ↺
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Gravity Presets</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {(Object.keys(GRAVITY_VALUES) as GravityPreset[]).map((preset) => {
+                    const isActive = gravity === preset && gravityMode === 'linear';
+                    return (
+                      <button
+                        key={preset}
+                        onClick={() => {
+                          changeGravity(preset);
+                          setGravityMode('linear');
+                          setMobileToolboxOpen(false);
+                        }}
+                        style={{
+                          padding: '8px 0',
+                          borderRadius: '8px',
+                          border: isActive ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
+                          background: isActive ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                          color: isActive ? '#a5b4fc' : '#64748b',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          outline: 'none',
+                        }}
+                      >
+                        {preset.toUpperCase()} ({GRAVITY_VALUES[preset]}G)
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Simulation Physics Mode</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => { setGravityMode('linear'); setMobileToolboxOpen(false); }}
+                    style={{
+                      flex: 1,
+                      padding: '8px 0',
+                      borderRadius: '8px',
+                      border: gravityMode === 'linear' ? '1px solid rgba(14, 165, 233, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
+                      background: gravityMode === 'linear' ? 'rgba(14, 165, 233, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                      color: gravityMode === 'linear' ? '#38bdf8' : '#64748b',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      outline: 'none',
+                    }}
+                  >
+                    🍎 Linear Gravity
+                  </button>
+                  <button
+                    onClick={() => { setGravityMode('radial'); setMobileToolboxOpen(false); }}
+                    style={{
+                      flex: 1,
+                      padding: '8px 0',
+                      borderRadius: '8px',
+                      border: gravityMode === 'radial' ? '1px solid rgba(167, 139, 250, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)',
+                      background: gravityMode === 'radial' ? 'rgba(167, 139, 250, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                      color: gravityMode === 'radial' ? '#c084fc' : '#64748b',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      outline: 'none',
+                    }}
+                  >
+                    🌌 Orbital Gravity
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Bottom Navigation Bar */}
+      {isMobile && (
+        <div style={{
+          display: 'flex',
+          height: '64px',
+          background: '#090d16',
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          zIndex: 400,
+          flexShrink: 0,
+          userSelect: 'none',
+        }}>
+          {[
+            { id: 'canvas', label: 'Canvas', icon: <CanvasIcon /> },
+            { id: 'assets', label: 'Assets', icon: <AssetsIcon /> },
+            { id: 'data', label: 'Data', icon: <DataIcon /> },
+            { id: 'ai', label: 'AI', icon: <Sparkles size={20} /> },
+          ].map((tab) => {
+            const isActive = activeMobileTab === tab.id;
+            let activeColor = '#6366f1';
+            let activeBg = 'rgba(99, 102, 241, 0.1)';
+            if (tab.id === 'canvas') { activeColor = '#10b981'; activeBg = 'rgba(16, 185, 129, 0.1)'; }
+            else if (tab.id === 'data') { activeColor = '#06b6d4'; activeBg = 'rgba(6, 182, 212, 0.1)'; }
+            else if (tab.id === 'ai') { activeColor = '#a855f7'; activeBg = 'rgba(168, 85, 247, 0.1)'; }
+
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveMobileTab(tab.id as any)}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: isActive ? activeColor : '#64748b',
+                  cursor: 'pointer',
+                  padding: '4px 0',
+                  outline: 'none',
+                  transition: 'color 0.2s ease',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '4px 12px',
+                  borderRadius: '16px',
+                  background: isActive ? activeBg : 'transparent',
+                  transition: 'background 0.2s ease',
+                }}>
+                  {tab.icon}
+                </div>
+                <span style={{ fontSize: '10px', fontWeight: isActive ? 800 : 500 }}>
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── Right panel ─────────────────────────────────────── */}
       <aside
         style={{
           ...S.rightSidebar,
+          display: isMobile ? 'none' : (rightPanelOpen ? 'block' : 'none'),
+          position: isMobile ? 'absolute' : 'relative',
+          right: 0,
+          top: 0,
+          zIndex: isMobile ? 300 : 'auto',
           width: rightPanelOpen ? 320 : 0,
           minWidth: rightPanelOpen ? 300 : 0,
           padding: rightPanelOpen ? '20px 16px' : 0,
@@ -4819,7 +6106,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex', width: '100%', height: '100%', minHeight: 560,
     background: '#090d16', color: '#0f172a',
     fontFamily: '"Plus Jakarta Sans",system-ui,sans-serif',
-    overflow: 'hidden', userSelect: 'none'
+    overflow: 'hidden', userSelect: 'none', position: 'relative'
   },
   panel: {
     width: 288, minWidth: 268, height: '100%', padding: '20px 16px',
