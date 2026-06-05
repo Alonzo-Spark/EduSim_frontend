@@ -53,7 +53,7 @@ function LawsOfMotionLab() {
             Three interactive simulations to feel inertia, force, and reaction.
           </p>
         </div>
-        <div className="glass rounded-2xl p-1 flex gap-1">
+        <div className="glass rounded-2xl p-1 flex flex-wrap sm:flex-nowrap gap-1 w-full sm:w-auto justify-center sm:justify-start">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -61,7 +61,7 @@ function LawsOfMotionLab() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${
                   active
                     ? "bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-blue)] text-white glow-purple"
                     : "hover:bg-white/5 text-muted-foreground"

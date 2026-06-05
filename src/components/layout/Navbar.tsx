@@ -3,47 +3,111 @@ import { GlobalSearch } from "./GlobalSearch";
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { motion } from "framer-motion";
 import { useRouterState } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 
 export function Navbar() {
-  const { setMobileOpen, isCollapsed } = useSidebarStore();
+  const { setMobileOpen } = useSidebarStore();
+  const [isDesktop, setIsDesktop] = useState(false);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  if (pathname.startsWith("/sandbox")) {
+
+  useEffect(() => {
+    const updateDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    updateDesktop();
+    window.addEventListener("resize", updateDesktop);
+    return () => window.removeEventListener("resize", updateDesktop);
+  }, []);
+
+  if (pathname.startsWith("/sandbox") || pathname.startsWith("/tutor")) {
     return null;
   }
+
   const hideSearch = pathname.startsWith("/tutor");
 
+  const getPageTitle = (path: string) => {
+    if (path.includes("/dashboard")) return "Home";
+    if (path.includes("/profile")) return "Profile";
+    if (path.includes("/settings")) return "Settings";
+    return "EduSim";
+  };
+
+  if (isDesktop) {
+    return (
+      <div className="fixed top-4 left-0 right-0 z-[50] pointer-events-none px-4 md:px-0">
+        <motion.header
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="mx-auto max-w-7xl w-full h-14 flex items-center justify-between px-6 pointer-events-none"
+        >
+          <div className="flex items-center gap-3 shrink-0 pointer-events-auto">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="lg:hidden w-11 h-11 rounded-xl flex items-center justify-center bg-card border border-border shadow-sm hover:bg-secondary/50 transition-all hover:scale-105 active:scale-95"
+            >
+              <Menu className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </div>
+
+          {/* Centered Search Bar Section */}
+          <div className="flex-1 flex justify-center min-w-0 px-4 pointer-events-auto">
+            <div className="w-full max-w-3xl">
+              {!hideSearch && <GlobalSearch />}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 pointer-events-auto">
+            <button className="hidden sm:flex w-11 h-11 rounded-xl items-center justify-center bg-card border border-border shadow-sm hover:bg-secondary/50 transition-all relative hover:scale-105 active:scale-95 group">
+              <Bell className="w-5 h-5 text-muted-foreground group-hover:text-foreground" />
+              <span className="absolute top-3.5 right-3.5 w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
+            </button>
+
+            <button className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--neon-purple)] to-[var(--neon-blue)] flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all border border-border">
+              <User className="w-5 h-5 text-white" />
+            </button>
+          </div>
+        </motion.header>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed top-4 left-0 right-0 z-[50] pointer-events-none px-4 md:px-0">
-      <motion.header 
+    <div className="fixed top-4 left-0 right-0 z-[50] pointer-events-none px-4">
+      <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="mx-auto max-w-7xl w-full h-14 flex items-center justify-between px-6 pointer-events-none"
+        className="mx-auto max-w-5xl w-full h-14 flex items-center justify-between gap-3 sm:gap-6 px-4 border border-border/80 bg-card/65 backdrop-blur-xl rounded-[24px] shadow-sm pointer-events-auto"
       >
-        <div className="flex items-center gap-3 shrink-0 pointer-events-auto">
-          <button 
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Mobile Menu Toggle (Hamburger Menu) */}
+          <button
             onClick={() => setMobileOpen(true)}
-            className="lg:hidden w-11 h-11 rounded-xl flex items-center justify-center bg-card border border-border shadow-sm hover:bg-secondary/50 transition-all hover:scale-105 active:scale-95"
+            className="lg:hidden w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer"
           >
-            <Menu className="w-5 h-5 text-muted-foreground" />
+            <Menu className="w-5 h-5" />
           </button>
+
+          {/* Page Title */}
+          <span className="hidden sm:block text-base sm:text-lg font-bold tracking-tight text-foreground">
+            {getPageTitle(pathname)}
+          </span>
         </div>
 
         {/* Centered Search Bar Section */}
-        <div className="flex-1 flex justify-center min-w-0 px-4 pointer-events-auto">
-          <div className="w-full max-w-3xl">
-            {!hideSearch && <GlobalSearch />}
-          </div>
+        <div className="flex-1 flex justify-center min-w-0 max-w-lg mx-auto">
+          <GlobalSearch />
         </div>
-        
-        <div className="flex items-center gap-3 shrink-0 pointer-events-auto">
-          <button className="hidden sm:flex w-11 h-11 rounded-xl items-center justify-center bg-card border border-border shadow-sm hover:bg-secondary/50 transition-all relative hover:scale-105 active:scale-95 group">
-            <Bell className="w-5 h-5 text-muted-foreground group-hover:text-foreground" />
-            <span className="absolute top-3.5 right-3.5 w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
+
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Notifications Bell */}
+          <button className="hidden sm:flex w-10 h-10 rounded-full items-center justify-center bg-card border border-border/80 shadow-sm hover:bg-secondary/50 transition-all hover:scale-105 active:scale-95 relative group cursor-pointer">
+            <Bell className="w-4.5 h-4.5 text-muted-foreground group-hover:text-foreground" />
+            <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
           </button>
 
-          <button className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--neon-purple)] to-[var(--neon-blue)] flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all border border-border">
-            <User className="w-5 h-5 text-white" />
+          {/* User Profile Button */}
+          <button className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer">
+            <User className="w-4 h-4" />
           </button>
         </div>
       </motion.header>

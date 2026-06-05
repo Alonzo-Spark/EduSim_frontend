@@ -86,12 +86,12 @@ function SettingsPage() {
             </section>
           </div>
 
-          <div className="bg-destructive/5 p-6 border-t border-destructive/20 flex items-center justify-between">
+          <div className="bg-destructive/5 p-6 border-t border-destructive/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <p className="text-sm font-bold text-destructive">Danger Zone</p>
               <p className="text-xs text-destructive/80">Once you delete your account, there is no going back.</p>
             </div>
-            <Button variant="destructive" className="rounded-xl px-6">
+            <Button variant="destructive" className="rounded-xl px-6 w-full sm:w-auto justify-center">
               <LogOut className="w-4 h-4 mr-2" /> Logout
             </Button>
           </div>

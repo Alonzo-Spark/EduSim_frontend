@@ -30,7 +30,7 @@ function SubjectsPage() {
         {c.name} <span className="text-muted-foreground text-lg font-normal">— Subjects</span>
       </h1>
       <p className="text-muted-foreground mb-8">{c.description}</p>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {subjects.map((s, i) => {
           const Icon = (Icons as any)[s.icon || "BookOpen"] ?? Icons.BookOpen;
           return (

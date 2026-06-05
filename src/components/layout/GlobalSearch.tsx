@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X, GraduationCap, Loader } from "lucide-react";
+import { Search, X, Loader } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "@tanstack/react-router";
 import { getApiUrl } from "@/config/api";
@@ -156,7 +156,7 @@ export function GlobalSearch() {
 
   const formatResultDisplay = (result: SearchResult): string => {
     if (result.type === "topic") {
-      return `${result.chapter} → ${result.topic}`;
+      return result.topic || "";
     } else if (result.type === "chapter") {
       return result.chapter || "";
     } else if (result.type === "subject") {
@@ -168,6 +168,9 @@ export function GlobalSearch() {
 
   const formatResultSubtext = (result: SearchResult): string => {
     const parts: string[] = [];
+    if (result.type === "topic" && result.chapter) {
+      parts.push(result.chapter);
+    }
     if (result.subject) parts.push(result.subject);
     if (result.class_name) parts.push(result.class_name);
     return parts.join(" • ");
@@ -224,20 +227,30 @@ export function GlobalSearch() {
     setIsMac(typeof window !== "undefined" && navigator.platform.toUpperCase().indexOf("MAC") >= 0);
   }, []);
 
+  const [placeholder, setPlaceholder] = useState("Search...");
+  useEffect(() => {
+    const handleResize = () => {
+      setPlaceholder(window.innerWidth < 640 ? "Search..." : "Search curriculum topics, subjects or formulas...");
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
-    <div className="relative flex-1 max-w-4xl group" ref={containerRef}>
+    <div className="relative w-full min-w-0 flex-1 max-w-4xl group animate-fade-in" ref={containerRef}>
       <motion.div
         animate={{ 
           scale: isOpen ? 1.01 : 1,
           y: isOpen ? -2 : 0
         }}
-        className={`glass-strong rounded-full flex items-center px-6 py-3.5 gap-4 transition-all duration-300 border ${
+        className={`glass-strong rounded-full flex items-center px-3 sm:px-6 py-2.5 sm:py-3.5 gap-2 sm:gap-4 transition-all duration-300 border w-full min-w-0 ${
           isOpen
             ? "border-primary shadow-[0_0_40px_rgba(112,181,255,0.25)] bg-background"
             : "border-border hover:border-primary/40 hover:shadow-lg bg-background/60"
         }`}
       >
-        <div className={`p-2 rounded-xl transition-colors ${isOpen ? "bg-primary/10" : "bg-secondary/50"}`}>
+        <div className={`p-2 rounded-xl transition-colors ${isOpen ? "bg-primary/10" : "bg-secondary/50"} flex-shrink-0`}>
           <Search
             className={`w-5 h-5 transition-colors flex-shrink-0 ${
               isOpen ? "text-primary" : "text-muted-foreground"
@@ -246,8 +259,8 @@ export function GlobalSearch() {
         </div>
         <input
           ref={inputRef}
-          placeholder="Search curriculum topics, subjects or formulas..."
-          className="bg-transparent outline-none flex-1 text-base placeholder:text-muted-foreground text-foreground font-medium"
+          placeholder={placeholder}
+          className="bg-transparent outline-none flex-1 min-w-0 text-sm sm:text-base placeholder:text-muted-foreground text-foreground font-medium"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => {
@@ -292,56 +305,34 @@ export function GlobalSearch() {
               {suggestions.length > 0 ? (
                 <div className="space-y-4 p-2">
                   {groupedSuggestions.map((group) => {
-                    const meta = TYPE_META[group.type];
                     return (
-                      <div key={group.type} className="space-y-1.5">
-                        <div className="flex items-center justify-between px-3 py-1">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${meta.bg} border ${meta.border}`} />
-                            <p className={`text-[10px] uppercase tracking-[0.2em] font-bold ${meta.accent}`}>
-                              {meta.label}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          {group.items.map((item) => {
-                            const currentIndex = suggestions.indexOf(item);
-                            return (
-                              <button
-                                key={`${item.type}-${item.class_name}-${item.subject}-${item.chapter}-${item.topic}`}
-                                onClick={() => handleSelect(item)}
-                                onMouseEnter={() => setActiveIndex(currentIndex)}
-                                className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl transition-all text-left ${
-                                  currentIndex === activeIndex
-                                    ? "bg-primary/10 border border-primary/20"
-                                    : "hover:bg-secondary/40 border border-transparent"
-                                }`}
-                              >
-                                <div
-                                  className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition-all ${
-                                    currentIndex === activeIndex ? "bg-primary text-white scale-105 shadow-md" : "bg-secondary text-muted-foreground"
-                                  }`}
-                                >
-                                  <GraduationCap className="w-5 h-5" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className={`text-sm font-bold truncate ${
-                                    currentIndex === activeIndex ? "text-primary" : "text-foreground"
-                                  }`}>
-                                    {renderHighlightedText(formatResultDisplay(item), query)}
-                                  </p>
-                                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-bold mt-0.5 truncate">
-                                    {renderHighlightedText(formatResultSubtext(item), query)}
-                                  </p>
-                                </div>
-                                <div className="shrink-0 px-2.5 py-1 rounded-lg border border-border bg-secondary/50 text-[9px] uppercase tracking-widest font-bold text-muted-foreground">
-                                  {meta.singular}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
+                      <div key={group.type} className="space-y-1">
+                        {group.items.map((item) => {
+                          const currentIndex = suggestions.indexOf(item);
+                          return (
+                            <button
+                              key={`${item.type}-${item.class_name}-${item.subject}-${item.chapter}-${item.topic}`}
+                              onClick={() => handleSelect(item)}
+                              onMouseEnter={() => setActiveIndex(currentIndex)}
+                              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl transition-all text-left ${
+                                currentIndex === activeIndex
+                                  ? "bg-primary/10 border border-primary/20"
+                                  : "hover:bg-secondary/40 border border-transparent"
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-bold truncate ${
+                                  currentIndex === activeIndex ? "text-primary" : "text-foreground"
+                                }`}>
+                                  {renderHighlightedText(formatResultDisplay(item), query)}
+                                </p>
+                                <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-bold mt-0.5 truncate">
+                                  {renderHighlightedText(formatResultSubtext(item), query)}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     );
                   })}

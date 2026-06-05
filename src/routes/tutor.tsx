@@ -32,6 +32,7 @@ function TutorPage() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [messages, setMessages] = useState<Message[] | undefined>(undefined);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const { setTutorResponse } = useSimulationStore();
 
@@ -159,12 +160,31 @@ function TutorPage() {
       )}
 
       <div className="relative mx-auto flex h-full w-full max-w-[100rem] items-stretch">
-        <ChatHistorySidebar
-          activeSessionId={activeSessionId}
-          onSelectSession={handleSelectSession}
-          onNewChat={handleNewChat}
-          refreshTrigger={refreshTrigger}
-        />
+        <div className={`
+          ${isHistoryOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          fixed lg:relative inset-y-0 left-0 z-[80] lg:z-30 transition-transform duration-300 lg:transition-none flex shrink-0
+        `}>
+          <ChatHistorySidebar
+            activeSessionId={activeSessionId}
+            onSelectSession={(sessionId) => {
+              handleSelectSession(sessionId);
+              setIsHistoryOpen(false);
+            }}
+            onNewChat={() => {
+              handleNewChat();
+              setIsHistoryOpen(false);
+            }}
+            refreshTrigger={refreshTrigger}
+          />
+        </div>
+
+        {/* Backdrop for mobile */}
+        {isHistoryOpen && (
+          <div 
+            onClick={() => setIsHistoryOpen(false)}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] lg:hidden"
+          />
+        )}
 
         <div className="flex w-full items-stretch flex-1 min-w-0">
           <ChatWorkspace
@@ -180,6 +200,7 @@ function TutorPage() {
             topicContext={compactTopicContext}
             messages={messages}
             onNewChat={handleNewChat}
+            toggleHistory={() => setIsHistoryOpen(prev => !prev)}
           />
         </div>
       </div>

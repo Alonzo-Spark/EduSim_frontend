@@ -85,7 +85,7 @@ function TopicsPage() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.04 }}
-            className="bg-card border border-border rounded-2xl p-5 flex items-center justify-between gap-4 hover:border-primary/50 transition-all shadow-sm hover:shadow-md"
+            className="bg-card border border-border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-primary/50 transition-all shadow-sm hover:shadow-md"
           >
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center font-mono text-sm text-primary font-bold">
@@ -101,7 +101,7 @@ function TopicsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end sm:justify-start">
               {topic.has_simulation && topic.simulation_route ? (
                 <motion.button
                   whileHover={{ scale: 1.06 }}

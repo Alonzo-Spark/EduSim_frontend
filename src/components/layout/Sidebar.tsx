@@ -55,7 +55,7 @@ export function Sidebar() {
         animate={isCollapsed ? "collapsed" : "expanded"}
         variants={sidebarVariants}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-background/80 backdrop-blur-2xl border-r border-border/20 shadow-2xl overflow-hidden transition-colors duration-300 ${
+        className={`fixed inset-y-0 left-0 z-[60] flex flex-col bg-background/80 backdrop-blur-2xl border-r border-border/20 shadow-2xl overflow-hidden transition-colors duration-300 ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >

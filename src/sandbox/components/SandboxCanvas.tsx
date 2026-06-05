@@ -303,8 +303,8 @@ export const SandboxCanvas: React.FC = () => {
   const dynRef = useRef<Body[]>([]);
 
   const [running, setRunning] = useState(false);
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [ready, setReady] = useState(false);
   const [bodyCount, setBodyCount] = useState(0);
   const [gravity, setGravity] = useState<GravityPreset>('earth');
@@ -318,12 +318,22 @@ export const SandboxCanvas: React.FC = () => {
   const [tutorPinned, setTutorPinned] = useState(false);
   const [tutorMaximized, setTutorMaximized] = useState(false);
   const [activeTab, setActiveTab] = useState<'explanation' | 'effects' | 'formula'>('explanation');
-const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
+  const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
   const [boundaryMode, setBoundaryMode] = useState<'screen' | 'custom' | 'none'>('screen');
   const [customWidth, setCustomWidth] = useState(1200);
   const [customHeight, setCustomHeight] = useState(800);
   const [boundaryThickness] = useState(28);
   const [propertyVersion, setPropertyVersion] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const boundaryModeRef = useRef(boundaryMode);
   const customWidthRef = useRef(customWidth);
@@ -366,9 +376,9 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
     if (mode === 'none' || isRadial) {
       // Disable collisions and hide
       targetGround.collides = false; targetGround.visible = false;
-      targetWallL.collides = false;  targetWallL.visible = false;
-      targetWallR.collides = false;  targetWallR.visible = false;
-      targetWallT.collides = false;  targetWallT.visible = false;
+      targetWallL.collides = false; targetWallL.visible = false;
+      targetWallR.collides = false; targetWallR.visible = false;
+      targetWallT.collides = false; targetWallT.visible = false;
     } else if (mode === 'screen') {
       // Dynamic: Locked to screen edges in world space
       const minX = -currentPanX / currentZoom;
@@ -432,10 +442,10 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
     // 2. Apply updates to the Matter.js bodies and PixiJS graphics
     const updateBodyAndDisplay = (obj: any, target: typeof targetGround) => {
       if (!obj) return;
-      
+
       // Update Matter body
       Matter.Body.setPosition(obj.body, { x: target.x, y: target.y });
-      
+
       // Update collision filter
       obj.body.collisionFilter.category = target.collides ? 0x0001 : 0x0000;
       obj.body.collisionFilter.mask = target.collides ? 0xFFFF : 0x0000;
@@ -786,19 +796,19 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
 
         const obj = type === 'circle'
           ? createObject({
-              id: bodyCfg.id || getUniqueId('circle'),
-              type: 'circle',
-              radius: bodyCfg.radius || 20,
-              ...base
-            })
+            id: bodyCfg.id || getUniqueId('circle'),
+            type: 'circle',
+            radius: bodyCfg.radius || 20,
+            ...base
+          })
           : createObject({
-              id: bodyCfg.id || getUniqueId('rect'),
-              type: 'rectangle',
-              width: bodyCfg.width || 40,
-              height: bodyCfg.height || 40,
-              cornerRadius: 8,
-              ...base
-            });
+            id: bodyCfg.id || getUniqueId('rect'),
+            type: 'rectangle',
+            width: bodyCfg.width || 40,
+            height: bodyCfg.height || 40,
+            cornerRadius: 8,
+            ...base
+          });
 
         // Set custom mass if explicitly asked by the tutor config
         if (bodyCfg.mass !== undefined && obj.body) {
@@ -2630,6 +2640,10 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
       <aside
         style={{
           ...S.panel,
+          position: isMobile ? 'absolute' : 'relative',
+          left: 0,
+          top: 0,
+          zIndex: isMobile ? 300 : 'auto',
           width: leftPanelOpen ? 288 : 0,
           minWidth: leftPanelOpen ? 268 : 0,
           padding: leftPanelOpen ? '20px 16px' : 0,
@@ -2729,25 +2743,25 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
 
             <Sep label="Controls" />
             <div style={S.row}>
-              <button 
+              <button
                 id="play-pause-btn"
-                style={{ 
-                  ...S.btn, 
-                  ...S.btnPrimary, 
+                style={{
+                  ...S.btn,
+                  ...S.btnPrimary,
                   flex: 1,
                   border: (highlightedAsset === 'play-btn') ? '2px solid rgb(34, 211, 238)' : S.btn.border,
                   boxShadow: (highlightedAsset === 'play-btn') ? '0 0 15px rgba(34, 211, 238, 0.75)' : 'none',
                   transition: 'all 0.3s ease'
-                }} 
-                onClick={togglePlay} 
+                }}
+                onClick={togglePlay}
                 disabled={!ready}
               >
                 {running ? '⏸ Pause' : '▶ Resume'}
               </button>
               <button style={{ ...S.btn, ...S.btnGhost }} onClick={handleReset} disabled={!ready} title="Reset">↺</button>
               <button
-                style={{ 
-                  ...S.btn, 
+                style={{
+                  ...S.btn,
                   ...S.btnGhost,
                   display: 'flex',
                   alignItems: 'center',
@@ -2829,10 +2843,10 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
             >
               <button
                 id="spawn-rect-btn"
-                style={{ 
-                  ...S.btn, 
-                  ...S.btnIndigo, 
-                  flex: 1, 
+                style={{
+                  ...S.btn,
+                  ...S.btnIndigo,
+                  flex: 1,
                   cursor: ready ? 'grab' : 'not-allowed',
                   border: (highlightedAsset === 'rectangle' || highlightedAsset === 'shape-toolbox') ? '2px solid rgb(52, 211, 153)' : S.btn.border,
                   boxShadow: (highlightedAsset === 'rectangle' || highlightedAsset === 'shape-toolbox') ? '0 0 15px rgba(52, 211, 153, 0.75)' : 'none',
@@ -2844,10 +2858,10 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
               >▪ Rectangle</button>
               <button
                 id="spawn-circle-btn"
-                style={{ 
-                  ...S.btn, 
-                  ...S.btnEmerald, 
-                  flex: 1, 
+                style={{
+                  ...S.btn,
+                  ...S.btnEmerald,
+                  flex: 1,
                   cursor: ready ? 'grab' : 'not-allowed',
                   border: (highlightedAsset === 'circle' || highlightedAsset === 'shape-toolbox') ? '2px solid rgb(52, 211, 153)' : S.btn.border,
                   boxShadow: (highlightedAsset === 'circle' || highlightedAsset === 'shape-toolbox') ? '0 0 15px rgba(52, 211, 153, 0.75)' : 'none',
@@ -2896,12 +2910,12 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
             >
               <button
                 id="spawn-pivot-btn"
-                style={{ 
-                  ...S.btn, 
-                  ...S.btnIndigo, 
-                  flex: '1 1 45%', 
-                  cursor: ready ? 'grab' : 'not-allowed', 
-                  padding: '7px 4px', 
+                style={{
+                  ...S.btn,
+                  ...S.btnIndigo,
+                  flex: '1 1 45%',
+                  cursor: ready ? 'grab' : 'not-allowed',
+                  padding: '7px 4px',
                   fontSize: 11,
                   border: (highlightedAsset === 'pivot' || highlightedAsset === 'constraints-toolbox') ? '2px solid rgb(245, 158, 11)' : S.btn.border,
                   boxShadow: (highlightedAsset === 'pivot' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.75)' : 'none',
@@ -2913,12 +2927,12 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
               >📌 Pivot</button>
               <button
                 id="spawn-spring-btn"
-                style={{ 
-                  ...S.btn, 
-                  ...S.btnEmerald, 
-                  flex: '1 1 45%', 
-                  cursor: ready ? 'grab' : 'not-allowed', 
-                  padding: '7px 4px', 
+                style={{
+                  ...S.btn,
+                  ...S.btnEmerald,
+                  flex: '1 1 45%',
+                  cursor: ready ? 'grab' : 'not-allowed',
+                  padding: '7px 4px',
                   fontSize: 11,
                   border: (highlightedAsset === 'spring' || highlightedAsset === 'constraints-toolbox') ? '2px solid rgb(245, 158, 11)' : S.btn.border,
                   boxShadow: (highlightedAsset === 'spring' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.75)' : 'none',
@@ -2930,11 +2944,11 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
               >🌀 Spring</button>
               <button
                 id="spawn-rope-chain-btn"
-                style={{ 
-                  ...S.btn, 
-                  ...S.btnSky, 
-                  width: '100%', 
-                  cursor: ready ? 'grab' : 'not-allowed', 
+                style={{
+                  ...S.btn,
+                  ...S.btnSky,
+                  width: '100%',
+                  cursor: ready ? 'grab' : 'not-allowed',
                   marginTop: 4,
                   border: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '2px solid rgb(245, 158, 11)' : S.btn.border,
                   boxShadow: (highlightedAsset === 'rope' || highlightedAsset === 'constraints-toolbox') ? '0 0 15px rgba(245, 158, 11, 0.75)' : 'none',
@@ -3383,10 +3397,10 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
 
         {/* Floating Sidebar Toggle Buttons */}
         <button
-          onClick={() => setLeftPanelOpen((open) => !open)}
+          onClick={() => setLeftPanelOpen((open) => { const next = !open; if (next && isMobile) setRightPanelOpen(false); return next; })}
           style={{
             position: 'absolute',
-            left: 14,
+            left: leftPanelOpen && isMobile ? 302 : 14,
             top: '50%',
             transform: 'translateY(-50%)',
             zIndex: 350,
@@ -3421,10 +3435,10 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
         </button>
 
         <button
-          onClick={() => setRightPanelOpen((open) => !open)}
+          onClick={() => setRightPanelOpen((open) => { const next = !open; if (next && isMobile) setLeftPanelOpen(false); return next; })}
           style={{
             position: 'absolute',
-            right: 14,
+            right: rightPanelOpen && isMobile ? 334 : 14,
             top: '50%',
             transform: 'translateY(-50%)',
             zIndex: 350,
@@ -4685,6 +4699,10 @@ const [gravityMode, setGravityMode] = useState<'linear' | 'radial'>('linear');
       <aside
         style={{
           ...S.rightSidebar,
+          position: isMobile ? 'absolute' : 'relative',
+          right: 0,
+          top: 0,
+          zIndex: isMobile ? 300 : 'auto',
           width: rightPanelOpen ? 320 : 0,
           minWidth: rightPanelOpen ? 300 : 0,
           padding: rightPanelOpen ? '20px 16px' : 0,
@@ -4819,7 +4837,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex', width: '100%', height: '100%', minHeight: 560,
     background: '#090d16', color: '#0f172a',
     fontFamily: '"Plus Jakarta Sans",system-ui,sans-serif',
-    overflow: 'hidden', userSelect: 'none'
+    overflow: 'hidden', userSelect: 'none', position: 'relative'
   },
   panel: {
     width: 288, minWidth: 268, height: '100%', padding: '20px 16px',
