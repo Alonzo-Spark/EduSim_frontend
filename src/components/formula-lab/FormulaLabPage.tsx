@@ -37,6 +37,8 @@ interface Props {
   ragContent?: string;
   formulas?: DynamicParsedFormula[] | null;
   isInline?: boolean;
+  formulaExpression?: string;
+  formulaMeaning?: string;
 }
 
 function getFormulaCategory(f: DynamicParsedFormula): string {
@@ -61,6 +63,8 @@ const FormulaLabPage: React.FC<Props> = ({
   ragContent,
   formulas: directFormulas,
   isInline = false,
+  formulaExpression,
+  formulaMeaning,
 }) => {
   const { formulas, selectedFormula, selectFormula, loadForTopic } = useFormulaLab();
 
@@ -145,9 +149,9 @@ const FormulaLabPage: React.FC<Props> = ({
 
   useEffect(() => {
     if (!directFormulas) {
-      loadForTopic({ topic, classId, subject, chapter, ragContent });
+      loadForTopic({ topic, classId, subject, chapter, ragContent, formulaExpression, formulaMeaning });
     }
-  }, [topic, classId, subject, chapter, ragContent, loadForTopic, directFormulas]);
+  }, [topic, classId, subject, chapter, ragContent, loadForTopic, directFormulas, formulaExpression, formulaMeaning]);
 
   // Set initial values when formula changes
   useEffect(() => {

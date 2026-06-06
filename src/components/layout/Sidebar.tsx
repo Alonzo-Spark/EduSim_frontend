@@ -24,7 +24,6 @@ const items: SidebarItem[] = [
   { to: "/tutor", label: "Tutor", icon: GraduationCap },
   { to: "/sandbox/default", label: "Sandbox", icon: Atom },
   { to: "/profile", label: "Profile", icon: User },
-  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {

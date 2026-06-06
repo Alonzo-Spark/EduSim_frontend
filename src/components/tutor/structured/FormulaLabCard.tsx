@@ -78,7 +78,12 @@ export function FormulaLabCard({ formula }: FormulaLabCardProps) {
         <Link
           to="/formula-lab/$topic"
           params={{ topic: topicName }}
-          search={{ classId, subject }}
+          search={{ 
+            classId, 
+            subject,
+            formulaExpression: formula.expression,
+            formulaMeaning: formula.meaning
+          }}
           className="group relative inline-flex items-center gap-2.5 rounded-[2rem] bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-6 py-3 text-xs font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95 shadow-lg shadow-violet-500/25 hover:shadow-violet-500/35 w-full sm:w-auto justify-center"
         >
           <Activity className="h-4 w-4" />

@@ -8,7 +8,12 @@ interface LoadParams {
   subject?: string;
   chapter?: string;
   ragContent?: string;
+  formulaExpression?: string;
+  formulaMeaning?: string;
 }
+
+import { getApiUrl } from "@/config/api";
+import { FormulaControl } from "@/utils/DynamicFormulaExtractor";
 
 export function useFormulaLab() {
   const [formulas, setFormulas] = useState<DynamicParsedFormula[] | null>(null);
@@ -33,57 +38,118 @@ export function useFormulaLab() {
       }
       const cacheKey = `formula-lab-v6:${params.topic}-${params.classId || ""}-${params.subject || ""}-${params.chapter || ""}-${contentHash}`;
 
+      let parsed: DynamicParsedFormula[] = [];
       const cached = typeof window !== "undefined" ? window.localStorage.getItem(cacheKey) : null;
       if (cached) {
         try {
-          const parsed: DynamicParsedFormula[] = JSON.parse(cached);
-          setFormulas(parsed);
-
-          setSelectedIndex(0);
-
-          return;
+          parsed = JSON.parse(cached);
         } catch {
           // ignore cache parse failures
         }
       }
 
-      setFormulas(null);
+      if (!parsed || parsed.length === 0) {
+        setFormulas(null);
 
-      let rag = params.ragContent || null;
-      if (!rag) {
-        const response = await physicsSimulationApi.queryRag(params.topic);
-        rag = response.success && response.data ? response.data.answer : "";
+        let rag = params.ragContent || null;
+        if (!rag) {
+          const response = await physicsSimulationApi.queryRag(params.topic);
+          rag = response.success && response.data ? response.data.answer : "";
+        }
+
+        parsed = await DynamicFormulaExtractor.parseTutorResponse(
+          rag || "",
+          params.topic,
+          params.subject,
+          params.classId,
+        );
       }
 
-      const parsed = await DynamicFormulaExtractor.parseTutorResponse(
-        rag || "",
-        params.topic,
-        params.subject,
-        params.classId,
-      );
-      console.log("[FormulaLab] formulas received:", parsed);
-      console.log(
-        "[useFormulaLab] Detected formulas:",
-        parsed.map((p) => ({ id: p.id, raw: p.raw, display: p.displayFormula })),
-      );
-      console.log(
-        "[useFormulaLab] Parsed variables:",
-        parsed.map((p) => p.variables),
-      );
-      console.log(
-        "[FormulaLab] formulas received:",
-        parsed.map((p) => ({
-          id: p.id,
-          displayFormula: p.displayFormula || p.formula || p.latex || p.raw,
-        })),
-      );
-      console.log("[FormulaLab] count:", parsed.length);
-      setFormulas(parsed);
+      // Check if we have a custom formula passed via route/search parameters
+      if (params.formulaExpression) {
+        const cleanCustom = params.formulaExpression.replace(/\s+/g, "");
+        const formulaExists = parsed.some(
+          (f) =>
+            (f.raw && f.raw.replace(/\s+/g, "") === cleanCustom) ||
+            (f.formula && f.formula.replace(/\s+/g, "") === cleanCustom) ||
+            (f.expression && f.expression.replace(/\s+/g, "") === cleanCustom)
+        );
 
-      setSelectedIndex(0);
+        if (!formulaExists) {
+          try {
+            let labData: any = null;
+            const labRes = await fetch(getApiUrl("/api/formula/lab"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ formula: params.formulaExpression })
+            });
+            if (labRes.ok) {
+              labData = await labRes.json();
+            }
+
+            let uniqueControls: FormulaControl[] = [];
+            const seenVars = new Set<string>();
+            for (const v of (labData?.variables || [])) {
+              if (!seenVars.has(v.symbol)) {
+                seenVars.add(v.symbol);
+                uniqueControls.push({
+                  symbol: v.symbol,
+                  label: v.label || v.symbol,
+                  unit: v.unit || "",
+                  min: v.min ?? 1,
+                  max: v.max ?? 100,
+                  step: v.step ?? 1,
+                  defaultValue: v.defaultValue ?? 10
+                });
+              }
+            }
+
+            const customFormula: DynamicParsedFormula = {
+              id: `custom-${cleanCustom}`,
+              raw: params.formulaExpression,
+              expression: params.formulaExpression,
+              latex: params.formulaExpression,
+              formula: params.formulaExpression,
+              displayFormula: params.formulaExpression,
+              title: params.formulaMeaning || "Key Equation",
+              description: labData?.description || params.formulaMeaning || "Formula from lesson",
+              category: "Custom",
+              controls: uniqueControls,
+              variables: uniqueControls,
+              anatomy: labData?.anatomy || [],
+              examples: labData?.examples || [],
+              practiceQuestions: labData?.practiceQuestions || [],
+              revisionCards: labData?.revisionCards || []
+            };
+
+            parsed = [customFormula, ...parsed];
+          } catch (err) {
+            console.error("Failed to load details for passed formula:", err);
+          }
+        }
+      }
+
+      // Find the index of the formula to select
+      let activeIndex = 0;
+      if (params.formulaExpression) {
+        const cleanCustom = params.formulaExpression.replace(/\s+/g, "");
+        const matchIdx = parsed.findIndex(
+          (f) =>
+            (f.raw && f.raw.replace(/\s+/g, "") === cleanCustom) ||
+            (f.formula && f.formula.replace(/\s+/g, "") === cleanCustom) ||
+            (f.expression && f.expression.replace(/\s+/g, "") === cleanCustom)
+        );
+        if (matchIdx >= 0) {
+          activeIndex = matchIdx;
+        }
+      }
+
+      console.log("[FormulaLab] formulas ready:", parsed);
+      setFormulas(parsed);
+      setSelectedIndex(activeIndex);
 
       try {
-        if (typeof window !== "undefined") {
+        if (typeof window !== "undefined" && parsed.length > 0) {
           window.localStorage.setItem(cacheKey, JSON.stringify(parsed));
         }
       } catch {

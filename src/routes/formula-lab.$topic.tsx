@@ -12,6 +12,16 @@ function FormulaLabRoute() {
   const search = Route.useSearch() as any;
   const classId = search.classId;
   const subject = search.subject;
+  const formulaExpression = search.formulaExpression;
+  const formulaMeaning = search.formulaMeaning;
 
-  return <FormulaLabPage topic={topic || "Topic"} classId={classId} subject={subject} />;
+  return (
+    <FormulaLabPage
+      topic={topic || "Topic"}
+      classId={classId}
+      subject={subject}
+      formulaExpression={formulaExpression}
+      formulaMeaning={formulaMeaning}
+    />
+  );
 }
