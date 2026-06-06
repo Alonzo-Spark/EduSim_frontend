@@ -79,7 +79,11 @@ const FormulaPlayground: React.FC<{
       if (formula.derived_expressions && resultSymbol && formula.derived_expressions[resultSymbol]) {
         expr = formula.derived_expressions[resultSymbol];
       } else {
-        const clean = expr.replace(/[\$\s]/g, "");
+        let clean = expr.replace(/[\$]/g, "");
+        clean = clean
+          .replace(/\\Delta\s*\{?([a-zA-Z])\}?/g, "Delta_$1")
+          .replace(/Delta\s*([a-zA-Z])/g, "Delta_$1")
+          .replace(/\s/g, "");
         const parts = clean.split("=");
         expr = parts[1] || parts[0];
         expr = expr
@@ -88,7 +92,6 @@ const FormulaPlayground: React.FC<{
           .replace(/\\cos/g, "cos")
           .replace(/\\tan/g, "tan")
           .replace(/\\theta/g, "theta")
-          .replace(/\\Delta/g, "Delta")
           .replace(/\\cdot/g, "*")
           .replace(/\\times/g, "*")
           .replace(/\^/g, "**")
