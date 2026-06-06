@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { CurriculumService } from "@/services/curriculumService";
 import { PageWrapper } from "@/components/Card";
 import { Crumbs } from "@/components/Crumbs";
-import { Brain, Play } from "lucide-react";
+import { Brain, Play, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
   beforeLoad: ({ params }) => {
@@ -26,11 +26,13 @@ export const Route = createFileRoute("/topics/$classId/$subject/$chapter")({
   component: TopicsPage,
   loader: async ({ params }) => {
     try {
-      const classes = await CurriculumService.getClasses();
+      const [classes, subjects] = await Promise.all([
+        CurriculumService.getClasses(),
+        CurriculumService.getSubjects(Number(params.classId)),
+      ]);
       const c = classes.find((cls) => cls.id === Number(params.classId));
       if (!c) throw notFound();
 
-      const subjects = await CurriculumService.getSubjects(Number(params.classId));
       const s = subjects.find(
         (sub) =>
           (sub.code || "").toLowerCase() === (params.subject || "").toLowerCase() ||
@@ -79,6 +81,12 @@ function TopicsPage() {
         topic: topic.name,
         prompt: `Explain "${topic.name}" from the chapter "${chapter.name}" in ${s.name} for ${c.name}.`,
       } as any,
+    });
+  };
+
+  const handleGenerateSimulation = (topic: any) => {
+    navigate({
+      to: "/simulation-generator",
     });
   };
 
@@ -138,7 +146,7 @@ function TopicsPage() {
                     whileTap={{ scale: 0.96 }}
                     onClick={() =>
                       navigate({
-                        to: topic.simulation_route,
+                        to: topic.simulation_route || undefined,
                       })
                     }
                     className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-secondary text-foreground text-sm font-bold border border-border hover:bg-secondary/80 transition-all"

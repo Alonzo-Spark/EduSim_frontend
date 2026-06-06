@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChatBubble, TypingAnimation } from "./ChatBubble";
+import { ChatBubble } from "./ChatBubble";
+import { GeneratingLoader } from "./GeneratingLoader";
 import ChatInput from "./ChatInput";
 import { TutorHeader } from "./TutorHeader";
 import { ChatMessage } from "@/services/TutorService";
@@ -264,12 +265,12 @@ export function ChatWorkspace({
           })}
 
           {loading && (
-            <div className="flex w-full items-start gap-4">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-primary text-white shadow-sm">
-                <span className="text-white text-xs font-bold">AI</span>
+            <div className="flex w-full items-start gap-2.5 sm:gap-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 mt-1 rounded-full flex items-center justify-center shrink-0 bg-primary text-white shadow-sm">
+                <span className="text-white text-xs font-bold tracking-wider">AI</span>
               </div>
-              <div className="pt-2">
-                <TypingAnimation />
+              <div className="flex-1 w-full max-w-5xl">
+                <GeneratingLoader />
               </div>
             </div>
           )}

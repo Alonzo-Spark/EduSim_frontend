@@ -68,11 +68,23 @@ export async function fetchJsonWithRetry<T = JsonValue>(url: string, options: Ap
 
       if (!response.ok) {
         const detail = (data as Record<string, unknown>)?.detail;
-        const errorMessage = Array.isArray(detail)
+        let errorMessage = Array.isArray(detail)
           ? detail
               .map((item) => (typeof item === 'object' && item && 'msg' in item ? String((item as Record<string, unknown>).msg) : String(item)))
               .join(', ')
-          : detail || (data as Record<string, unknown>)?.error || `HTTP ${response.status}`;
+          : detail || (data as Record<string, unknown>)?.error;
+
+        if (!errorMessage) {
+          if (response.status === 400) errorMessage = "Invalid request";
+          else if (response.status === 401) errorMessage = "Authentication failed";
+          else if (response.status === 403) errorMessage = "Access denied";
+          else if (response.status === 404) errorMessage = "Resource not found";
+          else if (response.status === 409) errorMessage = "User already exists";
+          else if (response.status === 422) errorMessage = "Validation failed";
+          else if (response.status === 429) errorMessage = "Too many requests";
+          else if (response.status >= 500) errorMessage = "Internal server error";
+          else errorMessage = `HTTP ${response.status}`;
+        }
         if (attempt < retries && isRetryableStatus(response.status)) {
           lastError = new Error(String(errorMessage));
           await sleep(retryDelayMs * (attempt + 1));
@@ -90,6 +102,10 @@ export async function fetchJsonWithRetry<T = JsonValue>(url: string, options: Ap
 
       if ((isAbort || isTimeout) && resolvedSignal?.aborted) {
         throw error;
+      }
+
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        lastError = new Error("Network error. Check your connection");
       }
 
       if (attempt < retries) {

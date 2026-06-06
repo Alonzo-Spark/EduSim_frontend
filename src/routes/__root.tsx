@@ -5,7 +5,16 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60000, // consider data fresh for 1 minute
+      gcTime: 1000 * 60 * 10, // keep unused data in cache for 10 minutes
+      refetchOnWindowFocus: false, // disable refetching on window focus
+      retry: 1,
+    },
+  },
+});
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
@@ -180,6 +189,7 @@ function RootComponent() {
     }
 
     if (!isAuthenticated && requiresAuth) {
+      toast.error("Please login to continue");
       navigate({ to: "/login", search: EMPTY_LOGIN_SEARCH as any });
     } else if (isAuthenticated && isAuthPage) {
       navigate({ to: "/dashboard" });
@@ -190,6 +200,7 @@ function RootComponent() {
     return (
       <div className="min-h-screen w-full relative bg-background text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar">
         <Outlet />
+        <Toaster />
       </div>
     );
   }

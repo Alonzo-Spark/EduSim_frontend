@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface SidebarItem {
   to: string;
@@ -29,6 +30,7 @@ const items: SidebarItem[] = [
 export function Sidebar() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { isCollapsed, toggleSidebar, isMobileOpen, setMobileOpen } = useSidebarStore();
+  const { logout } = useAuthStore();
 
   const sidebarVariants = {
     expanded: { width: 260 },
@@ -132,24 +134,61 @@ export function Sidebar() {
         </nav>
 
         <div className="p-4 mt-auto space-y-2 border-t border-border/10">
-           <button 
-             onClick={toggleSidebar}
-             className="w-full flex items-center h-12 rounded-2xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-300 group"
-           >
-             <div className="w-12 h-12 shrink-0 flex items-center justify-center">
-               <ChevronLeft className={`w-5 h-5 transition-transform duration-500 ${isCollapsed ? "rotate-180" : ""}`} />
-             </div>
-             {!isCollapsed && <span className="text-[15px] font-medium">Collapse</span>}
-           </button>
+           {isCollapsed ? (
+             <Tooltip>
+               <TooltipTrigger asChild>
+                 <button 
+                   onClick={toggleSidebar}
+                   className="w-full flex items-center h-12 rounded-2xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-300 group"
+                 >
+                   <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+                     <ChevronLeft className="w-5 h-5 rotate-180" />
+                   </div>
+                 </button>
+               </TooltipTrigger>
+               <TooltipContent side="right" sideOffset={15} className="font-medium text-sm bg-card border border-border text-foreground shadow-md px-3 py-1.5">
+                 Expand
+               </TooltipContent>
+             </Tooltip>
+           ) : (
+             <button 
+               onClick={toggleSidebar}
+               className="w-full flex items-center h-12 rounded-2xl text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-300 group"
+             >
+               <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+                 <ChevronLeft className="w-5 h-5" />
+               </div>
+               <span className="text-[15px] font-medium">Collapse</span>
+             </button>
+           )}
 
-           <button 
-             className="w-full flex items-center h-12 rounded-2xl text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 group"
-           >
-             <div className="w-12 h-12 shrink-0 flex items-center justify-center">
-               <LogOut className="w-5 h-5" />
-             </div>
-             {!isCollapsed && <span className="text-[15px] font-medium">Logout</span>}
-           </button>
+           {isCollapsed ? (
+             <Tooltip>
+               <TooltipTrigger asChild>
+                 <button 
+                   onClick={logout}
+                   className="w-full flex items-center h-12 rounded-2xl text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 group"
+                 >
+                   <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+                     <LogOut className="w-5 h-5" />
+                   </div>
+                 </button>
+               </TooltipTrigger>
+               <TooltipContent side="right" sideOffset={15} className="font-medium text-sm bg-card border border-border text-foreground shadow-md px-3 py-1.5">
+                 Logout
+               </TooltipContent>
+             </Tooltip>
+           ) : (
+             <button 
+               onClick={logout}
+               className="w-full flex items-center h-12 rounded-2xl text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 group"
+             >
+               <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+                 <LogOut className="w-5 h-5" />
+               </div>
+               <span className="text-[15px] font-medium">Logout</span>
+             </button>
+           )}
         </div>
       </motion.aside>
     </TooltipProvider>
