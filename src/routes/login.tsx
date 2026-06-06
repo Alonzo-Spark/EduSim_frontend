@@ -54,6 +54,18 @@ function Login() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Validation States
+  const [touched, setTouched] = useState({
+    loginEmail: false,
+    loginPassword: false,
+    forgotEmail: false,
+    resetPassword: false,
+    resetConfirm: false
+  });
+  const [submittedLogin, setSubmittedLogin] = useState(false);
+  const [submittedForgot, setSubmittedForgot] = useState(false);
+  const [submittedReset, setSubmittedReset] = useState(false);
+
   // Floating particles state and generator
   const [particles, setParticles] = useState<{ id: number; left: number; top: number; delay: number; duration: number }[]>([]);
   useEffect(() => {
@@ -83,42 +95,54 @@ function Login() {
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmittedLogin(true);
     const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail || !password) {
-      toast.warning("Please enter your email and password");
+    
+    if (normalizedEmail.length === 0 && password.length === 0) {
+      toast.error("Email and Password are required");
       return;
     }
+    
+    if (normalizedEmail.length === 0 || password.length === 0 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return;
+    }
+    
     const success = await login({ email: normalizedEmail, password });
     if (success) {
+      toast.success("Login successful");
       navigate({ to: "/dashboard" });
     }
   };
 
   const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmittedForgot(true);
     const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) {
-      toast.warning("Please enter your email address");
+    
+    if (normalizedEmail.length === 0 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return;
     }
+    
     const success = await forgotPassword(normalizedEmail);
     if (success) {
+      toast.success("Password reset link sent to your email");
       setShowForgotForm(false);
     }
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 8) {
-      toast.warning("Password must be at least 8 characters");
+    setSubmittedReset(true);
+    
+    const isStrong = newPassword.length >= 8 && /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) && /[0-9]/.test(newPassword) && /[^A-Za-z0-9]/.test(newPassword);
+    
+    if (!isStrong || newPassword !== confirmPassword) {
       return;
     }
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
+    
     const success = await resetPassword(reset_token!, newPassword);
     if (success) {
+      toast.success("Password reset successful");
       navigate({ to: "/login", replace: true, search: CLEAR_LOGIN_SEARCH });
     }
   };
@@ -207,15 +231,28 @@ function Login() {
                     <label className="text-[10px] font-bold text-muted-foreground font-mono">NEW PASSWORD</label>
                     <div className="relative">
                       <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
-                      <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
+                      <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} onBlur={() => setTouched(t => ({...t, resetPassword: true}))} className={`w-full pl-10 pr-4 py-3 rounded-2xl bg-background border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60 ${((touched.resetPassword || submittedReset) && (newPassword.length === 0 || !(newPassword.length >= 8 && /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) && /[0-9]/.test(newPassword) && /[^A-Za-z0-9]/.test(newPassword)))) ? "border-red-500" : "border-border"}`} />
                     </div>
+                    {((touched.resetPassword || submittedReset) && newPassword.length === 0) ? (
+                      <p className="text-xs text-red-400 mt-1">New Password is required</p>
+                    ) : ((touched.resetPassword || submittedReset) && !(newPassword.length >= 8 && /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) && /[0-9]/.test(newPassword) && /[^A-Za-z0-9]/.test(newPassword))) ? (
+                      <p className="text-xs text-red-400 mt-1">Password does not meet security requirements</p>
+                    ) : null}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground font-mono">CONFIRM PASSWORD</label>
                     <div className="relative">
                       <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
-                      <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
+                      <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} onBlur={() => setTouched(t => ({...t, resetConfirm: true}))} className={`w-full pl-10 pr-4 py-3 rounded-2xl bg-background border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60 ${((touched.resetConfirm || submittedReset) && (confirmPassword !== newPassword || confirmPassword.length === 0)) ? "border-red-500" : "border-border"}`} />
                     </div>
+                    {((touched.resetConfirm || submittedReset) && confirmPassword.length === 0) ? (
+                      <p className="text-xs text-red-400 mt-1">Confirm Password is required</p>
+                    ) : ((touched.resetConfirm || submittedReset) && confirmPassword !== newPassword) ? (
+                      <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
+                    ) : null}
+                    {touched.resetConfirm && confirmPassword.length > 0 && confirmPassword === newPassword && (
+                      <p className="text-xs text-green-500 mt-1">Passwords match ✓</p>
+                    )}
                   </div>
                   <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 duration-200">
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Save Password"}
@@ -231,8 +268,13 @@ function Login() {
                     <label className="text-[10px] font-bold text-muted-foreground font-mono">EMAIL</label>
                     <div className="relative">
                       <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
-                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
+                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setTouched(t => ({...t, forgotEmail: true}))} className={`w-full pl-10 pr-4 py-3 rounded-2xl bg-background border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60 ${((touched.forgotEmail || submittedForgot) && (email.trim().length === 0 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))) ? "border-red-500" : "border-border"}`} />
                     </div>
+                    {((touched.forgotEmail || submittedForgot) && email.trim().length === 0) ? (
+                      <p className="text-xs text-red-400 mt-1">Email is required</p>
+                    ) : ((touched.forgotEmail || submittedForgot) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) ? (
+                      <p className="text-xs text-red-400 mt-1">Please enter a valid email address</p>
+                    ) : null}
                   </div>
                   <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 duration-200">
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Send Reset Link"}
@@ -246,21 +288,33 @@ function Login() {
                   <p className="text-xs text-muted-foreground">Sign in to continue your learning journey</p>
                 </div>
                 <form onSubmit={handleEmailLogin} className="space-y-4">
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
-                    <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
+                  <div>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                      <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setTouched(t => ({...t, loginEmail: true}))} className={`w-full pl-10 pr-4 py-3 rounded-2xl bg-background border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60 ${((touched.loginEmail || submittedLogin) && (email.trim().length === 0 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))) ? "border-red-500" : "border-border"}`} />
+                    </div>
+                    {((touched.loginEmail || submittedLogin) && email.trim().length === 0) ? (
+                      <p className="text-xs text-red-400 mt-1">Email is required</p>
+                    ) : ((touched.loginEmail || submittedLogin) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) ? (
+                      <p className="text-xs text-red-400 mt-1">Please enter a valid email</p>
+                    ) : null}
                   </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
-                    <input type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-10 py-3 rounded-2xl bg-background border border-border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+                  <div>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                      <input type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} onBlur={() => setTouched(t => ({...t, loginPassword: true}))} className={`w-full pl-10 pr-10 py-3 rounded-2xl bg-background border text-sm text-foreground focus:border-primary outline-none placeholder:text-muted-foreground/60 ${((touched.loginPassword || submittedLogin) && password.length === 0) ? "border-red-500" : "border-border"}`} />
+                      <button type="button" onClick={() => { setShowPassword(!showPassword); }} className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+                    </div>
+                    {((touched.loginPassword || submittedLogin) && password.length === 0) && (
+                      <p className="text-xs text-red-400 mt-1">Password is required</p>
+                    )}
                   </div>
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <label className="flex items-center gap-2 text-muted-foreground select-none cursor-pointer">
                       <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-border bg-background text-primary focus:ring-primary" />
                       Remember me
                     </label>
-                    <button type="button" onClick={() => setShowForgotForm(true)} className="text-primary hover:underline transition-colors font-medium">Forgot password?</button>
+                    <button type="button" onClick={() => { setShowForgotForm(true); toast.success("Redirected to Forgot Password page"); }} className="text-primary hover:underline transition-colors font-medium">Forgot password?</button>
                   </div>
                   <button type="submit" disabled={isLoading} className="w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 duration-200">{isLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Sign In"}</button>
                 </form>

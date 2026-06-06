@@ -14,10 +14,10 @@ export function Card({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay }}
-      whileHover={{ scale: 1.03, y: -4 }}
+      transition={{ duration: 0.2, delay: delay * 0.5 }}
+      whileHover={{ scale: 1.02, y: -2 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={`bg-card border border-border rounded-3xl p-6 cursor-pointer shadow-sm hover:shadow-md hover:border-primary/50 transition-all duration-300 group ${className}`}
@@ -30,10 +30,10 @@ export function Card({
 export function PageWrapper({ children }: { children: ReactNode }) {
   return (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.35 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.15, ease: "easeOut" }}
     >
       {children}
     </motion.div>

@@ -7,11 +7,13 @@ export const Route = createFileRoute("/chapters/$classId/$subject")({
   component: ChaptersPage,
   loader: async ({ params }) => {
     try {
-      const classes = await CurriculumService.getClasses();
+      const [classes, subjects] = await Promise.all([
+        CurriculumService.getClasses(),
+        CurriculumService.getSubjects(Number(params.classId)),
+      ]);
       const c = classes.find((cls) => cls.id === Number(params.classId));
       if (!c) throw notFound();
 
-      const subjects = await CurriculumService.getSubjects(Number(params.classId));
       const s = subjects.find(
         (sub) =>
           (sub.code || "").toLowerCase() === (params.subject || "").toLowerCase() ||
