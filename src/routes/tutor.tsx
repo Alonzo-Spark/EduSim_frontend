@@ -31,7 +31,7 @@ function TutorPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[] | undefined>(undefined);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const { setTutorResponse } = useSimulationStore();
@@ -65,31 +65,6 @@ function TutorPage() {
 
     setIsLoading(true);
     setError(null);
-
-    // 1. Append user message to state
-    const userMsgId = crypto.randomUUID();
-    const timeStr = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    const userMsg: Message = {
-      id: userMsgId,
-      role: "user",
-      content: query,
-      timestamp: timeStr,
-    };
-    setMessages(prev => [...prev, userMsg]);
-
-    // 2. Append a placeholder AI message to state
-    const aiMsgId = crypto.randomUUID();
-    const aiMsg: Message = {
-      id: aiMsgId,
-      role: "ai",
-      content: "",
-      timestamp: timeStr,
-    };
-    setMessages(prev => [...prev, aiMsg]);
-
-    let accumulatedText = "";
-    let accumulatedRag: any[] = [];
-
     try {
       const contextArgs = {
         class_name: searchParams.class_name,
@@ -97,47 +72,23 @@ function TutorPage() {
         chapter: searchParams.chapter,
         topic: searchParams.topic
       };
-
-      await TutorService.analyzeQueryStream(
-        query,
-        contextArgs,
-        history,
-        activeSessionId,
-        (chunk) => {
-          accumulatedText += chunk;
-          // Update the placeholder AI message content in real time
-          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: accumulatedText } : m));
-        },
-        (rag) => {
-          accumulatedRag = rag;
-          // Sync rag content into state
-          setTutorData(prev => prev ? { ...prev, ragContent: rag } : {
-            queryType: "concept",
-            concepts: [],
-            formulas: [],
-            explanation: "",
-            ragContent: rag
-          });
-        },
-        (structured) => {
-          const updatedData = {
-            queryType: structured.queryType || "concept",
-            concepts: structured.concepts || [],
-            formulas: structured.formulas || [],
-            explanation: accumulatedText,
-            ragContent: accumulatedRag,
-          };
-          setTutorData(updatedData);
-          setTutorResponse(updatedData);
-        },
-        controller.signal
-      );
-
+      const response = await TutorService.analyzeQuery(query, contextArgs, history, activeSessionId, controller.signal);
+      if (response.success) {
+        setTutorData(response.data);
+        setTutorResponse(response.data); // Sync with store for FAB
+        
+        if (response.session_id && response.session_id !== activeSessionId) {
+          setActiveSessionId(response.session_id);
+          setRefreshTrigger(prev => prev + 1);
+        }
+      } else {
+        setError("Failed to analyze question.");
+      }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === "AbortError") {
         // request was aborted; do nothing
       } else {
-        console.error("Tutor analyze stream error:", err);
+        console.error("Tutor analyze error:", err);
         setError(
           err instanceof Error
             ? err.message
