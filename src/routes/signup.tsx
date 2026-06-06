@@ -141,6 +141,7 @@ function Signup() {
       });
 
       if (success) {
+        toast.success("Account created successfully! Please login now.");
         window.setTimeout(() => navigate({ to: "/login" } as any), 2000);
       }
     } finally {

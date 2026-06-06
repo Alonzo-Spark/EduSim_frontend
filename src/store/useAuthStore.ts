@@ -13,6 +13,7 @@ export interface User {
   mobile_number?: string;
   is_email_verified: boolean;
   is_mobile_verified: boolean;
+  created_at?: string;
 }
 
 interface AuthState {
