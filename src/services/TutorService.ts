@@ -28,6 +28,48 @@ export interface ChatMessage {
   content: string;
 }
 
+/**
+ * Ensures we have a valid auth token before making API calls.
+ * If the current token is expired, attempts a refresh via checkAuth.
+ */
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  let token = useAuthStore.getState().token;
+  
+  if (token) {
+    // Quick check if token is expired by decoding the payload
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const expMs = (payload.exp || 0) * 1000;
+      const nowMs = Date.now();
+      // If token expires within 60 seconds, proactively refresh
+      if (expMs - nowMs < 60_000) {
+        console.log("[TutorService] Token expiring soon, refreshing...");
+        const refreshed = await useAuthStore.getState().checkAuth();
+        if (refreshed) {
+          token = useAuthStore.getState().token;
+        } else {
+          console.warn("[TutorService] Token refresh failed, proceeding without auth");
+          token = null;
+        }
+      }
+    } catch {
+      // If we can't parse the token, just use it as-is
+    }
+  }
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  } else {
+    console.warn("[TutorService] No auth token available — chat will not be saved");
+  }
+
+  return headers;
+}
+
 export const TutorService = {
   analyzeQuery: async (
     query: string, 
@@ -49,13 +91,7 @@ export const TutorService = {
       session_id: sessionId || undefined
     };
     
-    const token = useAuthStore.getState().token;
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+    const headers = await getAuthHeaders();
     
     const response = await fetch(joinUrl(API_BASE, "/api/tutor/analyze"), {
       method: "POST",
@@ -73,11 +109,7 @@ export const TutorService = {
   },
 
   getSessions: async (): Promise<{ success: boolean; sessions: any[] }> => {
-    const token = useAuthStore.getState().token;
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+    const headers = await getAuthHeaders();
     const response = await fetch(joinUrl(API_BASE, "/api/persistence/tutor/sessions"), {
       method: "GET",
       headers,
@@ -89,11 +121,7 @@ export const TutorService = {
   },
 
   getSessionMessages: async (sessionId: string): Promise<{ success: boolean; session: any }> => {
-    const token = useAuthStore.getState().token;
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+    const headers = await getAuthHeaders();
     const response = await fetch(joinUrl(API_BASE, `/api/persistence/tutor/session/${sessionId}`), {
       method: "GET",
       headers,
@@ -105,11 +133,7 @@ export const TutorService = {
   },
 
   deleteSession: async (sessionId: string): Promise<{ success: boolean; message: string }> => {
-    const token = useAuthStore.getState().token;
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+    const headers = await getAuthHeaders();
     const response = await fetch(joinUrl(API_BASE, `/api/persistence/tutor/session/${sessionId}`), {
       method: "DELETE",
       headers,

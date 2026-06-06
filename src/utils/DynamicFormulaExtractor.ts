@@ -117,7 +117,7 @@ function parseGenericFormula(rawFormula: string): {
   const parts = clean.split("=");
   const resultSymbol = parts[0] || "y";
   const equation = parts[1] || parts[0] || "";
-  
+
   // Extract all single letter variables from the equation
   const matches = Array.from(new Set(equation.match(/[a-zA-Z]/g) || []));
   const controls: FormulaControl[] = matches.map(symbol => ({
@@ -129,7 +129,7 @@ function parseGenericFormula(rawFormula: string): {
     step: 1,
     defaultValue: 10
   }));
-  
+
   const anatomy: FormulaAnatomyRow[] = [
     { symbol: resultSymbol, meaning: "Calculated Result", unit: "" },
     ...matches.map(symbol => ({
@@ -138,7 +138,7 @@ function parseGenericFormula(rawFormula: string): {
       unit: ""
     }))
   ];
-  
+
   return {
     title: `Formula ${rawFormula}`,
     description: `Mathematical relationship defining ${resultSymbol}.`,
@@ -164,31 +164,31 @@ export const DynamicFormulaExtractor = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: content })
       });
-      
+
       if (!extractRes.ok) throw new Error("Extraction failed");
       const extractData = await extractRes.json();
       const formulasList = extractData.formulas || [];
-      
+
       // 2. Fetch metadata for each formula in parallel
       const parsedFormulasResults = await Promise.all(
         formulasList.map(async (f: any) => {
           try {
             let labData: any = null;
-            
+
             try {
               const labRes = await fetch(getApiUrl("/api/formula/lab"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ formula: f.formula })
               });
-              
+
               if (labRes.ok) {
                 labData = await labRes.json();
               }
             } catch (fetchErr) {
               console.warn("Could not reach formula lab endpoint, using offline fallback.", fetchErr);
             }
-            
+
             // Deduplicate controls based on symbol (so we don't have n1, n2, n_1 all duplicated)
             let uniqueControls: FormulaControl[] = [];
             const seenVars = new Set<string>();
@@ -206,20 +206,20 @@ export const DynamicFormulaExtractor = {
                 });
               }
             }
-            
+
             let anatomy: FormulaAnatomyRow[] = labData?.anatomy || [];
             let title = labData?.title || "Formula";
             let description = labData?.description || content;
             let resultSymbol = labData?.resultSymbol || "y";
-            
+
             // If backend returned empty variable data, use premium local fallbacks
             if (anatomy.length === 0) {
               const cleanFormula = f.formula.replace(/[\$\s]/g, ""); // Strip $ and spaces
-              const matchedKey = Object.keys(OFFLINE_FORMULA_BACKUP).find(key => 
-                cleanFormula.toUpperCase().includes(key) || 
+              const matchedKey = Object.keys(OFFLINE_FORMULA_BACKUP).find(key =>
+                cleanFormula.toUpperCase().includes(key) ||
                 key.includes(cleanFormula.toUpperCase())
               );
-              
+
               if (matchedKey) {
                 const backup = OFFLINE_FORMULA_BACKUP[matchedKey];
                 title = backup.title;
@@ -236,7 +236,7 @@ export const DynamicFormulaExtractor = {
                 resultSymbol = parsedGeneric.resultSymbol;
               }
             }
-            
+
             let formulaId = labData?.id || f.id;
             if (formulaId === "dynamic-formula" || formulaId === "fallback") {
               formulaId = f.id || `formula-${Math.random().toString(36).substring(2, 9)}`;
@@ -267,9 +267,9 @@ export const DynamicFormulaExtractor = {
           }
         })
       );
-      
+
       const parsedFormulas = parsedFormulasResults.filter((f): f is DynamicParsedFormula => f !== null);
-      
+
       return parsedFormulas;
     } catch (e) {
       console.error("[DynamicFormulaExtractor] Error:", e);
