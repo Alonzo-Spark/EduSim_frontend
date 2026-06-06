@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TutorRouteImport } from './routes/tutor'
-import { Route as SimulationGeneratorRouteImport } from './routes/simulation-generator'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -25,16 +24,10 @@ import { Route as SandboxSimulationIdRouteImport } from './routes/sandbox.$simul
 import { Route as FormulaLabTopicRouteImport } from './routes/formula-lab.$topic'
 import { Route as ChaptersClassIdSubjectRouteImport } from './routes/chapters.$classId.$subject'
 import { Route as TopicsClassIdSubjectChapterRouteImport } from './routes/topics.$classId.$subject.$chapter'
-import { Route as SimulationClass9PhysicsLawsOfMotionRouteImport } from './routes/simulation.class9.physics.laws-of-motion'
 
 const TutorRoute = TutorRouteImport.update({
   id: '/tutor',
   path: '/tutor',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SimulationGeneratorRoute = SimulationGeneratorRouteImport.update({
-  id: '/simulation-generator',
-  path: '/simulation-generator',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -108,12 +101,6 @@ const TopicsClassIdSubjectChapterRoute =
     path: '/topics/$classId/$subject/$chapter',
     getParentRoute: () => rootRouteImport,
   } as any)
-const SimulationClass9PhysicsLawsOfMotionRoute =
-  SimulationClass9PhysicsLawsOfMotionRouteImport.update({
-    id: '/simulation/class9/physics/laws-of-motion',
-    path: '/simulation/class9/physics/laws-of-motion',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -124,14 +111,12 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
-  '/simulation-generator': typeof SimulationGeneratorRoute
   '/tutor': typeof TutorRoute
   '/formula-lab/$topic': typeof FormulaLabTopicRoute
   '/sandbox/$simulationId': typeof SandboxSimulationIdRoute
   '/simulation/$topic': typeof SimulationTopicRoute
   '/subjects/$classId': typeof SubjectsClassIdRoute
   '/chapters/$classId/$subject': typeof ChaptersClassIdSubjectRoute
-  '/simulation/class9/physics/laws-of-motion': typeof SimulationClass9PhysicsLawsOfMotionRoute
   '/topics/$classId/$subject/$chapter': typeof TopicsClassIdSubjectChapterRoute
 }
 export interface FileRoutesByTo {
@@ -143,14 +128,12 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
-  '/simulation-generator': typeof SimulationGeneratorRoute
   '/tutor': typeof TutorRoute
   '/formula-lab/$topic': typeof FormulaLabTopicRoute
   '/sandbox/$simulationId': typeof SandboxSimulationIdRoute
   '/simulation/$topic': typeof SimulationTopicRoute
   '/subjects/$classId': typeof SubjectsClassIdRoute
   '/chapters/$classId/$subject': typeof ChaptersClassIdSubjectRoute
-  '/simulation/class9/physics/laws-of-motion': typeof SimulationClass9PhysicsLawsOfMotionRoute
   '/topics/$classId/$subject/$chapter': typeof TopicsClassIdSubjectChapterRoute
 }
 export interface FileRoutesById {
@@ -163,14 +146,12 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
-  '/simulation-generator': typeof SimulationGeneratorRoute
   '/tutor': typeof TutorRoute
   '/formula-lab/$topic': typeof FormulaLabTopicRoute
   '/sandbox/$simulationId': typeof SandboxSimulationIdRoute
   '/simulation/$topic': typeof SimulationTopicRoute
   '/subjects/$classId': typeof SubjectsClassIdRoute
   '/chapters/$classId/$subject': typeof ChaptersClassIdSubjectRoute
-  '/simulation/class9/physics/laws-of-motion': typeof SimulationClass9PhysicsLawsOfMotionRoute
   '/topics/$classId/$subject/$chapter': typeof TopicsClassIdSubjectChapterRoute
 }
 export interface FileRouteTypes {
@@ -184,14 +165,12 @@ export interface FileRouteTypes {
     | '/profile'
     | '/settings'
     | '/signup'
-    | '/simulation-generator'
     | '/tutor'
     | '/formula-lab/$topic'
     | '/sandbox/$simulationId'
     | '/simulation/$topic'
     | '/subjects/$classId'
     | '/chapters/$classId/$subject'
-    | '/simulation/class9/physics/laws-of-motion'
     | '/topics/$classId/$subject/$chapter'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -203,14 +182,12 @@ export interface FileRouteTypes {
     | '/profile'
     | '/settings'
     | '/signup'
-    | '/simulation-generator'
     | '/tutor'
     | '/formula-lab/$topic'
     | '/sandbox/$simulationId'
     | '/simulation/$topic'
     | '/subjects/$classId'
     | '/chapters/$classId/$subject'
-    | '/simulation/class9/physics/laws-of-motion'
     | '/topics/$classId/$subject/$chapter'
   id:
     | '__root__'
@@ -222,14 +199,12 @@ export interface FileRouteTypes {
     | '/profile'
     | '/settings'
     | '/signup'
-    | '/simulation-generator'
     | '/tutor'
     | '/formula-lab/$topic'
     | '/sandbox/$simulationId'
     | '/simulation/$topic'
     | '/subjects/$classId'
     | '/chapters/$classId/$subject'
-    | '/simulation/class9/physics/laws-of-motion'
     | '/topics/$classId/$subject/$chapter'
   fileRoutesById: FileRoutesById
 }
@@ -242,14 +217,12 @@ export interface RootRouteChildren {
   ProfileRoute: typeof ProfileRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
-  SimulationGeneratorRoute: typeof SimulationGeneratorRoute
   TutorRoute: typeof TutorRoute
   FormulaLabTopicRoute: typeof FormulaLabTopicRoute
   SandboxSimulationIdRoute: typeof SandboxSimulationIdRoute
   SimulationTopicRoute: typeof SimulationTopicRoute
   SubjectsClassIdRoute: typeof SubjectsClassIdRoute
   ChaptersClassIdSubjectRoute: typeof ChaptersClassIdSubjectRoute
-  SimulationClass9PhysicsLawsOfMotionRoute: typeof SimulationClass9PhysicsLawsOfMotionRoute
   TopicsClassIdSubjectChapterRoute: typeof TopicsClassIdSubjectChapterRoute
 }
 
@@ -260,13 +233,6 @@ declare module '@tanstack/react-router' {
       path: '/tutor'
       fullPath: '/tutor'
       preLoaderRoute: typeof TutorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/simulation-generator': {
-      id: '/simulation-generator'
-      path: '/simulation-generator'
-      fullPath: '/simulation-generator'
-      preLoaderRoute: typeof SimulationGeneratorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -367,13 +333,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TopicsClassIdSubjectChapterRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/simulation/class9/physics/laws-of-motion': {
-      id: '/simulation/class9/physics/laws-of-motion'
-      path: '/simulation/class9/physics/laws-of-motion'
-      fullPath: '/simulation/class9/physics/laws-of-motion'
-      preLoaderRoute: typeof SimulationClass9PhysicsLawsOfMotionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -386,15 +345,12 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileRoute: ProfileRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
-  SimulationGeneratorRoute: SimulationGeneratorRoute,
   TutorRoute: TutorRoute,
   FormulaLabTopicRoute: FormulaLabTopicRoute,
   SandboxSimulationIdRoute: SandboxSimulationIdRoute,
   SimulationTopicRoute: SimulationTopicRoute,
   SubjectsClassIdRoute: SubjectsClassIdRoute,
   ChaptersClassIdSubjectRoute: ChaptersClassIdSubjectRoute,
-  SimulationClass9PhysicsLawsOfMotionRoute:
-    SimulationClass9PhysicsLawsOfMotionRoute,
   TopicsClassIdSubjectChapterRoute: TopicsClassIdSubjectChapterRoute,
 }
 export const routeTree = rootRouteImport
