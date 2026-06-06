@@ -124,7 +124,22 @@ export const useAuthStore = create<AuthState>()(
           return true;
         } catch (error: any) {
           set({ isLoading: false });
-          toast.error(error.message || "Failed to log in");
+          let msg = error.message || "Unable to login. Please try again";
+          const lowerMsg = msg.toLowerCase();
+          if (lowerMsg.includes("invalid") || lowerMsg.includes("wrong") || lowerMsg.includes("credential")) {
+            msg = "Invalid email or password";
+          } else if (lowerMsg.includes("not found") || lowerMsg.includes("does not exist") || lowerMsg.includes("no account")) {
+            msg = "Account does not exist";
+          } else if (lowerMsg.includes("disabled") || lowerMsg.includes("banned") || lowerMsg.includes("suspended")) {
+            msg = "Account has been disabled";
+          } else if (lowerMsg.includes("too many") || lowerMsg.includes("attempt") || lowerMsg.includes("rate limit") || lowerMsg.includes("locked")) {
+            msg = "Account locked due to multiple failed attempts";
+          } else if (lowerMsg.includes("fetch") || lowerMsg.includes("network")) {
+            msg = "Network error. Check your connection";
+          } else if (!error.message || lowerMsg.includes("internal server") || lowerMsg.includes("http 5")) {
+            msg = "Unable to login. Please try again";
+          }
+          toast.error(msg);
           return false;
         }
       },
@@ -150,7 +165,18 @@ export const useAuthStore = create<AuthState>()(
           return true;
         } catch (error: any) {
           console.error("register failed", error);
-          toast.error(error.message || "Registration failed");
+          let errMsg = error.message || "Something went wrong. Please try again";
+          const lowerMsg = errMsg.toLowerCase();
+          if (lowerMsg.includes("email") && (lowerMsg.includes("registered") || lowerMsg.includes("exist") || lowerMsg.includes("taken"))) {
+            errMsg = "Email already registered";
+          } else if (lowerMsg.includes("username") && (lowerMsg.includes("exist") || lowerMsg.includes("taken"))) {
+            errMsg = "Username already taken";
+          } else if (lowerMsg.includes("fetch") || lowerMsg.includes("network")) {
+            errMsg = "Network error. Check your connection";
+          } else if (!error.message || lowerMsg.includes("internal server") || lowerMsg.includes("http 5")) {
+            errMsg = "Something went wrong. Please try again";
+          }
+          toast.error(errMsg);
           return false;
         } finally {
           set({ isLoading: false });
@@ -165,7 +191,7 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
         });
         syncLegacyToken(null);
-        toast.success("Logged out successfully.");
+        toast.success("Logged out successfully");
       },
 
       checkAuth: async () => {
@@ -219,16 +245,16 @@ export const useAuthStore = create<AuthState>()(
               return true;
             } catch (refreshErr) {
               get().logout();
-              if (!isUnauthorizedError(refreshErr)) {
-                toast.error("Session check failed. Please sign in again.");
+              if (isUnauthorizedError(refreshErr)) {
+                toast.error("Your session has expired. Please login again");
               }
               return false;
             }
           }
 
           get().logout();
-          if (!isUnauthorizedError(error)) {
-            toast.error("Unable to validate your session right now.");
+          if (isUnauthorizedError(error)) {
+            toast.error("Your session has expired. Please login again");
           }
           return false;
         }
@@ -290,7 +316,16 @@ export const useAuthStore = create<AuthState>()(
           return true;
         } catch (error: any) {
           set({ isLoading: false });
-          toast.error(error.message || "Failed to trigger password reset");
+          let errMsg = error.message || "Unable to send reset link";
+          const lowerMsg = errMsg.toLowerCase();
+          if (lowerMsg.includes("not found") || lowerMsg.includes("no account") || lowerMsg.includes("does not exist")) {
+            errMsg = "No account found with this email";
+          } else if (lowerMsg.includes("too many") || lowerMsg.includes("rate limit") || lowerMsg.includes("429")) {
+            errMsg = "Too many requests. Please try again later";
+          } else if (!error.message || lowerMsg.includes("internal server") || lowerMsg.includes("http 5")) {
+            errMsg = "Unable to send reset link";
+          }
+          toast.error(errMsg);
           return false;
         }
       },
@@ -307,7 +342,16 @@ export const useAuthStore = create<AuthState>()(
           return true;
         } catch (error: any) {
           set({ isLoading: false });
-          toast.error(error.message || "Failed to reset password");
+          let errMsg = error.message || "Unable to reset password";
+          const lowerMsg = errMsg.toLowerCase();
+          if (lowerMsg.includes("expired")) {
+            errMsg = "Reset link has expired";
+          } else if (lowerMsg.includes("invalid") || lowerMsg.includes("token")) {
+            errMsg = "Invalid reset link";
+          } else if (!error.message || lowerMsg.includes("internal server") || lowerMsg.includes("http 5")) {
+            errMsg = "Unable to reset password";
+          }
+          toast.error(errMsg);
           return false;
         }
       },

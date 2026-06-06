@@ -86,8 +86,13 @@ function Signup() {
 
   const passwordChecks = useMemo(() => {
     const digitsOnly = mobileNumber.replace(/\D/g, "");
+    const nameTrimmed = name.trim();
+    const nameLen = nameTrimmed.length >= 3;
+    const nameRegex = nameTrimmed.length === 0 || /^[A-Za-z0-9_]+$/.test(nameTrimmed);
     return {
-      name: name.trim().length >= 3,
+      nameLen,
+      nameRegex,
+      name: nameLen && nameRegex,
       email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()),
       mobile: digitsOnly.length === 0 || /^\d{10}$/.test(digitsOnly),
       length: password.length >= 8,
@@ -127,7 +132,11 @@ function Signup() {
 
     if (!isFormValid) {
       focusFirstInvalidField();
-      toast.error("Please fix the highlighted fields and try again.");
+      if (!name && !email && !password && !confirmPassword) {
+        toast.error("Please fill all required fields");
+      } else {
+        toast.error("Please correct the highlighted errors");
+      }
       return;
     }
 
@@ -150,7 +159,7 @@ function Signup() {
   };
 
   const strengthScore = [(passwordChecks as any).length, passwordChecks.uppercase, passwordChecks.lowercase, passwordChecks.number, passwordChecks.special].filter(Boolean).length;
-  const strength = strengthScore <= 2 ? { label: "Weak", width: "33%", color: "bg-red-500" } : strengthScore <= 4 ? { label: "Medium", width: "66%", color: "bg-amber-400" } : { label: "Strong", width: "100%", color: "bg-green-500" };
+  const strength = strengthScore <= 2 ? { label: "Weak Password", width: "33%", color: "bg-red-500" } : strengthScore <= 4 ? { label: "Medium Password", width: "66%", color: "bg-amber-400" } : { label: "Strong Password ✓", width: "100%", color: "bg-green-500" };
 
   const fieldClass = (valid: boolean, error: boolean) =>
     `w-full rounded-2xl bg-background text-sm text-foreground outline-none placeholder:text-muted-foreground/60 transition-all duration-300 ${
@@ -230,12 +239,25 @@ function Signup() {
 
           <form onSubmit={handleSignupSubmit} className="space-y-4 text-left" noValidate>
             <div className="space-y-1">
-              <label htmlFor="name" className="text-[10px] font-bold text-muted-foreground font-mono tracking-wider">FULL NAME</label>
+              <label htmlFor="name" className="text-[10px] font-bold text-muted-foreground font-mono tracking-wider">USERNAME</label>
               <div className="relative group/input">
                 <User className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground group-focus-within/input:text-primary transition-colors" />
-                <input id="name" ref={nameRef} type="text" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setTouched((current) => ({ ...current, name: true }))} aria-invalid={showError("name", passwordChecks.name)} aria-describedby={showError("name", passwordChecks.name) ? "name-error" : undefined} className={fieldClass(passwordChecks.name, showError("name", passwordChecks.name)) + " pl-10 pr-4 py-3"} />
+                <input id="name" ref={nameRef} type="text" placeholder="Enter your username" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setTouched((current) => ({ ...current, name: true }))} aria-invalid={showError("name", passwordChecks.name)} aria-describedby={showError("name", passwordChecks.name) ? "name-error" : undefined} className={fieldClass(passwordChecks.name, showError("name", passwordChecks.name)) + " pl-10 pr-4 py-3"} />
               </div>
-              {showError("name", passwordChecks.name) && <p id="name-error" className="text-xs text-red-400">Please enter your full name</p>}
+              {showError("name", passwordChecks.name) && (
+                <p id="name-error" className="text-xs text-red-400 mt-1">
+                  {name.trim().length === 0
+                    ? "Username is required"
+                    : !passwordChecks.nameLen
+                      ? "Username must be at least 3 characters"
+                      : "Only letters, numbers and underscores allowed"}
+                </p>
+              )}
+              {passwordChecks.name && name.trim().length >= 3 && (
+                <p className="text-xs text-green-500 mt-1">
+                  Username available ✓
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -244,7 +266,13 @@ function Signup() {
                 <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground group-focus-within/input:text-primary transition-colors" />
                 <input id="email" ref={emailRef} type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setTouched((current) => ({ ...current, email: true }))} aria-invalid={showError("email", passwordChecks.email)} aria-describedby={showError("email", passwordChecks.email) ? "email-error" : undefined} className={fieldClass(passwordChecks.email, showError("email", passwordChecks.email)) + " pl-10 pr-4 py-3"} />
               </div>
-              {showError("email", passwordChecks.email) && <p id="email-error" className="text-xs text-red-400">Please enter a valid email address</p>}
+              {showError("email", passwordChecks.email) && (
+                <p id="email-error" className="text-xs text-red-400">
+                  {email.trim().length === 0
+                    ? "Email is required"
+                    : "Please enter a valid email address"}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -260,11 +288,26 @@ function Signup() {
               <label htmlFor="password" className="text-[10px] font-bold text-muted-foreground font-mono tracking-wider">PASSWORD</label>
               <div className="relative group/input">
                 <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground group-focus-within/input:text-primary transition-colors" />
-                <input id="password" ref={passwordRef} type={showPassword ? "text" : "password"} placeholder="Create a strong password" value={password} onChange={(e) => setPassword(e.target.value)} onBlur={() => setTouched((current) => ({ ...current, password: true }))} className={fieldClass(isPasswordValid, false) + " pl-10 pr-10 py-3"} />
-                <button type="button" onClick={() => setShowPassword((prev) => !prev)} className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md" aria-label={showPassword ? "Hide password" : "Show password"}>
+                <input id="password" ref={passwordRef} type={showPassword ? "text" : "password"} placeholder="Create a strong password" value={password} onChange={(e) => setPassword(e.target.value)} onBlur={() => setTouched((current) => ({ ...current, password: true }))} className={fieldClass(isPasswordValid, showError("password", isPasswordValid)) + " pl-10 pr-10 py-3"} />
+                <button type="button" onClick={() => { setShowPassword((prev) => !prev); toast.success("Password visibility toggled"); }} className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md" aria-label={showPassword ? "Hide password" : "Show password"}>
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {showError("password", isPasswordValid) && (
+                <p id="password-error" className="text-xs text-red-400 mt-1">
+                  {password.length === 0
+                    ? "Password is required"
+                    : !passwordChecks.length
+                      ? "Password must be at least 8 characters"
+                      : !passwordChecks.uppercase
+                        ? "Must contain at least one uppercase letter"
+                        : !passwordChecks.lowercase
+                          ? "Must contain at least one lowercase letter"
+                          : !passwordChecks.number
+                            ? "Must contain at least one number"
+                            : "Must contain at least one special character"}
+                </p>
+              )}
 
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between text-[10px] font-semibold">
@@ -296,11 +339,22 @@ function Signup() {
               <div className="relative group/input">
                 <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground group-focus-within/input:text-primary transition-colors" />
                 <input id="confirmPassword" ref={confirmPasswordRef} type={showConfirmPassword ? "text" : "password"} placeholder="Confirm your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} onBlur={() => setTouched((current) => ({ ...current, confirmPassword: true }))} aria-invalid={showError("confirmPassword", passwordChecks.confirm)} aria-describedby={showError("confirmPassword", passwordChecks.confirm) ? "confirm-password-error" : undefined} className={fieldClass(passwordChecks.confirm, showError("confirmPassword", passwordChecks.confirm)) + " pl-10 pr-10 py-3"} />
-                <button type="button" onClick={() => setShowConfirmPassword((prev) => !prev)} className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md" aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}>
+                <button type="button" onClick={() => { setShowConfirmPassword((prev) => !prev); toast.success("Password visibility toggled"); }} className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md" aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}>
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {showError("confirmPassword", passwordChecks.confirm) && <p id="confirm-password-error" className="text-xs text-red-400">Passwords do not match</p>}
+              {showError("confirmPassword", passwordChecks.confirm) && (
+                <p id="confirm-password-error" className="text-xs text-red-400 mt-1">
+                  {confirmPassword.length === 0
+                    ? "Confirm Password is required"
+                    : "Passwords do not match"}
+                </p>
+              )}
+              {passwordChecks.confirm && confirmPassword.length > 0 && (
+                <p className="text-xs text-green-500 mt-1">
+                  Passwords match ✓
+                </p>
+              )}
             </div>
 
             <div className="space-y-2 rounded-2xl bg-secondary border border-border/40 p-4">

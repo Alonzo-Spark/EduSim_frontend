@@ -189,6 +189,7 @@ function RootComponent() {
     }
 
     if (!isAuthenticated && requiresAuth) {
+      toast.error("Please login to continue");
       navigate({ to: "/login", search: EMPTY_LOGIN_SEARCH as any });
     } else if (isAuthenticated && isAuthPage) {
       navigate({ to: "/dashboard" });
@@ -199,6 +200,7 @@ function RootComponent() {
     return (
       <div className="min-h-screen w-full relative bg-background text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar">
         <Outlet />
+        <Toaster />
       </div>
     );
   }
