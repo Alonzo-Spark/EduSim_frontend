@@ -41,11 +41,10 @@ export function ChatWorkspace({
   focusInput,
   topicTitle,
   topicContext,
-  messages: propsMessages,
+  messages = [],
   onNewChat,
   toggleHistory,
 }: Props) {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
@@ -55,29 +54,9 @@ export function ChatWorkspace({
     return () => window.removeEventListener("resize", updateDesktop);
   }, []);
 
-  useEffect(() => {
-    if (propsMessages !== undefined) {
-      setMessages(propsMessages);
-    }
-  }, [propsMessages]);
-
-  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const lastAiResponseRef = useRef<string | null>(null);
 
   const send = (text: string) => {
-    const newMsg: Message = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: text,
-      timestamp: formatTime(new Date()),
-    };
-    setMessages((current) => [
-      ...current,
-      newMsg,
-    ]);
-    setPendingPrompt(text);
-    
     const history: ChatMessage[] = messages.map((m) => ({
       role: m.role,
       content: m.content,
@@ -103,31 +82,8 @@ export function ChatWorkspace({
   };
 
   const handleNewChat = () => {
-    setMessages([]);
-    setPendingPrompt(null);
-    lastAiResponseRef.current = null;
     onNewChat?.();
   };
-
-  useEffect(() => {
-    if (!loading && aiResponse) {
-      const shouldAppend =
-        pendingPrompt !== null || messages.length === 0 || lastAiResponseRef.current !== aiResponse;
-      if (shouldAppend) {
-        setMessages((current) => [
-          ...current,
-          {
-            id: crypto.randomUUID(),
-            role: "ai",
-            content: aiResponse,
-            timestamp: formatTime(new Date()),
-          },
-        ]);
-        lastAiResponseRef.current = aiResponse;
-        setPendingPrompt(null);
-      }
-    }
-  }, [aiResponse, loading, messages.length, pendingPrompt]);
 
   useEffect(() => {
     if (messages.length > 0) {
