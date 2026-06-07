@@ -173,7 +173,7 @@ function Signup() {
   return (
     <div className="relative min-h-[100svh] overflow-hidden bg-background text-foreground font-sans">
       {/* Soft Ambient Background Gradient */}
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-[#FAFCFF] via-[#F4F9FF] to-[#E6F2FF]" />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-[#FAFCFF] via-[#F4F9FF] to-[#E6F2FF] dark:from-[#030712] dark:via-[#080E1A] dark:to-[#050811]" />
 
       <div className="relative z-10 grid min-h-[100svh] w-full max-w-[1100px] grid-cols-1 lg:grid-cols-2 items-center gap-12 px-6 py-8 mx-auto">
         
