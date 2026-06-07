@@ -61,24 +61,51 @@ const FormulaPlayground: React.FC<{
   values: Record<string, number>;
   setValues: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }> = ({ formula, values, setValues }) => {
+  const controls = useMemo(() => Array.isArray(formula?.controls) ? formula.controls : [], [formula]);
+  const symbols = useMemo(() => controls.map(c => c.symbol), [controls]);
 
-  const result = useMemo(() => {
-    if (!formula) return null;
+  // Track which symbol to solve for
+  const defaultTarget = formula?.resultSymbol || symbols[0] || "";
+  const [targetSymbol, setTargetSymbol] = useState<string>("");
+
+  useEffect(() => {
+    if (symbols.includes(defaultTarget)) {
+      setTargetSymbol(defaultTarget);
+    } else if (symbols.length > 0) {
+      setTargetSymbol(symbols[0]);
+    }
+  }, [defaultTarget, symbols]);
+
+  const result = useMemo<{ status: "ok"; value: number } | { status: "error"; message: string } | null>(() => {
+    if (!formula || !targetSymbol) return null;
     try {
-      // Demo fail-safe ONLY for Newton's Second Law
-      const isNewtonSecondLaw = formula.id === "newton-second-law" || formula.formula === "F=ma";
-      if (isNewtonSecondLaw) {
-        const m = values['m'] ?? 10;
-        const a = values['a'] ?? 5;
-        return { status: "ok", value: m * a };
-      }
-      
-      let expr = formula.expression || "";
-      const resultSymbol = formula.resultSymbol;
-      
-      if (formula.derived_expressions && resultSymbol && formula.derived_expressions[resultSymbol]) {
-        expr = formula.derived_expressions[resultSymbol];
+      let expr = formula.expression || formula.formula || "";
+      const formulaStr = (formula.formula || formula.expression || "").replace(/\s+/g, "");
+      const scope = { ...values };
+      delete scope[targetSymbol];
+
+      if (formula.derived_expressions && formula.derived_expressions[targetSymbol]) {
+        expr = formula.derived_expressions[targetSymbol];
+        const val = mathEvaluate(expr, scope);
+        if (typeof val === 'number' && Number.isFinite(val)) {
+          return { status: "ok", value: val };
+        }
+      } else if (formula.id === "newton-second-law" || formulaStr === "F=ma" || formulaStr === "F=m*a" || formulaStr === "F=m\\timesa") {
+        // Fallback F = m * a
+        const m = scope.m ?? 10;
+        const a = scope.a ?? 5;
+        const F = scope.F ?? 50;
+        if (targetSymbol === "F") {
+          return { status: "ok", value: m * a };
+        } else if (targetSymbol === "m") {
+          if (a === 0) throw new Error("Acceleration cannot be zero.");
+          return { status: "ok", value: F / a };
+        } else if (targetSymbol === "a") {
+          if (m === 0) throw new Error("Mass cannot be zero.");
+          return { status: "ok", value: F / m };
+        }
       } else {
+        // Dynamic string parser fallback
         let clean = expr.replace(/[\$]/g, "");
         clean = clean
           .replace(/\\Delta\s*\{?([a-zA-Z])\}?/g, "Delta_$1")
@@ -88,27 +115,42 @@ const FormulaPlayground: React.FC<{
         expr = parts[1] || parts[0];
         expr = expr
           .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "($1)/($2)")
+          .replace(/\\sqrt\s*\{([^}]+)\}/g, "sqrt($1)")
+          .replace(/\\sqrt/g, "sqrt")
           .replace(/\\sin/g, "sin")
           .replace(/\\cos/g, "cos")
           .replace(/\\tan/g, "tan")
           .replace(/\\theta/g, "theta")
           .replace(/\\cdot/g, "*")
           .replace(/\\times/g, "*")
+          .replace(/\\/g, "")
           .replace(/\^/g, "**")
           .replace(/\{/g, "(")
           .replace(/\}/g, ")");
-      }
-      
-      const scope = { ...values };
-      const val = mathEvaluate(expr, scope);
-      if (typeof val === 'number' && Number.isFinite(val)) {
-         return { status: "ok", value: val };
+
+        const val = mathEvaluate(expr, scope);
+        if (typeof val === 'number' && Number.isFinite(val)) {
+          return { status: "ok", value: val };
+        }
       }
       return { status: "ok", value: 0 };
-    } catch(e) {
-      return { status: "ok", value: 0 };
+    } catch(e: any) {
+      return { status: "error", message: e.message || "Calculation error" };
     }
-  }, [formula, values]);
+  }, [formula, values, targetSymbol]);
+
+  // Sync calculated result value back to parent values state
+  useEffect(() => {
+    if (result && result.status === "ok" && "value" in result && targetSymbol) {
+      const valNum = result.value;
+      if (valNum !== undefined) {
+        const roundedVal = Number(valNum.toPrecision(6));
+        if (values[targetSymbol] !== roundedVal) {
+          setValues((current) => ({ ...current, [targetSymbol]: roundedVal }));
+        }
+      }
+    }
+  }, [result, targetSymbol, setValues, values]);
 
   if (!formula) {
     return (
@@ -119,13 +161,11 @@ const FormulaPlayground: React.FC<{
   }
 
   const anatomy = Array.isArray(formula.anatomy) ? formula.anatomy : [];
-  const controls = Array.isArray(formula.controls) ? formula.controls : [];
-  const resultSymbol = formula.resultSymbol || "result";
-  const resultUnit = anatomy.find((row) => row.symbol === resultSymbol)?.unit || "";
+  const resultUnit = anatomy.find((row) => row.symbol === targetSymbol)?.unit || "";
   const title = formula.title || formula.displayFormula || formula.formula || formula.raw || "Unnamed Formula";
 
-  // Filter out resultSymbol from the inputs
-  const inputControls = controls.filter((control) => control.symbol !== resultSymbol);
+  // Filter out targetSymbol from the inputs
+  const inputControls = controls.filter((control) => control.symbol !== targetSymbol);
 
   if (inputControls.length === 0) {
     return (
@@ -137,29 +177,44 @@ const FormulaPlayground: React.FC<{
 
   return (
     <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] space-y-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Interactive Playground</p>
           <h3 className="mt-1 text-2xl font-black text-slate-800 tracking-tight">Try {title}</h3>
         </div>
-        <div className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-violet-700">
+        <div className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-violet-700 w-fit self-start">
           Live calculation
         </div>
       </div>
 
+      {/* Target variable selection */}
+      <div className="space-y-2">
+        <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Solve For</label>
+        <div className="flex flex-wrap gap-2">
+          {controls.map((c) => (
+            <button
+              key={c.symbol}
+              type="button"
+              onClick={() => setTargetSymbol(c.symbol)}
+              className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
+                targetSymbol === c.symbol
+                  ? "bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-650/15"
+                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {c.label || c.symbol} ({c.symbol})
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sliders for remaining variables */}
       <div className="grid gap-3">
         {inputControls.map((control) => {
-          const isNewtonSecondLaw = formula.id === "newton-second-law" || formula.formula === "F=ma";
           let min = control.min;
           let max = control.max;
           let step = control.step || 1;
           
-          if (isNewtonSecondLaw) {
-             if (control.symbol === 'm') { min = 1; max = 100; }
-             if (control.symbol === 'a') { min = 1; max = 20; }
-          }
-          
-          // Auto-scale ranges for very large or very small values if the bounds are generic
           const defVal = values[control.symbol] ?? control.defaultValue;
           if (min === 1 && max === 100 && (defVal < 0.1 || defVal > 1000)) {
             if (defVal > 0) {
@@ -188,18 +243,23 @@ const FormulaPlayground: React.FC<{
         })}
       </div>
 
+      {/* Result Display Card */}
       <div className="rounded-2xl bg-gradient-to-br from-violet-600 via-violet-650 to-indigo-750 p-5 shadow-lg shadow-violet-600/10 border border-violet-500/20 text-white relative overflow-hidden">
         <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-cyan-400/10 rounded-full blur-2xl" />
-        <div className="text-[10px] font-extrabold uppercase tracking-widest text-violet-200">Result</div>
+        <div className="text-[10px] font-extrabold uppercase tracking-widest text-violet-200">Result ({targetSymbol})</div>
         <div className="mt-1.5 text-3xl font-black tracking-tight text-white">
-          {(result as any)?.status === "ok" ? (
-            Math.abs((result as any).value) >= 10000 || (Math.abs((result as any).value) < 0.001 && (result as any).value !== 0)
-              ? `${Number((result as any).value).toExponential(4)} ${resultUnit}`
-              : `${Number((result as any).value).toFixed(2)} ${resultUnit}`
-          ) : (result as any)?.message || "Missing variable"}
+          {result?.status === "ok" && "value" in result && result.value !== undefined ? (
+            Math.abs(result.value) >= 10000 || (Math.abs(result.value) < 0.001 && result.value !== 0)
+              ? `${Number(result.value).toExponential(4)} ${resultUnit}`
+              : `${Number(result.value).toFixed(2)} ${resultUnit}`
+          ) : result?.status === "error" ? (
+            result.message
+          ) : (
+            "Adjust the controls to calculate"
+          )}
         </div>
         <div className="mt-1 text-xs text-violet-100/90 font-medium">
-          {(result as any)?.status === "ok" ? `${resultSymbol} = ${anatomy.find((row) => row.symbol === resultSymbol)?.meaning || title}` : "Adjust the controls to calculate the formula."}
+          {result?.status === "ok" ? `${targetSymbol} = ${anatomy.find((row) => row.symbol === targetSymbol)?.meaning || title}` : "Adjust the controls to calculate the formula."}
         </div>
       </div>
     </div>

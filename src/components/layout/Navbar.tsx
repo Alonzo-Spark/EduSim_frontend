@@ -1,14 +1,16 @@
-import { Bell, User, Menu } from "lucide-react";
+import { Sun, Moon, User, Menu } from "lucide-react";
 import { GlobalSearch } from "./GlobalSearch";
 import { useSidebarStore } from "@/store/useSidebarStore";
 import { motion } from "framer-motion";
-import { useRouterState } from "@tanstack/react-router";
+import { useRouterState, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { useTheme } from "@/hooks/useTheme";
 
 export function Navbar() {
   const { setMobileOpen } = useSidebarStore();
   const [isDesktop, setIsDesktop] = useState(false);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     const updateDesktop = () => setIsDesktop(window.innerWidth >= 1024);
@@ -37,7 +39,7 @@ export function Navbar() {
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="mx-auto max-w-7xl w-full h-14 flex items-center justify-between px-6 pointer-events-none"
+          className="mx-auto max-w-[96%] w-full h-14 flex items-center justify-between px-6 pointer-events-none"
         >
           <div className="flex items-center gap-3 shrink-0 pointer-events-auto">
             <button
@@ -56,14 +58,22 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0 pointer-events-auto">
-            <button className="hidden sm:flex w-11 h-11 rounded-xl items-center justify-center bg-card border border-border shadow-sm hover:bg-secondary/50 transition-all relative hover:scale-105 active:scale-95 group">
-              <Bell className="w-5 h-5 text-muted-foreground group-hover:text-foreground" />
-              <span className="absolute top-3.5 right-3.5 w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
+            {/* Theme Toggle Button */}
+            <button 
+              onClick={toggleTheme}
+              className="hidden sm:flex w-11 h-11 rounded-xl items-center justify-center bg-card border border-border shadow-sm hover:bg-secondary/50 transition-all hover:scale-105 active:scale-95 group cursor-pointer"
+              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {theme === "dark" ? (
+                <Sun className="w-5 h-5 text-muted-foreground group-hover:text-amber-500 transition-colors" />
+              ) : (
+                <Moon className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              )}
             </button>
 
-            <button className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--neon-purple)] to-[var(--neon-blue)] flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all border border-border">
+            <Link to="/profile" className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--neon-purple)] to-[var(--neon-blue)] flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all border border-border">
               <User className="w-5 h-5 text-white" />
-            </button>
+            </Link>
           </div>
         </motion.header>
       </div>
@@ -99,16 +109,23 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          {/* Notifications Bell */}
-          <button className="hidden sm:flex w-10 h-10 rounded-full items-center justify-center bg-card border border-border/80 shadow-sm hover:bg-secondary/50 transition-all hover:scale-105 active:scale-95 relative group cursor-pointer">
-            <Bell className="w-4.5 h-4.5 text-muted-foreground group-hover:text-foreground" />
-            <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
+          {/* Theme Toggle Button */}
+          <button 
+            onClick={toggleTheme}
+            className="flex w-10 h-10 rounded-full items-center justify-center bg-card border border-border/80 shadow-sm hover:bg-secondary/50 transition-all hover:scale-105 active:scale-95 group cursor-pointer"
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {theme === "dark" ? (
+              <Sun className="w-4.5 h-4.5 text-muted-foreground group-hover:text-amber-500 transition-colors" />
+            ) : (
+              <Moon className="w-4.5 h-4.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+            )}
           </button>
 
           {/* User Profile Button */}
-          <button className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer">
+          <Link to="/profile" className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer">
             <User className="w-4 h-4" />
-          </button>
+          </Link>
         </div>
       </motion.header>
     </div>

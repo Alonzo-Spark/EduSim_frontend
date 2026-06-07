@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { FormulaGraph } from "@/utils/formulaTemplates";
 import { FormulaSimulation } from "@/utils/formulaTemplates";
 import { extractFormulas } from "@/utils/formulaParser";
 import { BlockMath } from "@/components/math/Katex";
-import { Activity, BookOpen, Calculator, LineChart, PlaySquare, HelpCircle, X } from "lucide-react";
+import { Activity, BookOpen, Calculator, LineChart, PlaySquare, HelpCircle, X, Loader2 } from "lucide-react";
 import { useTutorStore } from "@/store/tutorStore";
 import FormulaCalculator from "./FormulaCalculator";
+import { getApiUrl } from "@/config/api";
 
 interface Props {
   formulaRaw: string;
@@ -17,13 +18,64 @@ export default function InteractiveFormulaCard({ formulaRaw }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const { setActiveFormulaId } = useTutorStore();
 
-  // Extract formula details
+  // Extract static formula details as initial fallback
   const parsed = extractFormulas(formulaRaw);
   const formulaDef = parsed[0]?.matchedDefinition;
 
-  const title = formulaDef?.title || "Formula Explanation";
-  const expression = formulaDef?.expression || formulaRaw;
-  const variables = formulaDef?.variables || {};
+  const [dynamicDef, setDynamicDef] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const fetchDetails = async () => {
+      setLoadingDetails(true);
+      try {
+        const response = await fetch(getApiUrl("/api/formula/lab"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ formula: formulaRaw })
+        });
+        if (response.ok && active) {
+          const data = await response.json();
+          setDynamicDef(data);
+        }
+      } catch (err) {
+        console.error("Failed to load dynamic formula details", err);
+      } finally {
+        if (active) setLoadingDetails(false);
+      }
+    };
+    fetchDetails();
+    return () => {
+      active = false;
+    };
+  }, [formulaRaw]);
+
+  const activeSelectedDef = dynamicDef || formulaDef;
+  const title = activeSelectedDef?.title || "Formula Explanation";
+  const expression = activeSelectedDef?.expression || formulaRaw;
+
+  const resolvedVariables = useMemo(() => {
+    if (dynamicDef) {
+      if (Array.isArray(dynamicDef.anatomy) && dynamicDef.anatomy.length > 0) {
+        return dynamicDef.anatomy;
+      }
+      if (Array.isArray(dynamicDef.controls) && dynamicDef.controls.length > 0) {
+        return dynamicDef.controls.map((c: any) => ({
+          symbol: c.symbol,
+          meaning: c.label || c.symbol,
+          unit: c.unit || ""
+        }));
+      }
+    }
+    const vars = formulaDef?.variables || {};
+    const unitMap = formulaDef?.unitMap || {};
+    return Object.entries(vars).map(([symbol, name]) => ({
+      symbol,
+      meaning: name as string,
+      unit: unitMap[symbol] || ""
+    }));
+  }, [dynamicDef, formulaDef]);
 
   const tabs = [
     { id: "overview", label: "Overview", icon: BookOpen },
@@ -35,7 +87,10 @@ export default function InteractiveFormulaCard({ formulaRaw }: Props) {
 
   return (
     <div className="w-full rounded-[1.75rem] border border-border bg-card shadow-2xl overflow-hidden mt-4 relative">
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+        {loadingDetails && (
+          <Loader2 className="w-4 h-4 text-violet-500 animate-spin" />
+        )}
         <button
           onClick={() => setActiveFormulaId(null)}
           className="p-1.5 rounded-full hover:bg-secondary text-muted-foreground transition-colors"
@@ -78,17 +133,19 @@ export default function InteractiveFormulaCard({ formulaRaw }: Props) {
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Variables</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {Object.entries(variables).length > 0 ? (
-                Object.entries(variables).map(([symbol, name]) => (
-                  <div key={symbol} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50 border border-border">
-                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary font-serif italic text-lg">
-                      {symbol}
+              {resolvedVariables.length > 0 ? (
+                resolvedVariables.map((v: any) => (
+                  <div key={v.symbol} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50 border border-border">
+                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary font-serif italic text-lg shrink-0">
+                      {v.symbol}
                     </div>
-                    <span className="text-sm text-muted-foreground">{name}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {v.meaning}{v.unit ? ` (${v.unit})` : ""}
+                    </span>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground">Unknown formula. No variables mapped.</p>
+                <p className="text-sm text-muted-foreground">Analyzing variables...</p>
               )}
             </div>
 
@@ -103,7 +160,7 @@ export default function InteractiveFormulaCard({ formulaRaw }: Props) {
         {activeTab === "calculator" && (
           <div className="h-full min-h-[300px]">
             <React.Suspense fallback={<div className="flex items-center justify-center">Loading calculator...</div>}>
-              <FormulaCalculator formulaDef={formulaDef} />
+              <FormulaCalculator formulaDef={activeSelectedDef} />
             </React.Suspense>
           </div>
         )}
@@ -111,7 +168,7 @@ export default function InteractiveFormulaCard({ formulaRaw }: Props) {
         {activeTab === "graph" && (
           <div className="w-full h-[300px] relative">
             <React.Suspense fallback={<div className="absolute inset-0 flex items-center justify-center">Loading graph...</div>}>
-              <FormulaGraph formulaDef={formulaDef} />
+              <FormulaGraph formulaDef={activeSelectedDef} />
             </React.Suspense>
           </div>
         )}
@@ -119,7 +176,7 @@ export default function InteractiveFormulaCard({ formulaRaw }: Props) {
         {activeTab === "simulation" && (
           <div className="w-full h-[300px] relative flex items-center justify-center bg-secondary/20 rounded-2xl border border-border overflow-hidden">
             <React.Suspense fallback={<div className="absolute inset-0 flex items-center justify-center">Loading simulation...</div>}>
-              <FormulaSimulation formulaDef={formulaDef} />
+              <FormulaSimulation formulaDef={activeSelectedDef} />
             </React.Suspense>
           </div>
         )}
@@ -134,3 +191,4 @@ export default function InteractiveFormulaCard({ formulaRaw }: Props) {
     </div>
   );
 }
+

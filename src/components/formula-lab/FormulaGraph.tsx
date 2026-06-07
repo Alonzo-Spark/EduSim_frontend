@@ -40,12 +40,15 @@ const FormulaGraph: React.FC<{
       expr = parts[1] || parts[0];
       expr = expr
         .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "($1)/($2)")
+        .replace(/\\sqrt\s*\{([^}]+)\}/g, "sqrt($1)")
+        .replace(/\\sqrt/g, "sqrt")
         .replace(/\\sin/g, "sin")
         .replace(/\\cos/g, "cos")
         .replace(/\\tan/g, "tan")
         .replace(/\\theta/g, "theta")
         .replace(/\\cdot/g, "*")
         .replace(/\\times/g, "*")
+        .replace(/\\/g, "")
         .replace(/\^/g, "**")
         .replace(/\{/g, "(")
         .replace(/\}/g, ")");
@@ -95,24 +98,24 @@ const FormulaGraph: React.FC<{
   }
 
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] space-y-4">
+    <div className="rounded-3xl border border-border bg-card p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Live Graph</p>
-          <h3 className="mt-1 text-lg font-black text-slate-800 tracking-tight">{yLabel} vs {xLabel}</h3>
+          <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">Live Graph</p>
+          <h3 className="mt-1 text-lg font-black text-foreground tracking-tight">{yLabel} vs {xLabel}</h3>
         </div>
-        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded">
+        <div className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground bg-secondary/35 border border-border px-2.5 py-1 rounded">
           {title}
         </div>
       </div>
       <div className="h-[320px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 20, left: 10, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.03)" />
-            <XAxis dataKey="x" stroke="rgba(15,23,42,0.4)" tickLine={false} tick={{ fontSize: 11, fontWeight: 500 }} />
-            <YAxis stroke="rgba(15,23,42,0.4)" tickLine={false} tick={{ fontSize: 11, fontWeight: 500 }} />
-            <Tooltip contentStyle={{ backgroundColor: "rgba(255, 255, 255, 0.98)", border: "1px solid rgba(241, 245, 249, 1)", borderRadius: 16, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05)" }} labelStyle={{ fontWeight: "bold", color: "#1e293b" }} itemStyle={{ color: "#7c3aed" }} />
-            <Line type="monotone" dataKey="y" stroke="#7c3aed" strokeWidth={3.5} dot={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
+            <XAxis dataKey="x" stroke="var(--foreground)" opacity={0.4} tickLine={false} tick={{ fontSize: 11, fontWeight: 500, fill: "currentColor" }} />
+            <YAxis stroke="var(--foreground)" opacity={0.4} tickLine={false} tick={{ fontSize: 11, fontWeight: 500, fill: "currentColor" }} />
+            <Tooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05)" }} labelStyle={{ fontWeight: "bold", color: "var(--foreground)" }} itemStyle={{ color: "var(--primary)" }} />
+            <Line type="monotone" dataKey="y" stroke="var(--primary)" strokeWidth={3.5} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>

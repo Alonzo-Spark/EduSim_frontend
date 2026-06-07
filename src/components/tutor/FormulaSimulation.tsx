@@ -1,12 +1,23 @@
-import React from "react";
-import { FormulaDefinition } from "@/data/formulaRegistry";
+import React, { useMemo } from "react";
 import { motion } from "framer-motion";
 
 interface Props {
-  formulaDef?: FormulaDefinition;
+  formulaDef?: any;
 }
 
 export default function FormulaSimulation({ formulaDef }: Props) {
+  const simulationType = useMemo(() => {
+    if (!formulaDef) return "generic";
+    if (formulaDef.simulation && formulaDef.simulation !== "generic") {
+      return formulaDef.simulation;
+    }
+    const text = `${formulaDef.title || ""} ${formulaDef.expression || formulaDef.formula || ""} ${formulaDef.description || ""}`.toLowerCase();
+    if (/force|acceleration|mass/i.test(text)) return "force-motion";
+    if (/voltage|current|resistance|circuit|ohm/i.test(text)) return "circuit-flow";
+    if (/velocity|speed|kinetic|ball/i.test(text)) return "rolling-ball";
+    return "generic";
+  }, [formulaDef]);
+
   if (!formulaDef) {
     return (
       <div className="text-muted-foreground text-sm">
@@ -15,9 +26,9 @@ export default function FormulaSimulation({ formulaDef }: Props) {
     );
   }
 
-  // Very basic Framer Motion based simulations for MVP
+  // Basic Framer Motion based simulations
   const renderSimulation = () => {
-    switch (formulaDef.simulation) {
+    switch (simulationType) {
       case "force-motion":
         return (
           <div className="relative w-full h-full flex flex-col items-center justify-center">
@@ -101,3 +112,4 @@ export default function FormulaSimulation({ formulaDef }: Props) {
     </div>
   );
 }
+

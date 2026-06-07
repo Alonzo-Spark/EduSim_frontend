@@ -182,46 +182,49 @@ body,
 
 .dark {
   --radius: 1rem;
-  --background: #FAFCFF;
-  --foreground: #0F172A;
-  --card: #FFFFFF;
-  --card-foreground: #0F172A;
-  --popover: #FFFFFF;
-  --popover-foreground: #0F172A;
-  --primary: #70B5FF;
+  --background: #090D1A;
+  --foreground: #F8FAFC;
+  --card: #111827;
+  --card-foreground: #F8FAFC;
+  --popover: #111827;
+  --popover-foreground: #F8FAFC;
+  --primary: #3B82F6;
   --primary-foreground: #FFFFFF;
-  --secondary: #E6F2FF;
-  --secondary-foreground: #0F172A;
-  --muted: #E6F2FF;
-  --muted-foreground: #64748B;
-  --accent: #CCE6FF;
-  --accent-foreground: #0F172A;
+  --secondary: #1F2937;
+  --secondary-foreground: #F8FAFC;
+  --muted: #1F2937;
+  --muted-foreground: #9CA3AF;
+  --accent: #374151;
+  --accent-foreground: #F8FAFC;
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
-  --border: #CCE6FF;
-  --input: #E6F2FF;
-  --ring: #70B5FF;
+  --border: #1F2937;
+  --input: #1F2937;
+  --ring: #3B82F6;
 
   /* Chart Colors - Dark Mode */
-  --chart-1: #70B5FF;
-  --chart-2: #A2D2FF;
-  --chart-3: #CCE6FF;
-  --chart-4: #3B82F6;
-  --chart-5: #0F172A;
+  --chart-1: #60A5FA;
+  --chart-2: #3B82F6;
+  --chart-3: #93C5FD;
+  --chart-4: #2563EB;
+  --chart-5: #1D4ED8;
 
-  --neon-purple: #70B5FF;
-  --neon-cyan: #70B5FF;
-  --neon-blue: #70B5FF;
+  --neon-purple: #8B5CF6;
+  --neon-cyan: #06B6D4;
+  --neon-blue: #3B82F6;
 
   --gradient-bg: none;
-  --sidebar: #FAFCFF;
-  --sidebar-foreground: #0F172A;
-  --sidebar-primary: #70B5FF;
+  --gradient-primary: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+  --shadow-premium: 0 4px 20px rgba(0, 0, 0, 0.4);
+
+  --sidebar: #090D1A;
+  --sidebar-foreground: #E5E7EB;
+  --sidebar-primary: #3B82F6;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #CCE6FF;
-  --sidebar-accent-foreground: #0F172A;
-  --sidebar-border: #CCE6FF;
-  --sidebar-ring: #70B5FF;
+  --sidebar-accent: #1F2937;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #1F2937;
+  --sidebar-ring: #3B82F6;
 }
 
 @layer base {
@@ -324,5 +327,49 @@ body,
 
   .dark .sidebar-active-glow {
     box-shadow: 0 0 25px oklch(0.7 0.25 300 / 25%);
+  }
+
+  /* Theme overrides for hardcoded light-theme Tailwind utility classes in dark mode */
+  .dark .text-slate-900,
+  .dark .text-slate-850,
+  .dark .text-slate-800 {
+    color: var(--foreground) !important;
+  }
+  
+  .dark .text-slate-700,
+  .dark .text-slate-650,
+  .dark .text-slate-600,
+  .dark .text-slate-500 {
+    color: var(--muted-foreground) !important;
+  }
+
+  .dark .bg-white,
+  .dark .bg-white\/80,
+  .dark .bg-white\/85 {
+    background-color: var(--card) !important;
+  }
+  
+  .dark .bg-slate-50,
+  .dark .bg-slate-50\/40,
+  .dark .bg-slate-50\/45,
+  .dark .bg-slate-50\/80 {
+    background-color: var(--secondary) !important;
+  }
+  
+  .dark .border-slate-100,
+  .dark .border-slate-200,
+  .dark .border-slate-200\/80 {
+    border-color: var(--border) !important;
+  }
+  
+  .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--border) !important;
+  }
+
+  /* Force KaTeX math formulas to render as white in dark mode */
+  .dark .katex,
+  .dark .katex-display,
+  .dark .katex * {
+    color: #FFFFFF !important;
   }
 }

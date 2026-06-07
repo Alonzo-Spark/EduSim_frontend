@@ -7,16 +7,19 @@ import { Moon, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 
+import { useTheme } from "@/hooks/useTheme";
+
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
 function SettingsPage() {
-  const [darkMode, setDarkMode] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+  const darkMode = theme === "dark";
 
   const handleToggle = (checked: boolean) => {
-    setDarkMode(checked);
-    toast.success("Settings saved");
+    toggleTheme();
+    toast.success(`Theme updated to ${checked ? "dark" : "light"} mode`);
   };
 
   return (

@@ -15,9 +15,12 @@ import {
   Loader2,
   Sparkles,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  Sun,
+  Moon
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTheme } from "@/hooks/useTheme";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>) => {
@@ -33,6 +36,7 @@ function Login() {
   const { verify_token, reset_token } = Route.useSearch();
   const navigate = useNavigate();
   const CLEAR_LOGIN_SEARCH = { verify_token: undefined, reset_token: undefined };
+  const { theme, toggleTheme } = useTheme();
   
   const { 
     login, 
@@ -150,7 +154,22 @@ function Login() {
   return (
     <div className="relative min-h-[100svh] overflow-hidden bg-background text-foreground font-sans">
       {/* Soft Ambient Background Gradient */}
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-[#FAFCFF] via-[#F4F9FF] to-[#E6F2FF]" />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-[#FAFCFF] via-[#F4F9FF] to-[#E6F2FF] dark:from-[#090D1A] dark:via-[#0E172A] dark:to-[#111827]" />
+
+      {/* Theme Toggle Button */}
+      <div className="absolute top-6 right-6 z-50">
+        <button 
+          onClick={toggleTheme}
+          className="w-10 h-10 rounded-full flex items-center justify-center bg-card border border-border shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+          {theme === "dark" ? (
+            <Sun className="w-5 h-5 text-muted-foreground hover:text-amber-500 transition-colors" />
+          ) : (
+            <Moon className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
+          )}
+        </button>
+      </div>
 
       <div className="relative z-10 grid min-h-[100svh] w-full max-w-[1100px] grid-cols-1 lg:grid-cols-2 items-center gap-12 px-6 py-8 mx-auto">
         
