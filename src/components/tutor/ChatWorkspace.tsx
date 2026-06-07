@@ -158,94 +158,43 @@ export function ChatWorkspace({
           className={`mx-auto w-full max-w-[1600px] min-h-full flex flex-col px-4 sm:px-6 md:px-8 pb-6 pt-6 ${messages.length === 0 ? "justify-center" : "justify-start"} space-y-6`}
         >
           {messages.length === 0 && !loading && (
-            isDesktop ? (
-              <div className="flex flex-col items-center justify-center w-full space-y-10 mt-[-5vh]">
-                <div className="text-center space-y-3">
-                  <div className="inline-block rounded-2xl bg-secondary px-4 py-1.5 mb-2 border border-border/30">
-                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-                      AI Tutor
-                    </span>
-                  </div>
-                  <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
-                    What would you like to learn today?
-                  </h2>
+            <div className="flex flex-col items-center justify-center w-full space-y-10 py-12 relative mt-[-2vh] sm:mt-[-5vh]">
+               {/* Welcome Badge and Title */}
+              <div className="flex flex-col items-center text-center space-y-4 max-w-xl z-10 animate-fade-in">
+                <div className="flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/20 px-3.5 py-1 text-[11px] font-bold uppercase tracking-widest text-primary shadow-sm">
+                  <Sparkles className="w-3.5 h-3.5 text-primary fill-primary/20" />
+                  <span>AI Tutor</span>
                 </div>
+                
+                <h2 className="text-3xl sm:text-4.5xl md:text-5xl font-extrabold tracking-tight text-foreground leading-tight">
+                  What would you like to learn today?
+                </h2>
+              </div>
 
-                <div className="flex flex-wrap justify-center gap-3 max-w-2xl relative z-40">
-                  {subjects.map((sub) => (
+              {/* Subject Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl px-4 z-10">
+                {subjects.map((sub) => {
+                  const Icon = sub.icon;
+                  return (
                     <button
                       key={sub.name}
                       type="button"
                       onClick={() => {
                         send(`Explain ${sub.name}`);
                       }}
-                      className="pointer-events-auto relative z-50 rounded-full border border-border bg-card px-6 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-secondary hover:border-primary hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+                      className="pointer-events-auto flex items-center gap-4 px-5 py-4 bg-card hover:bg-secondary/40 border border-border/80 hover:border-primary/45 rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-103 active:scale-98 cursor-pointer text-left w-full group"
                     >
-                      {sub.name}
+                      <div className={`w-11 h-11 rounded-full ${sub.bg} ${sub.iconColor} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
+                        <Icon className="w-5.5 h-5.5" />
+                      </div>
+                      <span className="font-bold text-foreground text-sm sm:text-base group-hover:text-primary transition-colors">
+                        {sub.name}
+                      </span>
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center w-full space-y-10 py-12 relative">
-                {/* Background Decorative Icons */}
-                <div className="absolute top-0 left-4 sm:left-12 opacity-15 pointer-events-none text-blue-500 animate-pulse hidden sm:block">
-                  <Atom className="w-16 h-16 sm:w-20 sm:h-20" />
-                </div>
-                <div className="absolute top-4 right-4 sm:right-12 opacity-15 pointer-events-none text-amber-500 animate-pulse hidden sm:block">
-                  <Lightbulb className="w-16 h-16 sm:w-20 sm:h-20" />
-                </div>
-                <div className="absolute bottom-8 left-4 sm:left-12 opacity-15 pointer-events-none text-emerald-500 animate-pulse hidden sm:block">
-                  <BookOpen className="w-16 h-16 sm:w-20 sm:h-20" />
-                </div>
-                <div className="absolute bottom-12 right-4 sm:right-12 opacity-15 pointer-events-none text-purple-500 animate-pulse hidden sm:block">
-                  <Share2 className="w-16 h-16 sm:w-20 sm:h-20" />
-                </div>
-
-                {/* Welcome Badge and Title */}
-                <div className="flex flex-col items-center text-center space-y-4 max-w-xl z-10 animate-fade-in">
-                  <div className="flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/20 px-3.5 py-1 text-[11px] font-bold uppercase tracking-widest text-primary shadow-sm">
-                    <Sparkles className="w-3.5 h-3.5 text-primary fill-primary/20" />
-                    <span>AI Tutor</span>
-                  </div>
-                  
-                  <h2 className="text-3xl sm:text-4.5xl font-extrabold tracking-tight text-foreground leading-tight">
-                    What would you like to learn today?
-                  </h2>
-
-                  {/* Decorative Divider */}
-                  <div className="flex items-center justify-center gap-1.5 pt-2">
-                    <div className="w-8 h-1 rounded-full bg-primary" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-                    <div className="w-8 h-1 rounded-full bg-primary/20" />
-                  </div>
-                </div>
-
-                {/* Subject Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl px-4 z-10">
-                  {subjects.map((sub) => {
-                    const Icon = sub.icon;
-                    return (
-                      <button
-                        key={sub.name}
-                        type="button"
-                        onClick={() => {
-                          send(`Explain ${sub.name}`);
-                        }}
-                        className="pointer-events-auto flex items-center gap-4 px-5 py-4 bg-card hover:bg-secondary/40 border border-border/80 hover:border-primary/45 rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-103 active:scale-98 cursor-pointer text-left w-full group"
-                      >
-                        <div className={`w-11 h-11 rounded-full ${sub.bg} ${sub.iconColor} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
-                          <Icon className="w-5.5 h-5.5" />
-                        </div>
-                        <span className="font-bold text-foreground text-sm sm:text-base group-hover:text-primary transition-colors">
-                          {sub.name}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )
+            </div>
           )}
 
           {messages.map((m, idx) => {
@@ -266,8 +215,8 @@ export function ChatWorkspace({
 
           {loading && (
             <div className="flex w-full items-start gap-2.5 sm:gap-3">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 mt-1 rounded-full flex items-center justify-center shrink-0 bg-primary text-white shadow-sm">
-                <span className="text-white text-xs font-bold tracking-wider">AI</span>
+              <div className="w-9 h-9 sm:w-10 sm:h-10 mt-1 rounded-full flex items-center justify-center shrink-0 bg-primary text-primary-foreground shadow-sm">
+                <span className="text-primary-foreground text-xs font-bold tracking-wider">AI</span>
               </div>
               <div className="flex-1 w-full max-w-5xl">
                 <GeneratingLoader />

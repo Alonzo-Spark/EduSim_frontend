@@ -85,7 +85,7 @@ export function ChatInput({ onSend, disabled, focus = false }: ChatInputProps) {
                   }
                 }}
                 disabled={disabled || !text.trim()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-[0_4px_12px_rgba(112,181,255,0.3)] transition-all duration-200 hover:scale-105 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none hover:bg-primary/95 cursor-pointer"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_4px_12px_rgba(112,181,255,0.3)] transition-all duration-200 hover:scale-105 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none hover:bg-primary/95 cursor-pointer"
               >
                 <Send className="h-4.5 w-4.5 ml-0.5" />
               </button>
