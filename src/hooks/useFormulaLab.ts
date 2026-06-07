@@ -53,8 +53,16 @@ export function useFormulaLab() {
 
         let rag = params.ragContent || null;
         if (!rag) {
-          const response = await physicsSimulationApi.queryRag(params.topic);
-          rag = response.success && response.data ? response.data.answer : "";
+          const response = await physicsSimulationApi.searchRag(
+            params.topic,
+            params.subject || "physics",
+            params.chapter || ""
+          );
+          if (response.success && response.data?.chunks) {
+            rag = response.data.chunks.map((c: any) => c.text).join("\n\n");
+          } else {
+            rag = "";
+          }
         }
 
         parsed = await DynamicFormulaExtractor.parseTutorResponse(
@@ -63,6 +71,15 @@ export function useFormulaLab() {
           params.subject,
           params.classId,
         );
+
+        if ((!parsed || parsed.length === 0) && params.topic.includes("=")) {
+          parsed = await DynamicFormulaExtractor.parseTutorResponse(
+            params.topic,
+            params.topic,
+            params.subject,
+            params.classId,
+          );
+        }
       }
 
       // Check if we have a custom formula passed via route/search parameters

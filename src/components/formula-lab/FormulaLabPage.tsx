@@ -26,7 +26,7 @@ import {
   GraduationCap
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { BlockMath } from "@/components/math/Katex";
+import { BlockMath, InlineMath } from "@/components/math/Katex";
 import "katex/dist/katex.min.css";
 
 interface Props {
@@ -55,6 +55,80 @@ function getFormulaCategory(f: DynamicParsedFormula): string {
   return "General Physics";
 }
 
+const getSubjectTheme = (subName?: string) => {
+  const name = (subName || "physics").toLowerCase();
+  if (name.includes("math")) {
+    return {
+      gradient: "from-slate-950 via-purple-950/80 to-slate-900 border-purple-500/20",
+      symbolColor: "text-purple-400/40",
+      formulaHighlight: "text-purple-300 drop-shadow-[0_0_6px_rgba(168,85,247,0.25)]",
+      accentColor: "cyan",
+      platformBorder: "border-cyan-400/30",
+      platformBg: "bg-cyan-500/5",
+      platformShadow: "shadow-[0_0_30px_rgba(34,211,238,0.25)]",
+      cubeBorder: "border-cyan-400/60",
+      cubeBg: "bg-cyan-500/5",
+      cubeShadow: "shadow-[0_0_20px_rgba(34,211,238,0.15)]",
+      nodeBg: "bg-cyan-300",
+    };
+  }
+  if (name.includes("physic") || name.includes("science")) {
+    return {
+      gradient: "from-[#090d16] via-[#101b2d]/90 to-[#070b12] border-blue-500/20",
+      symbolColor: "text-cyan-400/55",
+      formulaHighlight: "text-cyan-300/90 drop-shadow-[0_0_8px_rgba(34,211,238,0.25)]",
+      accentColor: "cyan",
+      platformBorder: "border-cyan-400/35",
+      platformBg: "bg-cyan-500/5",
+      platformShadow: "shadow-[0_0_35px_rgba(34,211,238,0.3)]",
+      cubeBorder: "border-cyan-400/65",
+      cubeBg: "bg-cyan-500/5",
+      cubeShadow: "shadow-[0_0_25px_rgba(34,211,238,0.2)]",
+      nodeBg: "bg-cyan-300",
+    };
+  }
+  if (name.includes("biolog") || name.includes("evs")) {
+    return {
+      gradient: "from-slate-950 via-teal-950/80 to-slate-900 border-emerald-500/20",
+      symbolColor: "text-emerald-400/40",
+      formulaHighlight: "text-emerald-300 drop-shadow-[0_0_6px_rgba(16,185,129,0.25)]",
+      accentColor: "emerald",
+      platformBorder: "border-emerald-400/30",
+      platformBg: "bg-emerald-500/5",
+      platformShadow: "shadow-[0_0_30px_rgba(16,185,129,0.25)]",
+      cubeBorder: "border-emerald-400/60",
+      cubeBg: "bg-emerald-500/5",
+      cubeShadow: "shadow-[0_0_20px_rgba(16,185,129,0.15)]",
+      nodeBg: "bg-emerald-300",
+    };
+  }
+  // Default dark violet/fuchsia lab theme
+  return {
+    gradient: "from-slate-950 via-slate-900 to-zinc-950 border-fuchsia-500/20",
+    symbolColor: "text-fuchsia-400/40",
+    formulaHighlight: "text-fuchsia-300 drop-shadow-[0_0_6px_rgba(217,70,239,0.25)]",
+    accentColor: "fuchsia",
+    platformBorder: "border-fuchsia-400/30",
+    platformBg: "bg-fuchsia-500/5",
+    platformShadow: "shadow-[0_0_30px_rgba(217,70,239,0.25)]",
+    cubeBorder: "border-fuchsia-400/60",
+    cubeBg: "bg-fuchsia-500/5",
+    cubeShadow: "shadow-[0_0_20px_rgba(217,70,239,0.15)]",
+    nodeBg: "bg-fuchsia-300",
+  };
+};
+
+const getFloatingSymbols = (subName?: string) => {
+  const name = (subName || "physics").toLowerCase();
+  if (name.includes("math")) {
+    return ["+", "−", "×", "÷", "√", "π", "%", "=", "∞", "x²", "a+b", "½"];
+  }
+  if (name.includes("physic") || name.includes("science")) {
+    return ["c", "G", "g", "h", "λ", "Σ", "Ω", "Δ", "F=ma", "E=mc²", "v=d/t"];
+  }
+  return ["★", "✦", "●", "▲", "◆", "■", "✿", "☘", "☀", "⚡"];
+};
+
 const FormulaLabPage: React.FC<Props> = ({
   topic,
   classId,
@@ -67,6 +141,7 @@ const FormulaLabPage: React.FC<Props> = ({
   formulaMeaning,
 }) => {
   const { formulas, selectedFormula, selectFormula, loadForTopic } = useFormulaLab();
+  const theme = getSubjectTheme(subject);
 
   const [localFormulas, setLocalFormulas] = useState<DynamicParsedFormula[] | null>(null);
   const [localSelectedIndex, setLocalSelectedIndex] = useState(0);
@@ -99,15 +174,27 @@ const FormulaLabPage: React.FC<Props> = ({
     setIsSearchingAi(true);
     setAiSearchError(null);
     try {
-      const response = await physicsSimulationApi.queryRag(q);
-      const rag = response.success && response.data ? response.data.answer : "";
+      const response = await physicsSimulationApi.searchRag(q, subject || "physics", chapter || "");
+      let rag = "";
+      if (response.success && response.data?.chunks) {
+        rag = response.data.chunks.map((c: any) => c.text).join("\n\n");
+      }
 
-      const parsed = await DynamicFormulaExtractor.parseTutorResponse(
+      let parsed = await DynamicFormulaExtractor.parseTutorResponse(
         rag,
         q,
         subject || "physics",
         classId
       );
+
+      if ((!parsed || parsed.length === 0) && q.includes("=")) {
+        parsed = await DynamicFormulaExtractor.parseTutorResponse(
+          q,
+          q,
+          subject || "physics",
+          classId
+        );
+      }
 
       if (parsed && parsed.length > 0) {
         setLocalFormulas(parsed);
@@ -328,21 +415,274 @@ const FormulaLabPage: React.FC<Props> = ({
 
   return (
     <div className={`w-full max-w-[1600px] mx-auto space-y-6 ${isInline ? "px-0 py-2" : "p-4 md:p-6"}`}>
-      {/* Premium SaaS Header */}
-      <header className="flex flex-col gap-4 rounded-3xl border border-slate-100 bg-white/85 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] backdrop-blur-xl md:flex-row md:items-center md:justify-between transition-all duration-300">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-violet-600 animate-pulse" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-violet-600">EduSim Laboratory</span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">Formula Lab</h1>
-          <div className="text-xs text-slate-500 font-semibold">
-            {localFormulas ? `AI Search: "${localFormulas[0]?.topic || topic}"` : (topic === "new" ? "New Workspace" : topic)} • <span className="capitalize">{subject || "physics"}</span> {classId ? `• Class ${classId}` : ""}
+      {/* Premium SaaS Header Banner with Holographic 3D Blueprint Animation */}
+      <header className={`relative overflow-hidden rounded-[24px] bg-gradient-to-r ${theme.gradient} py-14 px-8 mb-6 shadow-xl border border-white/10 min-h-[260px] flex items-center transition-all duration-300 z-10`}>
+        {/* Glow Spheres */}
+        <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-white/5 blur-[100px] pointer-events-none z-0" />
+        <div className="absolute -left-20 -bottom-20 w-64 h-64 rounded-full bg-white/5 blur-[100px] pointer-events-none z-0" />
+
+        {/* Beautiful Dotted Connecting Lines & Mathematical Graphs */}
+        <svg className="absolute inset-0 w-full h-full opacity-25 pointer-events-none z-0" xmlns="http://www.w3.org/2000/svg">
+          {/* Background Grid Pattern */}
+          <defs>
+            <pattern id="math-grid-header" width="25" height="25" patternUnits="userSpaceOnUse">
+              <path d="M 25 0 L 0 0 0 25" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+            </pattern>
+            <linearGradient id="headerGraphGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.1" />
+              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#818cf8" stopOpacity="0.1" />
+            </linearGradient>
+            <linearGradient id="headerGraphGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.05" />
+              <stop offset="50%" stopColor="#ec4899" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.05" />
+            </linearGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#math-grid-header)" />
+
+          {/* Dotted axis lines */}
+          <line x1="280" y1="10" x2="280" y2="250" stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="3 3" />
+          <line x1="150" y1="130" x2="650" y2="130" stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="3 3" />
+
+          {/* Sine curve graph with morphing animation */}
+          <motion.path
+            d="M 180 130 Q 280 40, 380 130 T 580 130"
+            fill="none"
+            stroke="url(#headerGraphGrad1)"
+            strokeWidth="2.5"
+            animate={{
+              d: [
+                "M 180 130 Q 280 40, 380 130 T 580 130",
+                "M 180 130 Q 280 220, 380 130 T 580 130",
+                "M 180 130 Q 280 40, 380 130 T 580 130",
+              ],
+              strokeDashoffset: [0, -100]
+            }}
+            transition={{
+              d: { duration: 12, repeat: Infinity, ease: "easeInOut" },
+              strokeDashoffset: { duration: 20, repeat: Infinity, ease: "linear" }
+            }}
+            style={{ strokeDasharray: "4 4" }}
+          />
+
+          {/* Secondary cosine wave graph with morphing animation */}
+          <motion.path
+            d="M 180 90 Q 300 190, 420 70 T 600 130"
+            fill="none"
+            stroke="url(#headerGraphGrad2)"
+            strokeWidth="1.5"
+            animate={{
+              d: [
+                "M 180 90 Q 300 190, 420 70 T 600 130",
+                "M 180 170 Q 300 50, 420 190 T 600 130",
+                "M 180 90 Q 300 190, 420 70 T 600 130",
+              ],
+              strokeDashoffset: [0, 100]
+            }}
+            transition={{
+              d: { duration: 15, repeat: Infinity, ease: "easeInOut" },
+              strokeDashoffset: { duration: 24, repeat: Infinity, ease: "linear" }
+            }}
+            style={{ strokeDasharray: "3 3" }}
+          />
+
+          {/* Pulsing Graph Nodes with Dual Radar Wave Rings */}
+          <circle cx="380" cy="130" r="4.5" className="fill-cyan-400 opacity-90" />
+          <motion.circle
+            cx="380"
+            cy="130"
+            r="4.5"
+            className="fill-none stroke-cyan-400 stroke-[1.5]"
+            animate={{ scale: [1, 3], opacity: [0.8, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeOut" }}
+          />
+          <motion.circle
+            cx="380"
+            cy="130"
+            r="4.5"
+            className="fill-none stroke-cyan-400 stroke-[1]"
+            animate={{ scale: [1, 2], opacity: [0.6, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeOut", delay: 1.5 }}
+          />
+        </svg>
+
+        {/* Holographic 3D Blueprint Illustration */}
+        <div className="absolute right-[240px] top-1/2 -translate-y-1/2 w-56 h-56 pointer-events-none hidden lg:block z-0" style={{ perspective: "800px" }}>
+          {/* Glowing Platform Ring */}
+          <div className={`absolute left-2 bottom-4 w-52 h-10 border ${theme.platformBorder} rounded-full ${theme.platformBg} ${theme.platformShadow}`} style={{ transform: "rotateX(75deg)" }} />
+          <motion.div
+            className="absolute left-8 bottom-5 w-40 h-8 border border-dashed border-white/20 rounded-full"
+            style={{ transform: "rotateX(75deg)" }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+          />
+
+          {/* Central Holographic 3D Spinning Cube */}
+          <div className="absolute left-10 top-6 w-36 h-36 flex items-center justify-center">
+            <motion.div
+              className="w-24 h-24 relative"
+              style={{ transformStyle: "preserve-3d" }}
+              animate={{
+                rotateX: [0, 360],
+                rotateY: [0, 360],
+                rotateZ: [0, 360],
+              }}
+              transition={{
+                duration: 20,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+            >
+              {/* Front Face */}
+              <div className={`absolute inset-0 border ${theme.cubeBorder} ${theme.cubeBg} rounded ${theme.cubeShadow}`} style={{ transform: "translateZ(48px)" }}>
+                <div className={`absolute top-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute top-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+              </div>
+              {/* Back Face */}
+              <div className={`absolute inset-0 border ${theme.cubeBorder} ${theme.cubeBg} rounded ${theme.cubeShadow}`} style={{ transform: "rotateY(180deg) translateZ(48px)" }}>
+                <div className={`absolute top-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute top-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+              </div>
+              {/* Left Face */}
+              <div className={`absolute inset-0 border ${theme.cubeBorder} ${theme.cubeBg} rounded ${theme.cubeShadow}`} style={{ transform: "rotateY(-90deg) translateZ(48px)" }}>
+                <div className={`absolute top-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute top-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+              </div>
+              {/* Right Face */}
+              <div className={`absolute inset-0 border ${theme.cubeBorder} ${theme.cubeBg} rounded ${theme.cubeShadow}`} style={{ transform: "rotateY(90deg) translateZ(48px)" }}>
+                <div className={`absolute top-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute top-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+              </div>
+              {/* Top Face */}
+              <div className={`absolute inset-0 border ${theme.cubeBorder} ${theme.cubeBg} rounded ${theme.cubeShadow}`} style={{ transform: "rotateX(90deg) translateZ(48px)" }}>
+                <div className={`absolute top-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute top-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+              </div>
+              {/* Bottom Face */}
+              <div className={`absolute inset-0 border ${theme.cubeBorder} ${theme.cubeBg} rounded ${theme.cubeShadow}`} style={{ transform: "rotateX(-90deg) translateZ(48px)" }}>
+                <div className={`absolute top-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute top-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 left-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+                <div className={`absolute bottom-0 right-0 w-2 h-2 ${theme.nodeBg} rounded-full`} />
+              </div>
+            </motion.div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="rounded-full border border-slate-100 bg-slate-50/80 px-4 py-2 text-xs font-semibold text-slate-600 shadow-inner">
-            Detected Formulas: <span className="text-violet-600 font-extrabold">{activeCount}</span>
+
+        {/* Floating animated background math/physics symbols (positioned to strictly prevent overlap) */}
+        {(() => {
+          const baseSymbols = getFloatingSymbols(subject);
+          const renderedSymbols = [
+            baseSymbols[0] || "+",
+            baseSymbols[1] || "−",
+            "π ≈ 3.14159",
+            baseSymbols[2] || "×",
+            baseSymbols[3] || "÷",
+          ];
+          return renderedSymbols.map((sym, idx) => {
+            const positions = [
+              { top: "15%", left: "6%", rotate: "12deg", scale: 1.0, opacity: 0.45, duration: 6, delay: 0 },
+              { bottom: "15%", left: "6%", rotate: "-15deg", scale: 1.1, opacity: 0.35, duration: 8, delay: 1 },
+              { top: "18%", left: "45%", rotate: "0deg", scale: 1.25, opacity: 0.55, duration: 7, delay: 0.5 },
+              { top: "15%", right: "6%", rotate: "25deg", scale: 1.1, opacity: 0.4, duration: 5, delay: 1.2 },
+              { bottom: "15%", right: "6%", rotate: "-8deg", scale: 1.0, opacity: 0.45, duration: 9, delay: 0.8 },
+            ];
+            const pos = positions[idx];
+            const styleObj: React.CSSProperties = {
+              opacity: pos.opacity,
+            };
+            if (pos.top) styleObj.top = pos.top;
+            if (pos.bottom) styleObj.bottom = pos.bottom;
+            if (pos.left) styleObj.left = pos.left;
+            if (pos.right) styleObj.right = pos.right;
+
+            const textSizeClass = sym.includes("≈") 
+              ? "text-lg sm:text-2xl md:text-3xl font-sans" 
+              : "text-3xl sm:text-4xl md:text-5xl font-mono";
+
+            const renderContent = () => {
+              if (sym.includes("π")) {
+                return (
+                  <span>
+                    <span className="font-serif italic font-medium">π</span>
+                    <span> ≈ 3.14159</span>
+                  </span>
+                );
+              }
+              return sym;
+            };
+
+            return (
+              <motion.span
+                key={idx}
+                className={`absolute font-black select-none pointer-events-none ${textSizeClass} ${theme.symbolColor}`}
+                style={styleObj}
+                animate={{
+                  y: [0, -8, 0],
+                  rotate: [parseFloat(pos.rotate), parseFloat(pos.rotate) + (sym.includes("≈") ? 2 : 5), parseFloat(pos.rotate)],
+                }}
+                transition={{
+                  duration: pos.duration,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: pos.delay,
+                }}
+              >
+                {renderContent()}
+              </motion.span>
+            );
+          });
+        })()}
+
+        {/* Center-placed Floating Equation (merged as a floating highlighted symbol at the bottom) */}
+        <div className="absolute inset-x-0 bottom-6 flex justify-center pointer-events-none z-10">
+          <motion.div 
+            className={`font-mono text-2xl sm:text-3xl md:text-4xl font-extrabold select-none pointer-events-none opacity-80 ${theme.formulaHighlight}`}
+            animate={{
+              y: [0, -6, 0],
+              rotate: [0, 1.5, 0],
+            }}
+            transition={{
+              duration: 6,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 0.5,
+            }}
+          >
+            <InlineMath math={
+              activeSelectedFormula 
+                ? (activeSelectedFormula.latex || activeSelectedFormula.formula || activeSelectedFormula.raw)
+                : (subject?.toLowerCase().includes("math") ? "e^{i\\pi} + 1 = 0" : "E = m c^2")
+            } />
+          </motion.div>
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10 w-full">
+          <div className="space-y-1.5 max-w-2xl">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/80">EduSim Laboratory</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white leading-none">Formula Lab</h1>
+            <div className="text-sm text-white/85 font-semibold mt-1.5">
+              {localFormulas ? `AI Search: "${localFormulas[0]?.topic || topic}"` : (topic === "new" ? "New Workspace" : topic)} • <span className="capitalize">{subject || "physics"}</span> {classId ? `• Class ${classId}` : ""}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white shadow-inner backdrop-blur-md">
+              Detected Formulas: <span className="text-white font-extrabold">{activeCount}</span>
+            </div>
           </div>
         </div>
       </header>
