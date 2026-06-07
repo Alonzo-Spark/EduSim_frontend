@@ -46,10 +46,76 @@ function Dashboard() {
     <PageWrapper>
       {/* Welcome Banner */}
       <section className="glass-strong rounded-3xl p-8 md:p-12 mb-8 relative overflow-hidden bg-card border border-border shadow-sm">
-        <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute -bottom-20 -left-10 w-72 h-72 rounded-full bg-primary/10 blur-3xl" />
-        
-        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-primary/10 blur-3xl z-0" />
+        <div className="absolute -bottom-20 -left-10 w-72 h-72 rounded-full bg-primary/10 blur-3xl z-0" />
+
+        {/* Animated Quantum Orbit Background Illustration */}
+        <div className="absolute right-16 top-1/2 -translate-y-1/2 w-[240px] h-[240px] overflow-hidden pointer-events-none hidden md:block z-0">
+          <svg className="w-full h-full opacity-90 dark:opacity-60" viewBox="0 0 300 300" fill="none">
+            {/* Center Core */}
+            <circle cx="150" cy="150" r="6" fill="currentColor" className="text-primary" />
+            <circle cx="150" cy="150" r="14" stroke="currentColor" className="text-primary/35" strokeWidth="1" />
+            
+            {/* Ring 1 */}
+            <circle cx="150" cy="150" r="60" stroke="currentColor" className="text-primary/45" strokeWidth="1" strokeDasharray="4 4" />
+            {/* Particle 1 */}
+            <g>
+              <circle r="4.5" fill="currentColor" className="text-primary">
+                <animateMotion 
+                  path="M 150,90 A 60,60 0 1,1 150,210 A 60,60 0 1,1 150,90 Z" 
+                  dur="8s" 
+                  repeatCount="indefinite" 
+                />
+              </circle>
+              <circle r="9" stroke="currentColor" className="text-primary/40" strokeWidth="1">
+                <animateMotion 
+                  path="M 150,90 A 60,60 0 1,1 150,210 A 60,60 0 1,1 150,90 Z" 
+                  dur="8s" 
+                  repeatCount="indefinite" 
+                />
+              </circle>
+            </g>
+
+            {/* Ring 2 */}
+            <circle cx="150" cy="150" r="100" stroke="currentColor" className="text-primary/30" strokeWidth="1" />
+            {/* Particle 2 (Orbiting Counter-Clockwise) */}
+            <circle r="5.5" fill="currentColor" className="text-primary/80">
+              <animateMotion 
+                path="M 250,150 A 100,100 0 1,0 50,150 A 100,100 0 1,0 250,150 Z" 
+                dur="15s" 
+                repeatCount="indefinite" 
+              />
+            </circle>
+
+            {/* Ring 3 (First Inclined Ellipse for 3D look) */}
+            <g transform="rotate(30 150 150)">
+              <ellipse cx="150" cy="150" rx="130" ry="40" stroke="currentColor" className="text-primary/25" strokeWidth="1" strokeDasharray="6 3" />
+              {/* Particle 3 (Orbiting Elliptical Path) */}
+              <circle r="4" fill="currentColor" className="text-primary/60">
+                <animateMotion 
+                  path="M 280,150 A 130,40 0 1,1 20,150 A 130,40 0 1,1 280,150 Z" 
+                  dur="25s" 
+                  repeatCount="indefinite" 
+                />
+              </circle>
+            </g>
+
+            {/* Ring 4 (Second Opposing Inclined Ellipse for balanced 3D look) */}
+            <g transform="rotate(-30 150 150)">
+              <ellipse cx="150" cy="150" rx="130" ry="40" stroke="currentColor" className="text-primary/25" strokeWidth="1" strokeDasharray="6 3" />
+              {/* Particle 4 (Orbiting Elliptical Path, counter-clockwise) */}
+              <circle r="4" fill="currentColor" className="text-primary/60">
+                <animateMotion 
+                  path="M 280,150 A 130,40 0 1,0 20,150 A 130,40 0 1,0 280,150 Z" 
+                  dur="20s" 
+                  repeatCount="indefinite" 
+                />
+              </circle>
+            </g>
+          </svg>
+        </div>
+
+        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-6 z-10">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary border border-border text-xs text-primary font-mono mb-4">
               <GraduationCap className="w-3.5 h-3.5" />
@@ -58,9 +124,24 @@ function Dashboard() {
             <motion.h1 
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-4xl font-bold mb-3 tracking-tight text-foreground"
+              className="text-4xl font-bold mb-3 tracking-tight text-foreground flex items-center gap-2"
             >
-              Welcome back, <span className="text-primary font-extrabold">{user?.name || "Explorer"}</span>! 🚀
+              Welcome back, <span className="text-primary font-extrabold">{user?.name || "Explorer"}</span>! 
+              <motion.span 
+                className="inline-block cursor-grab active:cursor-grabbing"
+                animate={{
+                  y: [0, -4, 0],
+                  rotate: [0, 5, 0],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                whileHover={{ scale: 1.25, rotate: [0, 15, -10, 0] }}
+              >
+                🚀
+              </motion.span>
             </motion.h1>
             <p className="text-muted-foreground max-w-xl text-base">
               Dive back into your simulations or ask the AI Tutor to explain complex physics concepts in real-time.
@@ -69,17 +150,6 @@ function Dashboard() {
               Signed in as <span className="font-semibold text-foreground">{user?.email || "unknown"}</span>
             </p>
           </div>
-          
-          <button
-            onClick={() => {
-              logout();
-              navigate({ to: "/login", search: EMPTY_LOGIN_SEARCH });
-            }}
-            className="px-5 py-2.5 rounded-2xl bg-card hover:bg-destructive/10 text-destructive text-sm font-semibold transition-all duration-300 border border-border hover:border-destructive/30 flex items-center gap-2 hover:scale-[1.02]"
-          >
-            <User className="w-4 h-4" />
-            Sign Out
-          </button>
         </div>
       </section>
 
