@@ -60,7 +60,7 @@ type ComparisonGroup = {
 type MarkdownGroup = SectionBlock | ComparisonGroup;
 
 interface TutorMarkdownRendererProps {
-  content: unknown;
+  content: string;
   className?: string;
   density?: Density;
 }
