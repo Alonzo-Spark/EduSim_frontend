@@ -43,17 +43,13 @@ function TutorPage() {
   // Load topic content from search params
   useEffect(() => {
     if (searchParams.subject && searchParams.class_name && searchParams.chapter) {
-      setIsLoading(true);
-
       // Fetch topic content
       fetchTopic(
         searchParams.subject,
         searchParams.class_name,
         searchParams.chapter,
         searchParams.topic,
-      ).then(() => {
-        setIsLoading(false);
-      });
+      );
     }
   }, [searchParams, fetchTopic]);
 
