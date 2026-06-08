@@ -59,17 +59,16 @@ export function ChatBubble({ content, role, timestamp, topicTitle, userQuery, on
           className={`relative group flex items-start gap-2.5 sm:gap-3 ${isAi ? "w-full max-w-5xl" : "w-fit flex-row-reverse"}`}
         >
           {isAi && (
-            <div className="w-9 h-9 sm:w-10 sm:h-10 mt-1 rounded-full flex items-center justify-center shrink-0 bg-primary text-white shadow-sm">
-              <span className="text-white text-xs font-bold tracking-wider">AI</span>
+            <div className="w-9 h-9 sm:w-10 sm:h-10 mt-1 rounded-full flex items-center justify-center shrink-0 bg-primary text-primary-foreground shadow-sm">
+              <span className="text-primary-foreground text-xs font-bold tracking-wider">AI</span>
             </div>
           )}
 
           <div
-            className={`relative rounded-[20px] transition-all duration-200 shadow-md ${
-              isAi
+            className={`relative rounded-[20px] transition-all duration-200 shadow-md ${isAi
                 ? "px-4 py-3.5 sm:px-6 sm:py-5 border border-border bg-card text-foreground rounded-tl-sm shadow-[0_4px_20px_rgba(112,181,255,0.08)] text-[14.5px] sm:text-[15px] leading-relaxed w-full hover:border-primary/40 hover:shadow-[0_6px_25px_rgba(112,181,255,0.12)]"
-                : "px-4 py-2.5 bg-primary text-white rounded-tr-sm shadow-[0_4px_12px_rgba(112,181,255,0.25)] text-sm sm:text-[14.5px] font-medium leading-relaxed hover:-translate-y-[1px] hover:shadow-[0_6px_18px_rgba(112,181,255,0.35)]"
-            }`}
+                : "px-4 py-2.5 bg-primary text-primary-foreground rounded-tr-sm shadow-[0_4px_12px_rgba(112,181,255,0.25)] text-sm sm:text-[14.5px] font-semibold leading-relaxed hover:-translate-y-[1px] hover:shadow-[0_6px_18px_rgba(112,181,255,0.35)]"
+              }`}
           >
             {isAi ? (
               <TutorMarkdownRenderer
@@ -88,12 +87,12 @@ export function ChatBubble({ content, role, timestamp, topicTitle, userQuery, on
                     setInlineRagContent(content);
                     setShowInlineFormulaLab(true);
                   }}
-                  className="group relative flex items-center gap-3 rounded-[2rem] bg-primary hover:bg-primary/90 px-8 py-3.5 text-sm font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95 shadow-[0_4px_12px_rgba(112,181,255,0.25)] hover:shadow-[0_6px_20px_rgba(112,181,255,0.35)] w-full sm:w-auto justify-center"
+                  className="group relative flex items-center gap-3 rounded-[2rem] bg-primary hover:bg-primary/90 px-8 py-3.5 text-sm font-bold text-primary-foreground transition-all hover:-translate-y-0.5 active:scale-95 shadow-[0_4px_12px_rgba(112,181,255,0.25)] hover:shadow-[0_6px_20px_rgba(112,181,255,0.35)] w-full sm:w-auto justify-center"
                 >
-                  <Activity className="h-5 w-5 text-white/80" />
+                  <Activity className="h-5 w-5 text-primary-foreground/80" />
                   <span>Explore in Formula Lab</span>
                 </button>
-                 <Link
+                <Link
                   to="/sandbox/$simulationId"
                   params={{ simulationId: "default" }}
                   search={{ query: userQuery || topicTitle || "Physics Simulation", mode: "guide" }}

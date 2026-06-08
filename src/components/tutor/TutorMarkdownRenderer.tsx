@@ -60,7 +60,7 @@ type ComparisonGroup = {
 type MarkdownGroup = SectionBlock | ComparisonGroup;
 
 interface TutorMarkdownRendererProps {
-  content: unknown;
+  content: string;
   className?: string;
   density?: Density;
 }
@@ -504,25 +504,25 @@ function getSectionIcon(kind: SectionKind) {
 function getSectionColorClasses(kind: SectionKind): { border: string; bg: string; text: string } {
   switch (kind) {
     case "introduction":
-      return { border: "border-l-sky-500", bg: "bg-sky-500/5", text: "text-sky-600 dark:text-sky-400" };
+      return { border: "border-l-sky-500", bg: "bg-sky-500/5", text: "text-sky-600 dark:text-sky-300" };
     case "definition":
-      return { border: "border-l-indigo-500", bg: "bg-indigo-500/5", text: "text-indigo-600 dark:text-indigo-400" };
+      return { border: "border-l-indigo-500", bg: "bg-indigo-500/5", text: "text-indigo-600 dark:text-indigo-300" };
     case "concepts":
-      return { border: "border-l-purple-500", bg: "bg-purple-500/5", text: "text-purple-600 dark:text-purple-400" };
+      return { border: "border-l-purple-500", bg: "bg-purple-500/5", text: "text-purple-600 dark:text-purple-300" };
     case "characteristics":
-      return { border: "border-l-pink-500", bg: "bg-pink-500/5", text: "text-pink-600 dark:text-pink-400" };
+      return { border: "border-l-pink-500", bg: "bg-pink-500/5", text: "text-pink-600 dark:text-pink-300" };
     case "formula":
-      return { border: "border-l-violet-500", bg: "bg-violet-500/5", text: "text-violet-600 dark:text-violet-400" };
+      return { border: "border-l-violet-500", bg: "bg-violet-500/5", text: "text-violet-600 dark:text-violet-300" };
     case "applications":
-      return { border: "border-l-emerald-500", bg: "bg-emerald-500/5", text: "text-emerald-600 dark:text-emerald-400" };
+      return { border: "border-l-emerald-500", bg: "bg-emerald-500/5", text: "text-emerald-600 dark:text-emerald-300" };
     case "summary":
-      return { border: "border-l-amber-500", bg: "bg-amber-500/5", text: "text-amber-600 dark:text-amber-400" };
+      return { border: "border-l-amber-500", bg: "bg-amber-500/5", text: "text-amber-600 dark:text-amber-300" };
     case "questions":
-      return { border: "border-l-teal-500", bg: "bg-teal-500/5", text: "text-teal-600 dark:text-teal-400" };
+      return { border: "border-l-teal-500", bg: "bg-teal-500/5", text: "text-teal-600 dark:text-teal-300" };
     case "examples":
-      return { border: "border-l-orange-500", bg: "bg-orange-500/5", text: "text-orange-600 dark:text-orange-400" };
+      return { border: "border-l-orange-500", bg: "bg-orange-500/5", text: "text-orange-600 dark:text-orange-300" };
     default:
-      return { border: "border-l-slate-400 dark:border-l-slate-600", bg: "bg-slate-500/5", text: "text-slate-600 dark:text-slate-400" };
+      return { border: "border-l-slate-400 dark:border-l-slate-600", bg: "bg-slate-500/5", text: "text-slate-600 dark:text-slate-350" };
   }
 }
 
@@ -531,7 +531,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
     h1: ({ children }) => (
       <h1
         id={slugify(flattenText(children))}
-        className="scroll-mt-28 text-base font-bold text-foreground mt-4 mb-2"
+        className="scroll-mt-28 text-base font-bold text-foreground! mt-4 mb-2"
       >
         {children}
       </h1>
@@ -539,7 +539,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
     h2: ({ children }) => (
       <h2
         id={slugify(flattenText(children))}
-        className="scroll-mt-28 text-sm font-semibold text-foreground/80 mt-3 mb-1.5"
+        className="scroll-mt-28 text-sm font-semibold text-foreground/80! mt-3 mb-1.5"
       >
         {children}
       </h2>
@@ -557,7 +557,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
         );
       }
       return (
-        <h3 className="text-xs font-bold text-foreground/70 mt-4 mb-2 uppercase tracking-wider">
+        <h3 className="text-xs font-bold text-foreground/70! mt-4 mb-2 uppercase tracking-wider">
           {children}
         </h3>
       );
@@ -565,14 +565,14 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
     p: ({ children }) => {
       return (
         <p className={cn(
-          "text-foreground/80 dark:text-foreground/90 text-sm sm:text-[15px] leading-relaxed w-full font-normal max-w-[85ch]",
+          "text-foreground/80! dark:text-foreground/90! text-sm sm:text-[15px] leading-relaxed w-full font-normal max-w-[85ch]",
           density === "compact" ? "mb-1.5" : "mb-3"
         )}>
           {children}
         </p>
       );
     },
-    strong: ({ children }) => <strong className="font-bold text-foreground">{children}</strong>,
+    strong: ({ children }) => <strong className="font-bold text-foreground!">{children}</strong>,
     a: ({ children, href }) => (
       <a href={href} className="font-semibold text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary">
         {children}
@@ -688,7 +688,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
       
       if (depth > 1) {
         return (
-          <li className="relative pl-5 text-xs sm:text-sm leading-relaxed text-foreground/80 font-normal my-1">
+          <li className="relative pl-5 text-xs sm:text-sm leading-relaxed text-foreground/80! font-normal my-1">
             <span className="absolute left-0 top-1.5 flex h-1.5 w-1.5 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background" />
             <span className="min-w-0 flex-1">{children}</span>
           </li>
@@ -696,7 +696,7 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
       }
  
       return (
-        <li className="relative flex gap-2.5 rounded-2xl border border-border/40 bg-card px-4 py-3 text-xs sm:text-sm leading-relaxed text-foreground/80 shadow-sm transition-all hover:border-primary/20 hover:bg-secondary/40 my-2">
+        <li className="relative flex gap-2.5 rounded-2xl border border-border/40 bg-card px-4 py-3 text-xs sm:text-sm leading-relaxed text-foreground/80! shadow-sm transition-all hover:border-primary/20 hover:bg-secondary/40 my-2">
           <span className="mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[8px] font-bold text-primary">
             •
           </span>
@@ -715,12 +715,12 @@ function renderMarkdownBody(body: string, sectionKind: SectionKind, density: Den
     tbody: ({ children }) => <tbody className="divide-y divide-border/30">{children}</tbody>,
     tr: ({ children }) => <tr className="transition-colors hover:bg-secondary/10 even:bg-secondary/5">{children}</tr>,
     th: ({ children }) => (
-      <th className="px-5 py-3 font-bold uppercase tracking-wider text-muted-foreground text-[10px] sm:text-[11px] border-b border-border/40">
+      <th className="px-5 py-3 font-bold uppercase tracking-wider text-muted-foreground! text-[10px] sm:text-[11px] border-b border-border/40">
         {children}
       </th>
     ),
     td: ({ children }) => (
-      <td className="px-5 py-3 align-middle text-foreground/80 leading-relaxed">
+      <td className="px-5 py-3 align-middle text-foreground/80! leading-relaxed">
         {children}
       </td>
     ),
@@ -841,7 +841,7 @@ function getGroupForKey(key: string) {
         title: "Introduction",
         icon: <Compass className="w-5 h-5 text-sky-500" />,
         border: "border-l-sky-500",
-        text: "text-sky-600 dark:text-sky-400",
+        text: "text-sky-600 dark:text-sky-300",
         isStandalone: false,
       };
     case "group2":
@@ -849,7 +849,7 @@ function getGroupForKey(key: string) {
         title: "Characteristics",
         icon: <Sliders className="w-5 h-5 text-pink-500" />,
         border: "border-l-pink-500",
-        text: "text-pink-600 dark:text-pink-400",
+        text: "text-pink-600 dark:text-pink-300",
         isStandalone: false,
       };
     case "group3":
@@ -857,7 +857,7 @@ function getGroupForKey(key: string) {
         title: "Formula",
         icon: <FunctionSquare className="w-5 h-5 text-violet-500" />,
         border: "border-l-violet-500",
-        text: "text-violet-600 dark:text-violet-400",
+        text: "text-violet-600 dark:text-violet-300",
         isStandalone: false,
       };
     case "group4":
@@ -865,7 +865,7 @@ function getGroupForKey(key: string) {
         title: "Example",
         icon: <BookOpen className="w-5 h-5 text-orange-500" />,
         border: "border-l-orange-500",
-        text: "text-orange-600 dark:text-orange-400",
+        text: "text-orange-600 dark:text-orange-300",
         isStandalone: false,
       };
     case "group5":
@@ -873,7 +873,7 @@ function getGroupForKey(key: string) {
         title: "Applications",
         icon: <Sparkles className="w-5 h-5 text-emerald-500" />,
         border: "border-l-emerald-500",
-        text: "text-emerald-600 dark:text-emerald-400",
+        text: "text-emerald-600 dark:text-emerald-300",
         isStandalone: false,
       };
     case "group6":
@@ -881,7 +881,7 @@ function getGroupForKey(key: string) {
         title: "Summary",
         icon: <CheckCircle2 className="w-5 h-5 text-amber-500" />,
         border: "border-l-amber-500",
-        text: "text-amber-600 dark:text-amber-400",
+        text: "text-amber-600 dark:text-amber-300",
         isStandalone: false,
       };
     case "questions":
@@ -889,7 +889,7 @@ function getGroupForKey(key: string) {
         title: "Suggested Questions",
         icon: <HelpCircle className="w-5 h-5 text-teal-500" />,
         border: "border-l-teal-500",
-        text: "text-teal-600 dark:text-teal-400",
+        text: "text-teal-600 dark:text-teal-300",
         isStandalone: true,
       };
     default:
@@ -897,7 +897,7 @@ function getGroupForKey(key: string) {
         title: "Introduction",
         icon: <Compass className="w-5 h-5 text-sky-500" />,
         border: "border-l-sky-500",
-        text: "text-sky-600 dark:text-sky-400",
+        text: "text-sky-600 dark:text-sky-300",
         isStandalone: false,
       };
   }

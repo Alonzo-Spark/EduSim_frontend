@@ -3232,6 +3232,34 @@ export const SandboxCanvas: React.FC = () => {
                     opacity: aiLoading ? 0.5 : 1
                   }}
                 />
+
+                {aiLoading && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#c084fc', marginBottom: 4, fontWeight: 600 }}>
+                      <span>Generating instructions...</span>
+                      <span style={{ opacity: 0.8 }} className="animate-pulse">Please wait</span>
+                    </div>
+                    <div style={{ width: '100%', backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(168, 85, 247, 0.1)', height: 5, borderRadius: 2.5, overflow: 'hidden', position: 'relative' }}>
+                      <motion.div
+                        style={{
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #a855f7, #ec4899)',
+                          borderRadius: 2.5,
+                          width: '30%',
+                          position: 'absolute',
+                        }}
+                        animate={{
+                          left: ['-30%', '100%']
+                        }}
+                        transition={{
+                          repeat: Infinity,
+                          duration: 1.5,
+                          ease: 'easeInOut'
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </>
@@ -4728,6 +4756,77 @@ export const SandboxCanvas: React.FC = () => {
                     onAutoBuild={handleAutoBuild}
                     onReset={handleReset}
                   />
+                )}
+              </AnimatePresence>
+
+              {/* AI Instructions Guide Generation Loader Overlay */}
+              <AnimatePresence>
+                {aiLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                    transition={{ duration: 0.3 }}
+                    style={{
+                      position: 'absolute',
+                      right: 20,
+                      top: 20,
+                      zIndex: 400,
+                      width: 320,
+                      background: 'rgba(15, 23, 42, 0.85)',
+                      backdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(168, 85, 247, 0.3)',
+                      borderRadius: 16,
+                      padding: 16,
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(168, 85, 247, 0.15)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        background: 'rgba(168, 85, 247, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#c084fc'
+                      }}>
+                        <Sparkles size={14} className="animate-pulse" />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>AI Guide Builder</span>
+                        <span style={{ fontSize: 10, color: '#c084fc', fontWeight: 500 }}>Formulating your simulation guide</span>
+                      </div>
+                    </div>
+                    
+                    <p style={{ fontSize: 11, color: '#cbd5e1', margin: 0, lineHeight: 1.4 }}>
+                      Analyzing physics concepts and mapping interactive steps for the sandbox...
+                    </p>
+
+                    <div style={{ width: '100%', backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(168, 85, 247, 0.1)', height: 6, borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
+                      <motion.div
+                        style={{
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #a855f7, #ec4899)',
+                          borderRadius: 3,
+                          width: '40%',
+                          position: 'absolute',
+                        }}
+                        animate={{
+                          left: ['-40%', '100%']
+                        }}
+                        transition={{
+                          repeat: Infinity,
+                          duration: 1.8,
+                          ease: 'easeInOut'
+                        }}
+                      />
+                    </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </>

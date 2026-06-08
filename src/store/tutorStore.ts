@@ -5,7 +5,7 @@ export type TutorMode = "Learn" | "Solve" | "Visualize" | "Quiz";
 interface TutorState {
   currentMode: TutorMode;
   setMode: (mode: TutorMode) => void;
-  
+
   // Interactive Formula State
   activeFormulaId: string | null;
   setActiveFormulaId: (id: string | null) => void;
@@ -19,7 +19,7 @@ interface TutorState {
 export const useTutorStore = create<TutorState>((set) => ({
   currentMode: "Learn",
   setMode: (mode) => set({ currentMode: mode }),
-  
+
   activeFormulaId: null,
   setActiveFormulaId: (id) => set({ activeFormulaId: id }),
   showInlineFormulaLab: false,

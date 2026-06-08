@@ -26,17 +26,17 @@ const SliderRow: React.FC<{
   };
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/45 p-4 hover:border-slate-200/80 hover:bg-slate-50 transition-all duration-300">
+    <div className="rounded-2xl border border-border/60 bg-secondary/35 p-4 hover:border-border hover:bg-secondary/50 transition-all duration-300">
       <div className="mb-2.5 flex items-center justify-between gap-3 text-sm">
         <div>
-          <div className="font-extrabold text-slate-800">{label}</div>
-          <div className="text-[11px] font-semibold text-slate-400">{unit || "unitless"}</div>
+          <div className="font-extrabold text-foreground">{label}</div>
+          <div className="text-[11px] font-semibold text-muted-foreground">{unit || "unitless"}</div>
         </div>
         <input
           type="text"
           value={tempValue}
           onChange={(e) => handleTextChange(e.target.value)}
-          className="w-40 rounded-xl bg-white border border-slate-200 px-3 py-1 text-right font-mono text-xs font-bold text-violet-750 shadow-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 outline-none transition-all"
+          className="w-40 rounded-xl bg-card border border-border/60 px-3 py-1 text-right font-mono text-xs font-bold text-violet-600 dark:text-violet-400 shadow-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 outline-none transition-all"
         />
       </div>
       <input
@@ -112,7 +112,7 @@ const FormulaPlayground: React.FC<{
 
   if (!formula) {
     return (
-      <div className="rounded-3xl border border-slate-100 bg-white/80 p-6 text-sm text-slate-400 text-center font-medium shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+      <div className="rounded-3xl border border-border/60 bg-card/85 p-6 text-sm text-muted-foreground text-center font-medium shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
         Select a formula to interact.
       </div>
     );
@@ -129,20 +129,20 @@ const FormulaPlayground: React.FC<{
 
   if (inputControls.length === 0) {
     return (
-      <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center text-slate-400 font-medium shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+      <div className="rounded-3xl border border-border/60 bg-card p-8 text-center text-muted-foreground font-medium shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
         This formula does not have any variables or sliders configured for interactive calculation.
       </div>
     );
   }
 
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] space-y-5">
+    <div className="rounded-3xl border border-border/60 bg-card p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Interactive Playground</p>
-          <h3 className="mt-1 text-2xl font-black text-slate-800 tracking-tight">Try {title}</h3>
+          <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">Interactive Playground</p>
+          <h3 className="mt-1 text-2xl font-black text-foreground tracking-tight">Try {title}</h3>
         </div>
-        <div className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-violet-700">
+        <div className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-violet-600 dark:text-violet-400">
           Live calculation
         </div>
       </div>
