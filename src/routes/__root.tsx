@@ -106,7 +106,11 @@ export const Route = createRootRoute({
         content: "Explore classes, subjects, and immersive science simulations.",
       },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
+    ],
   }),
   shellComponent: RootShell,
   component: () => (
@@ -204,21 +208,21 @@ function RootComponent() {
       </div>
     );
   }
-  
+
   return (
     <div className="flex min-h-screen w-full relative bg-background text-foreground overflow-hidden">
       {!isMaximized && <Sidebar />}
-      
-      <motion.main 
+
+      <motion.main
         initial={false}
-        animate={{ 
+        animate={{
           paddingLeft: isDesktop ? (isMaximized ? 0 : (isCollapsed ? 72 : 240)) : 0
         }}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
         className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden relative w-full"
       >
         <Navbar />
-        
+
         {/* Main Content Scroll Container */}
         {/* Outlet is rendered directly — no AnimatePresence wrapper to avoid exit-animation
             blocking the incoming page from becoming visible. */}

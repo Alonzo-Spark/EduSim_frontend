@@ -79,19 +79,35 @@ const FormulaPlayground: React.FC<{
       if (formula.derived_expressions && resultSymbol && formula.derived_expressions[resultSymbol]) {
         expr = formula.derived_expressions[resultSymbol];
       } else {
-        let clean = expr.replace(/[\$]/g, "");
-        clean = clean
-          .replace(/\\Delta\s*\{?([a-zA-Z])\}?/g, "Delta_$1")
-          .replace(/Delta\s*([a-zA-Z])/g, "Delta_$1")
-          .replace(/\s/g, "");
+        const clean = expr
+          .replace(/\$/g, "")
+          .replace(/\\approx|\\propto|approx|propto|≈|∝|\\le|\\ge|\\leq|\\geq|≤|≥/g, "=")
+          .trim();
         const parts = clean.split("=");
         expr = parts[1] || parts[0];
         expr = expr
           .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "($1)/($2)")
+          .replace(/\\sqrt\{([^}]+)\}/g, "sqrt($1)")
+          .replace(/_\{([^}]+)\}/g, (_, inner) => "_" + inner.replace(/,/g, "").replace(/\s/g, ""))
           .replace(/\\sin/g, "sin")
           .replace(/\\cos/g, "cos")
           .replace(/\\tan/g, "tan")
           .replace(/\\theta/g, "theta")
+          .replace(/\\omega/g, "omega")
+          .replace(/\\pi/g, "pi")
+          .replace(/\\phi/g, "phi")
+          .replace(/\\mu/g, "mu")
+          .replace(/\\lambda/g, "lambd")
+          .replace(/\\rho/g, "rho")
+          .replace(/\\epsilon/g, "epsilon")
+          .replace(/\\eta/g, "eta")
+          .replace(/\\tau/g, "tau")
+          .replace(/\\nu/g, "nu")
+          .replace(/\\sigma/g, "sigma")
+          .replace(/\\alpha/g, "alpha")
+          .replace(/\\beta/g, "beta")
+          .replace(/\\gamma/g, "gamma")
+          .replace(/\\Delta/g, "Delta")
           .replace(/\\cdot/g, "*")
           .replace(/\\times/g, "*")
           .replace(/\^/g, "**")
